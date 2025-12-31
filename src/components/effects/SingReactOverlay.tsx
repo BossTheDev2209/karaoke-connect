@@ -1,44 +1,42 @@
 import React from 'react';
 import { useAudioReactive } from '@/hooks/useAudioReactive';
+import { BeatSyncBackground } from './BeatSyncBackground';
 import { cn } from '@/lib/utils';
 
 interface SingReactOverlayProps {
   isPlaying: boolean;
   userId: string;
   channel: any | null;
+  targetBpm?: number;
   className?: string;
 }
 
 export const SingReactOverlay: React.FC<SingReactOverlayProps> = ({
   isPlaying,
+  targetBpm = 120,
   className,
 }) => {
-  const { intensity, isBeat } = useAudioReactive({
+  const { intensity, isBeat, beatPhase, lowFreq, midFreq, highFreq, bpm } = useAudioReactive({
     enabled: isPlaying,
-    sensitivity: 6,
-    smoothing: 0.7,
+    sensitivity: 7,
+    smoothing: 0.6,
+    targetBpm,
   });
 
   if (!isPlaying) return null;
 
   return (
     <div className={cn('pointer-events-none', className)}>
-      {/* Audio-reactive background pulse */}
-      <div 
-        className="absolute inset-0 transition-opacity duration-150"
-        style={{
-          background: `radial-gradient(ellipse at center bottom, hsl(var(--primary) / ${intensity * 0.15}), transparent 70%)`,
-          opacity: isPlaying ? 1 : 0,
-        }}
+      <BeatSyncBackground
+        isPlaying={isPlaying}
+        intensity={intensity}
+        beatPhase={beatPhase}
+        isBeat={isBeat}
+        lowFreq={lowFreq}
+        midFreq={midFreq}
+        highFreq={highFreq}
+        bpm={bpm}
       />
-      
-      {/* Beat flash effect */}
-      {isBeat && (
-        <div 
-          className="absolute inset-0 bg-primary/10 animate-pulse"
-          style={{ animationDuration: '150ms' }}
-        />
-      )}
     </div>
   );
 };
