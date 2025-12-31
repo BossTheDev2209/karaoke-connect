@@ -144,7 +144,7 @@ export const useYouTubePlayer = (
       const newPlayer = new window.YT.Player(containerId, {
         videoId,
         playerVars: {
-          autoplay: 0,
+          autoplay: 1,
           controls: 0,
           disablekb: 1,
           fs: 0,
@@ -156,11 +156,12 @@ export const useYouTubePlayer = (
           playsinline: 1,
         },
         events: {
-          onReady: () => {
+          onReady: (event: { target: YouTubePlayer }) => {
             isPlayerReady.current = true;
             isInitializing.current = false;
             setIsReady(true);
             setDuration(newPlayer.getDuration());
+            event.target.playVideo();
           },
           onStateChange: (event) => {
             const playing = event.data === window.YT.PlayerState.PLAYING;
