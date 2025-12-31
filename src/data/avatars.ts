@@ -47,7 +47,15 @@ export function avatarConfigToId(config: AvatarConfig): string {
 }
 
 // Parse avatar ID string back to config
-export function avatarIdToConfig(id: string): AvatarConfig {
+export function avatarIdToConfig(id: string | undefined | null): AvatarConfig {
+  if (!id || typeof id !== 'string') {
+    return {
+      bodyColor: 'purple',
+      hairStyle: 'short',
+      hairColor: 'black',
+      accessory: 'none',
+    };
+  }
   const [bodyColor, hairStyle, hairColor, accessory] = id.split('|');
   return {
     bodyColor: bodyColor || 'purple',
