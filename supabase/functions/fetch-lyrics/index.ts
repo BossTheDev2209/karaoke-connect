@@ -7,6 +7,70 @@ const corsHeaders = {
 
 const LRCLIB_API = 'https://lrclib.net/api';
 
+// Thai character range detection
+function containsThai(text: string): boolean {
+  return /[\u0E00-\u0E7F]/.test(text);
+}
+
+// Extract Thai text from mixed content
+function extractThai(text: string): string {
+  const matches = text.match(/[\u0E00-\u0E7F]+/g);
+  return matches ? matches.join(' ') : '';
+}
+
+// Extract non-Thai (romanized/English) text
+function extractNonThai(text: string): string {
+  return text
+    .replace(/[\u0E00-\u0E7F]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Common Thai artist name mappings to romanized versions
+const THAI_ARTIST_MAPPINGS: Record<string, string[]> = {
+  'ป้าง นครินทร์': ['Pang Nakarin', 'Pang'],
+  'บอดี้สแลม': ['Bodyslam', 'Body Slam'],
+  'โปเตโต้': ['Potato'],
+  'ลาบานูน': ['Labanoon'],
+  'บิ๊กแอส': ['Big Ass'],
+  'แสตมป์': ['Stamp', 'Stamp Apiwat'],
+  'พาราด็อกซ์': ['Paradox'],
+  'ซิลลี่ฟูลส์': ['Silly Fools'],
+  'สล็อตแมชชีน': ['Slot Machine'],
+  'คาราบาว': ['Carabao'],
+  'เบิร์ด ธงไชย': ['Bird Thongchai', 'Thongchai McIntyre'],
+  'ทาทา ยัง': ['Tata Young'],
+  'แอม สิริอร': ['Am Siriorn'],
+  'กอล์ฟ ฟักกลิ้ง': ['Golf Fuckling', 'Golf Pichaya'],
+  'หนุ่ม กะลา': ['Num Kala'],
+  'ด้าแน็ก': ['Da Endorphine', 'Endorphine'],
+  'พัลลีย์': ['Palmy'],
+  'มาลีฮวนน่า': ['Maleehuana'],
+  'อัสนี วสันต์': ['Asanee Wasan'],
+  'คริสติน่า อากีล่าร์': ['Christina Aguilar'],
+  'ไอซ์ ศรัณยู': ['Ice Sarunyu'],
+  'นิว จิ๋ว': ['New Jiew'],
+  'กัน นภัทร': ['Gun Napat'],
+  'โอม ค็อกเทล': ['Ohm Cocktail', 'Cocktail'],
+  'ไททาเนียม': ['Titanium'],
+  'แมว จิระศักดิ์': ['Mew Jirasakul'],
+  'ออฟ ปองศักดิ์': ['Off Pongsak'],
+};
+
+// Get romanized variations for Thai artist
+function getThaiArtistVariations(artist: string): string[] {
+  const variations: string[] = [];
+  
+  // Check direct mappings
+  for (const [thai, romanized] of Object.entries(THAI_ARTIST_MAPPINGS)) {
+    if (artist.includes(thai)) {
+      variations.push(...romanized);
+    }
+  }
+  
+  return variations;
+}
+
 // Clean YouTube-specific patterns from title
 function cleanTitle(title: string): string {
   return title
@@ -106,11 +170,12 @@ function extractPrimaryArtist(text: string): string {
   return text;
 }
 
-// Remove Korean/Japanese/Chinese text in parentheses (romanization kept)
+// Remove Korean/Japanese/Chinese/Thai text in parentheses (romanization kept)
 function removeAsianParentheses(text: string): string {
   return text
     .replace(/\([가-힣ㄱ-ㅎㅏ-ㅣ]+\)/g, '') // Korean
     .replace(/\([一-龯ぁ-んァ-ン]+\)/g, '') // Japanese/Chinese
+    .replace(/\([\u0E00-\u0E7F]+\)/g, '') // Thai
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -168,6 +233,67 @@ async function searchLRCLIB(trackName: string, artistName?: string): Promise<any
   }
 }
 
+// Generate Thai-specific search strategies
+function generateThaiSearchStrategies(
+  artist: string,
+  title: string,
+  cleanedArtist: string,
+  cleanedTitle: string
+): Array<{ track: string; artist: string | undefined }> {
+  const strategies: Array<{ track: string; artist: string | undefined }> = [];
+  
+  const hasThai = containsThai(artist) || containsThai(title);
+  
+  if (!hasThai) {
+    return strategies;
+  }
+  
+  console.log('Thai content detected, adding Thai-specific strategies');
+  
+  // Extract Thai and non-Thai parts
+  const thaiTitle = extractThai(title);
+  const romanizedTitle = extractNonThai(title);
+  const thaiArtist = extractThai(artist);
+  const romanizedArtist = extractNonThai(artist);
+  
+  // Get known romanizations for Thai artists
+  const artistVariations = getThaiArtistVariations(artist);
+  
+  // Strategy: Thai title only
+  if (thaiTitle) {
+    strategies.push({ track: thaiTitle, artist: undefined });
+    if (thaiArtist) {
+      strategies.push({ track: thaiTitle, artist: thaiArtist });
+    }
+  }
+  
+  // Strategy: Romanized title + romanized artist
+  if (romanizedTitle && romanizedArtist) {
+    strategies.push({ track: romanizedTitle, artist: romanizedArtist });
+  }
+  
+  // Strategy: Romanized title only
+  if (romanizedTitle) {
+    strategies.push({ track: romanizedTitle, artist: undefined });
+  }
+  
+  // Strategy: Use known artist romanizations
+  for (const romanizedVariation of artistVariations) {
+    if (romanizedTitle) {
+      strategies.push({ track: romanizedTitle, artist: romanizedVariation });
+    }
+    if (thaiTitle) {
+      strategies.push({ track: thaiTitle, artist: romanizedVariation });
+    }
+    strategies.push({ track: cleanedTitle, artist: romanizedVariation });
+  }
+  
+  // Strategy: Search with just cleaned title (no artist) - wider net
+  strategies.push({ track: cleanedTitle, artist: undefined });
+  
+  return strategies;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -199,8 +325,8 @@ serve(async (req) => {
     console.log(`Cleaned artist: "${cleanedArtist}" | Primary: "${primaryArtist}"`);
     console.log(`Cleaned title: "${cleanedTitle}" | Song name: "${songName}"`);
 
-    // Try multiple search strategies
-    const searchStrategies = [
+    // Base search strategies
+    const searchStrategies: Array<{ track: string; artist: string | undefined }> = [
       // Strategy 1: Extracted song name + cleaned artist
       { track: songName, artist: cleanedArtist },
       // Strategy 2: Cleaned title + cleaned artist  
@@ -214,6 +340,10 @@ serve(async (req) => {
       // Strategy 6: Cleaned title only
       { track: cleanedTitle, artist: undefined },
     ];
+    
+    // Add Thai-specific strategies
+    const thaiStrategies = generateThaiSearchStrategies(artist, title, cleanedArtist, cleanedTitle);
+    searchStrategies.push(...thaiStrategies);
 
     // Remove duplicate searches
     const uniqueSearches = searchStrategies.filter((search, index, self) => 
