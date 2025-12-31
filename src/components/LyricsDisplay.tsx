@@ -57,11 +57,14 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-muted-foreground animate-pulse flex items-center gap-2">
-          <Music className="w-5 h-5" />
-          <span>Loading lyrics...</span>
+      <div className="flex flex-col items-center justify-center h-full gap-3 px-8">
+        <div className="w-full max-w-xs">
+          <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-primary via-accent to-primary rounded-full animate-shimmer" 
+                 style={{ backgroundSize: '200% 100%', width: '100%' }} />
+          </div>
         </div>
+        <span className="text-xs text-muted-foreground">Loading lyrics...</span>
       </div>
     );
   }

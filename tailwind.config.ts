@@ -14,7 +14,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Outfit', 'sans-serif'],
+        sans: ['IBM Plex Sans Thai', 'sans-serif'],
         mono: ['Space Mono', 'monospace'],
       },
       colors: {
