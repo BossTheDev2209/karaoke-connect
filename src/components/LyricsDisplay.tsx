@@ -1,8 +1,7 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { LyricLine } from '@/types/karaoke';
 import { cn } from '@/lib/utils';
 import { Music } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 interface LyricsDisplayProps {
   lyrics: LyricLine[];
@@ -12,38 +11,17 @@ interface LyricsDisplayProps {
   error: string | null;
 }
 
-type DisplayMode = 'scroll' | 'focus';
-
 export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   lyrics,
   currentLineIndex,
-  currentTime,
   isLoading,
   error,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const activeLineRef = useRef<HTMLDivElement>(null);
-  const [displayMode, setDisplayMode] = useState<DisplayMode>('focus');
-
-  // Calculate progress through the current line (0 to 1)
-  const lineProgress = useMemo(() => {
-    if (currentLineIndex < 0 || currentLineIndex >= lyrics.length) return 0;
-    
-    const currentLine = lyrics[currentLineIndex];
-    const nextLine = lyrics[currentLineIndex + 1];
-    
-    const lineStartTime = currentLine.time;
-    const lineEndTime = nextLine ? nextLine.time : lineStartTime + 5; // Assume 5s if last line
-    const lineDuration = lineEndTime - lineStartTime;
-    
-    if (lineDuration <= 0) return 0;
-    
-    const elapsed = currentTime - lineStartTime;
-    return Math.max(0, Math.min(1, elapsed / lineDuration));
-  }, [currentTime, currentLineIndex, lyrics]);
 
   useEffect(() => {
-    if (displayMode === 'scroll' && activeLineRef.current && containerRef.current) {
+    if (activeLineRef.current && containerRef.current) {
       const container = containerRef.current;
       const activeLine = activeLineRef.current;
       
@@ -56,7 +34,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
         behavior: 'smooth',
       });
     }
-  }, [currentLineIndex, displayMode]);
+  }, [currentLineIndex]);
 
   if (isLoading) {
     return (
@@ -72,68 +50,17 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   if (error || lyrics.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-        <Music className="w-12 h-12 mb-4 opacity-50" />
-        <p>{error || 'No lyrics available'}</p>
-        <p className="text-sm mt-2">Sing along from memory!</p>
+        <Music className="w-8 h-8 mb-2 opacity-50" />
+        <p className="text-sm">{error || 'No lyrics available'}</p>
       </div>
     );
   }
 
-  // Focus mode - shows current, previous, and next lines
-  if (displayMode === 'focus') {
-    const prevLine = lyrics[currentLineIndex - 1];
-    const currentLine = lyrics[currentLineIndex];
-    const nextLine = lyrics[currentLineIndex + 1];
-
-    return (
-      <div className="h-full flex flex-col relative">
-        {/* Mode toggle */}
-        <div className="absolute top-2 right-2 z-10">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setDisplayMode('scroll')}
-            className="text-xs text-muted-foreground"
-          >
-            Show All
-          </Button>
-        </div>
-
-        {/* Focused lyrics - compact */}
-        <div className="flex-1 flex flex-col items-center justify-center px-4 text-center gap-2 overflow-hidden">
-
-          {/* Current line only */}
-          <p className="text-xl md:text-2xl font-bold text-primary leading-tight">
-            {currentLine?.text || '♫ ♫ ♫'}
-          </p>
-          {/* Next line hint */}
-          <p className="text-sm text-muted-foreground/50 truncate max-w-full">
-            {nextLine?.text || ''}
-          </p>
-
-        </div>
-      </div>
-    );
-  }
-
-  // Scroll mode - shows all lyrics with word highlighting on active line
   return (
-    <div className="h-full flex flex-col relative">
-      {/* Mode toggle */}
-      <div className="absolute top-2 right-2 z-10">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setDisplayMode('focus')}
-          className="text-xs text-muted-foreground"
-        >
-          Focus Mode
-        </Button>
-      </div>
-
+    <div className="h-full flex flex-col relative overflow-hidden">
       <div 
         ref={containerRef}
-        className="flex-1 overflow-y-auto scrollbar-hide px-4 py-8"
+        className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4"
       >
         <div className="space-y-1 text-center">
           {lyrics.map((line, index) => (
@@ -141,7 +68,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
               key={index}
               ref={index === currentLineIndex ? activeLineRef : null}
               className={cn(
-                'lyric-line',
+                'lyric-line transition-all duration-300',
                 index === currentLineIndex && 'active',
                 index < currentLineIndex && 'past'
               )}

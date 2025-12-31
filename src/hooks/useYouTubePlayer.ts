@@ -11,6 +11,7 @@ interface YouTubePlayer {
   unMute: () => void;
   loadVideoById: (videoId: string) => void;
   destroy: () => void;
+  getPlayerState: () => number;
 }
 
 interface UseYouTubePlayerReturn {
@@ -19,6 +20,7 @@ interface UseYouTubePlayerReturn {
   currentTime: number;
   duration: number;
   isPlaying: boolean;
+  hasEnded: boolean;
   play: () => void;
   pause: () => void;
   seekTo: (seconds: number) => void;
@@ -46,6 +48,8 @@ declare global {
         PLAYING: number;
         PAUSED: number;
         ENDED: number;
+        BUFFERING: number;
+        CUED: number;
       };
     };
     onYouTubeIframeAPIReady: () => void;
@@ -55,7 +59,8 @@ declare global {
 export const useYouTubePlayer = (
   containerId: string,
   videoId: string | null,
-  onStateChange?: (isPlaying: boolean) => void
+  onStateChange?: (isPlaying: boolean) => void,
+  onEnded?: () => void
 ): UseYouTubePlayerReturn => {
   const playerRef = useRef<YouTubePlayer | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -63,9 +68,16 @@ export const useYouTubePlayer = (
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [hasEnded, setHasEnded] = useState(false);
   const intervalRef = useRef<number>(0);
   const currentVideoIdRef = useRef<string | null>(null);
   const isPlayerReady = useRef(false);
+  const onEndedRef = useRef(onEnded);
+
+  // Keep onEnded ref updated
+  useEffect(() => {
+    onEndedRef.current = onEnded;
+  }, [onEnded]);
 
   // Load YouTube IFrame API
   useEffect(() => {
@@ -85,6 +97,7 @@ export const useYouTubePlayer = (
     if (playerRef.current && isPlayerReady.current) {
       if (currentVideoIdRef.current !== videoId) {
         currentVideoIdRef.current = videoId;
+        setHasEnded(false);
         playerRef.current.loadVideoById(videoId);
       }
       return;
@@ -116,11 +129,19 @@ export const useYouTubePlayer = (
           },
           onStateChange: (event) => {
             const playing = event.data === window.YT.PlayerState.PLAYING;
+            const ended = event.data === window.YT.PlayerState.ENDED;
+            
             setIsPlaying(playing);
+            setHasEnded(ended);
             onStateChange?.(playing);
             
             if (playing) {
               setDuration(newPlayer.getDuration());
+            }
+            
+            // Trigger onEnded callback when video ends
+            if (ended) {
+              onEndedRef.current?.();
             }
           },
         },
@@ -207,6 +228,7 @@ export const useYouTubePlayer = (
     currentTime,
     duration,
     isPlaying,
+    hasEnded,
     play,
     pause,
     seekTo,

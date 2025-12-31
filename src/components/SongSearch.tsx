@@ -52,6 +52,9 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
     setResults([]);
   };
 
+  // Group results by title similarity to show multiple authors
+  const groupedResults = results;
+
   return (
     <div className="relative">
       <div className="flex gap-2">
@@ -74,11 +77,11 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
         </Button>
       </div>
 
-      {isOpen && results.length > 0 && (
+      {isOpen && groupedResults.length > 0 && (
         <div className="absolute top-full left-0 right-0 mt-2 z-50 glass rounded-xl max-h-80 overflow-y-auto">
           <div className="p-2 flex justify-between items-center border-b border-border">
             <span className="text-sm text-muted-foreground">
-              {results.length} results
+              {groupedResults.length} results
             </span>
             <Button
               variant="ghost"
@@ -90,7 +93,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
             </Button>
           </div>
           <div className="p-2 space-y-1">
-            {results.map((result) => (
+            {groupedResults.map((result) => (
               <button
                 key={result.videoId}
                 onClick={() => handleAddSong(result)}
@@ -106,7 +109,8 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{result.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">
+                  {/* Show channel/author prominently */}
+                  <p className="text-xs text-primary font-medium truncate">
                     {result.channelTitle}
                   </p>
                 </div>

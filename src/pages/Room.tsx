@@ -42,7 +42,7 @@ const Room = () => {
   // Auto theme from thumbnail
   const autoColors = useThemeFromThumbnail(currentSong?.videoId || null, theme === 'auto');
 
-  // Apply theme CSS variables
+  // Apply theme CSS variables - update ALL theme colors
   useEffect(() => {
     const root = document.documentElement;
     
@@ -50,17 +50,28 @@ const Room = () => {
       root.style.setProperty('--neon-pink', autoColors.primary);
       root.style.setProperty('--neon-purple', autoColors.secondary);
       root.style.setProperty('--neon-blue', autoColors.accent);
+      root.style.setProperty('--primary', autoColors.secondary);
+      root.style.setProperty('--accent', autoColors.primary);
+      root.style.setProperty('--ring', autoColors.secondary);
     } else if (theme !== 'auto') {
       const styles = themeStyles[theme];
       Object.entries(styles).forEach(([key, value]) => {
         root.style.setProperty(key, value);
       });
+      // Also update primary/accent to match theme
+      root.style.setProperty('--primary', styles['--neon-purple']);
+      root.style.setProperty('--accent', styles['--neon-pink']);
+      root.style.setProperty('--ring', styles['--neon-purple']);
     }
 
     return () => {
+      // Reset to defaults on unmount
       root.style.removeProperty('--neon-pink');
       root.style.removeProperty('--neon-purple');
       root.style.removeProperty('--neon-blue');
+      root.style.removeProperty('--primary');
+      root.style.removeProperty('--accent');
+      root.style.removeProperty('--ring');
     };
   }, [theme, autoColors]);
 
@@ -71,7 +82,15 @@ const Room = () => {
     updatePlayback({ isPlaying });
   }, [updatePlayback]);
 
-  const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange);
+  // Auto-play next song when current ends
+  const handleVideoEnded = useCallback(() => {
+    if (queue.length > 1) {
+      const nextIndex = (playbackState.currentSongIndex + 1) % queue.length;
+      updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
+    }
+  }, [queue.length, playbackState.currentSongIndex, updatePlayback]);
+
+  const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded);
 
   const { lyrics, currentLineIndex, isLoading: lyricsLoading, error: lyricsError } = useLyrics(
     currentSong?.artist || null,
@@ -101,8 +120,19 @@ const Room = () => {
   };
 
   const handleNext = () => {
-    const nextIndex = (playbackState.currentSongIndex + 1) % queue.length;
-    updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
+    if (queue.length > 0) {
+      const nextIndex = (playbackState.currentSongIndex + 1) % queue.length;
+      updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
+    }
+  };
+
+  const handlePrevious = () => {
+    if (queue.length > 0) {
+      const prevIndex = playbackState.currentSongIndex > 0 
+        ? playbackState.currentSongIndex - 1 
+        : queue.length - 1;
+      updatePlayback({ currentSongIndex: prevIndex, currentTime: 0, isPlaying: true });
+    }
   };
 
   const handleAddSong = (song: Song) => {
@@ -150,11 +180,11 @@ const Room = () => {
         </div>
       </header>
 
-      {/* Main content */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4">
+      {/* Main content - Video takes priority */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Queue panel */}
-        <div className="lg:col-span-1 card-karaoke overflow-hidden flex flex-col">
-          <h3 className="font-semibold mb-3 text-neon-purple">Queue</h3>
+        <div className="lg:col-span-3 card-karaoke overflow-hidden flex flex-col">
+          <h3 className="font-semibold mb-3 text-primary">Queue</h3>
           <div className="mb-3">
             <SongSearch onAddSong={handleAddSong} userId={user.id} />
           </div>
@@ -163,9 +193,9 @@ const Room = () => {
           </div>
         </div>
 
-        {/* Video & Lyrics */}
-        <div className="lg:col-span-2 flex flex-col gap-4">
-          <div className="card-karaoke aspect-video relative">
+        {/* Video & Lyrics - Main focus */}
+        <div className="lg:col-span-6 flex flex-col gap-4">
+          <div className="card-karaoke aspect-video relative flex-1">
             <div id="youtube-player" className="w-full h-full rounded-lg overflow-hidden" />
             {!currentSong && (
               <div className="absolute inset-0 flex items-center justify-center bg-card/80 rounded-lg">
@@ -173,14 +203,14 @@ const Room = () => {
               </div>
             )}
           </div>
-          <div className="card-karaoke h-[120px] shrink-0">
+          <div className="card-karaoke h-[100px] shrink-0">
             <LyricsDisplay lyrics={lyrics} currentLineIndex={currentLineIndex} currentTime={currentTime} isLoading={lyricsLoading} error={lyricsError} />
           </div>
         </div>
 
         {/* Controls panel */}
-        <div className="lg:col-span-1 card-karaoke flex flex-col">
-          <h3 className="font-semibold mb-4 text-neon-pink">Now Playing</h3>
+        <div className="lg:col-span-3 card-karaoke flex flex-col">
+          <h3 className="font-semibold mb-4 text-primary">Now Playing</h3>
           {currentSong && (
             <div className="mb-4">
               <p className="font-medium truncate">{currentSong.title}</p>
@@ -194,8 +224,11 @@ const Room = () => {
             currentTime={currentTime}
             duration={duration}
             isMicEnabled={isMicEnabled}
+            canGoPrevious={queue.length > 0}
+            canGoNext={queue.length > 0}
             onPlayPause={handlePlayPause}
             onNext={handleNext}
+            onPrevious={handlePrevious}
             onSeek={handleSeek}
             onVolumeChange={handleVolumeChange}
             onMuteToggle={isMuted ? unmute : mute}

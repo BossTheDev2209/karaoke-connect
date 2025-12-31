@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AvatarPicker } from '@/components/AvatarPicker';
 import { generateRoomCode, isValidRoomCode } from '@/lib/roomCode';
+import { avatarConfigToId, generateRandomAvatar } from '@/data/avatars';
 import { Music, Users } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
@@ -11,7 +12,7 @@ const Index = () => {
   const navigate = useNavigate();
   const [mode, setMode] = useState<'home' | 'create' | 'join'>('home');
   const [nickname, setNickname] = useState('');
-  const [avatarId, setAvatarId] = useState(1);
+  const [avatarId, setAvatarId] = useState(() => avatarConfigToId(generateRandomAvatar()));
   const [roomCode, setRoomCode] = useState('');
 
   const handleCreate = () => {
@@ -67,7 +68,7 @@ const Index = () => {
           <h2 className="text-2xl font-bold mb-2">
             {mode === 'create' ? 'Create a Room' : 'Join a Room'}
           </h2>
-          <p className="text-muted-foreground text-sm">Pick your avatar and nickname</p>
+          <p className="text-muted-foreground text-sm">Customize your avatar and nickname</p>
         </div>
 
         <AvatarPicker selectedId={avatarId} onSelect={setAvatarId} />
