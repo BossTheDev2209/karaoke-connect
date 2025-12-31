@@ -3,28 +3,33 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 interface AudioReactiveState {
   intensity: number;      // 0-1 overall audio level
   isBeat: boolean;        // true during beat detection
+  beatPhase: number;      // 0-1 phase within beat cycle (for smooth animations)
   lowFreq: number;        // 0-1 bass level
   midFreq: number;        // 0-1 mid level
   highFreq: number;       // 0-1 treble level
+  bpm: number;            // estimated BPM
 }
 
 interface UseAudioReactiveOptions {
   enabled?: boolean;
   sensitivity?: number;   // 1-10, higher = more reactive
   smoothing?: number;     // 0-1, higher = smoother
+  targetBpm?: number;     // target BPM for simulation (default: 120)
 }
 
 export const useAudioReactive = (
   options: UseAudioReactiveOptions = {}
 ): AudioReactiveState & { isAnalyzing: boolean } => {
-  const { enabled = true, sensitivity = 5, smoothing = 0.8 } = options;
+  const { enabled = true, sensitivity = 5, smoothing = 0.8, targetBpm = 120 } = options;
   
   const [state, setState] = useState<AudioReactiveState>({
     intensity: 0,
     isBeat: false,
+    beatPhase: 0,
     lowFreq: 0,
     midFreq: 0,
     highFreq: 0,
+    bpm: targetBpm,
   });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   
@@ -34,6 +39,7 @@ export const useAudioReactive = (
   const animationRef = useRef<number | null>(null);
   const lastBeatTimeRef = useRef<number>(0);
   const prevIntensityRef = useRef<number>(0);
+  const startTimeRef = useRef<number>(0);
 
   const analyze = useCallback(() => {
     if (!analyserRef.current) return;
@@ -83,59 +89,62 @@ export const useAudioReactive = (
     setState({
       intensity,
       isBeat,
+      beatPhase: 0,
       lowFreq: Math.min(1, lowFreq),
       midFreq: Math.min(1, midFreq),
       highFreq: Math.min(1, highFreq),
+      bpm: targetBpm,
     });
     
     animationRef.current = requestAnimationFrame(analyze);
-  }, [sensitivity, smoothing]);
+  }, [sensitivity, smoothing, targetBpm]);
 
   useEffect(() => {
     if (!enabled) {
-      setState({ intensity: 0, isBeat: false, lowFreq: 0, midFreq: 0, highFreq: 0 });
+      setState({ intensity: 0, isBeat: false, beatPhase: 0, lowFreq: 0, midFreq: 0, highFreq: 0, bpm: targetBpm });
       setIsAnalyzing(false);
       return;
     }
 
-    // Find the YouTube iframe's audio
+    // Simulate BPM-synced audio reactivity
     const connectToYouTube = () => {
-      // YouTube doesn't expose its audio directly, so we'll use a simulated approach
-      // based on the video's playback state. For real audio analysis, we'd need
-      // to capture system audio which requires user permission.
+      startTimeRef.current = performance.now();
       
-      // For now, we'll create a simulated audio reactivity based on time
-      // This gives the visual effect without needing audio access
-      let phase = 0;
+      const msPerBeat = 60000 / targetBpm;
       
       const simulateAudio = () => {
-        phase += 0.05;
+        const now = performance.now();
+        const elapsed = now - startTimeRef.current;
         
-        // Create pseudo-random but smooth variations
-        const baseLow = (Math.sin(phase * 0.7) + 1) / 2;
-        const baseMid = (Math.sin(phase * 1.3 + 1) + 1) / 2;
-        const baseHigh = (Math.sin(phase * 2.1 + 2) + 1) / 2;
+        // Calculate beat phase (0-1, where 0 is the beat moment)
+        const beatPhase = (elapsed % msPerBeat) / msPerBeat;
         
-        // Add some randomness for more natural feel
-        const noise = Math.random() * 0.2;
+        // Detect beat at the start of each cycle
+        const isBeat = beatPhase < 0.08 && now - lastBeatTimeRef.current > msPerBeat * 0.8;
+        if (isBeat) lastBeatTimeRef.current = now;
         
-        const lowFreq = Math.min(1, baseLow * 0.8 + noise);
-        const midFreq = Math.min(1, baseMid * 0.6 + noise);
-        const highFreq = Math.min(1, baseHigh * 0.4 + noise);
+        // Create audio-like variations synced to beat
+        // Peak at beat (beatPhase = 0), decay afterward
+        const beatCurve = Math.exp(-beatPhase * 4); // Exponential decay from beat
+        
+        // Add some variation between beats
+        const noise = Math.random() * 0.1;
+        const variation = Math.sin(elapsed * 0.001) * 0.2;
+        
+        const lowFreq = Math.min(1, beatCurve * 0.8 + variation + noise);
+        const midFreq = Math.min(1, beatCurve * 0.5 + Math.sin(elapsed * 0.002) * 0.3 + noise);
+        const highFreq = Math.min(1, Math.sin(elapsed * 0.003) * 0.3 + noise);
         
         const intensity = (lowFreq * 0.5 + midFreq * 0.3 + highFreq * 0.2) * (sensitivity / 5);
-        
-        // Simulated beat on low frequency peaks
-        const now = performance.now();
-        const isBeat = lowFreq > 0.7 && now - lastBeatTimeRef.current > 400;
-        if (isBeat) lastBeatTimeRef.current = now;
         
         setState({
           intensity: Math.min(1, intensity),
           isBeat,
+          beatPhase,
           lowFreq,
           midFreq,
           highFreq,
+          bpm: targetBpm,
         });
         
         animationRef.current = requestAnimationFrame(simulateAudio);
@@ -159,7 +168,7 @@ export const useAudioReactive = (
       }
       setIsAnalyzing(false);
     };
-  }, [enabled, sensitivity, smoothing, analyze]);
+  }, [enabled, sensitivity, smoothing, targetBpm, analyze]);
 
   return { ...state, isAnalyzing };
 };
