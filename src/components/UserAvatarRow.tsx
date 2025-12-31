@@ -11,6 +11,7 @@ interface UserAvatarRowProps {
   audioIntensity?: number;
   beatPhase?: number;
   isBeat?: boolean;
+  bpm?: number;
 }
 
 export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({ 
@@ -20,6 +21,7 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
   audioIntensity = 0,
   beatPhase = 0,
   isBeat = false,
+  bpm = 120,
 }) => {
   // Sort to put current user first
   const sortedUsers = [...users].sort((a, b) => {
@@ -53,6 +55,7 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
                     intensity={audioIntensity}
                     beatPhase={beatPhase}
                     isBeat={isBeat}
+                    bpm={bpm}
                     size="sm"
                     className="transform -rotate-12"
                   />

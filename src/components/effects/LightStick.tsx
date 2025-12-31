@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 interface LightStickProps {
@@ -7,6 +7,7 @@ interface LightStickProps {
   intensity?: number; // 0-1 for audio reactivity
   beatPhase?: number; // 0-1 phase within beat cycle
   isBeat?: boolean;   // true on beat moment
+  bpm?: number;       // beats per minute for animation timing
   size?: 'sm' | 'md' | 'lg';
   className?: string;
 }
@@ -17,6 +18,7 @@ export const LightStick: React.FC<LightStickProps> = ({
   intensity = 0,
   beatPhase = 0,
   isBeat = false,
+  bpm = 120,
   size = 'md',
   className,
 }) => {
@@ -27,28 +29,51 @@ export const LightStick: React.FC<LightStickProps> = ({
   };
   
   const { width, height } = sizeConfig[size];
-  const glowIntensity = Math.max(0.3, intensity);
   
-  // Calculate wave rotation based on beat phase (synced to BPM)
-  // Swing from -20deg to +20deg following the beat
-  const beatWaveAngle = isWaving 
-    ? Math.sin(beatPhase * Math.PI * 2) * 20 
-    : 0;
+  // Calculate animation duration based on BPM
+  const beatDuration = useMemo(() => 60000 / bpm, [bpm]);
   
-  // Extra "pop" on beat
-  const beatScale = isBeat ? 1.1 : 1;
-  const beatGlow = isBeat ? 30 : 8 + intensity * 20;
+  // Glow intensity follows the beat decay curve
+  const beatDecay = Math.exp(-beatPhase * 4);
+  const glowIntensity = Math.max(0.3, 0.3 + beatDecay * 0.7 * intensity);
   
+  // Wave motion synced to beat - complete swing cycle per beat
+  // Use sine wave that peaks at different points in the beat cycle
+  const waveAngle = useMemo(() => {
+    if (!isWaving) return 0;
+    
+    // Swing follows beat: forward on beat, back after
+    // Creates a natural "pumping" motion synced to music
+    const swingPhase = beatPhase * 2 * Math.PI; // Full cycle per beat
+    const primarySwing = Math.sin(swingPhase) * 25; // Main swing ±25°
+    
+    // Add a smaller secondary oscillation for energy
+    const secondarySwing = Math.sin(swingPhase * 2) * 5;
+    
+    return primarySwing + secondarySwing;
+  }, [isWaving, beatPhase]);
+  
+  // Scale pop on beat with quick attack, slow decay
+  const beatScale = 1 + beatDecay * 0.15 * (isBeat ? 1.5 : 1);
+  
+  // Glow radius pulses with beat
+  const glowRadius = 8 + beatDecay * 25 * intensity;
+  const innerGlowOpacity = 0.3 + beatDecay * 0.5;
+  
+  // Slight y-translation on beat for "bounce" effect
+  const bounceY = beatDecay * -5 * intensity;
+
   return (
     <div
       className={cn(
-        'relative transition-all duration-75',
+        'relative',
         className
       )}
       style={{
         transformOrigin: 'bottom center',
-        transform: `rotate(${beatWaveAngle}deg) scale(${beatScale})`,
-        filter: `drop-shadow(0 0 ${beatGlow}px ${color})`,
+        transform: `rotate(${waveAngle}deg) scale(${beatScale}) translateY(${bounceY}px)`,
+        filter: `drop-shadow(0 0 ${glowRadius}px ${color})`,
+        transition: `transform ${beatDuration / 8}ms cubic-bezier(0.4, 0, 0.2, 1)`,
       }}
     >
       <svg
@@ -85,7 +110,7 @@ export const LightStick: React.FC<LightStickProps> = ({
           fill="hsl(var(--muted))"
         />
         
-        {/* Light bulb */}
+        {/* Light bulb - outer glow */}
         <ellipse
           cx="20"
           cy="30"
@@ -93,7 +118,20 @@ export const LightStick: React.FC<LightStickProps> = ({
           ry="28"
           fill={color}
           style={{
-            opacity: 0.7 + glowIntensity * 0.3,
+            opacity: 0.6 + glowIntensity * 0.4,
+          }}
+        />
+        
+        {/* Light bulb - mid layer pulsing */}
+        <ellipse
+          cx="20"
+          cy="28"
+          rx="13"
+          ry="23"
+          fill={color}
+          style={{
+            opacity: 0.7 + beatDecay * 0.3,
+            filter: `blur(${2 + beatDecay * 3}px)`,
           }}
         />
         
@@ -105,8 +143,19 @@ export const LightStick: React.FC<LightStickProps> = ({
           ry="18"
           fill="white"
           style={{
-            opacity: isBeat ? 0.8 : 0.3 + glowIntensity * 0.4,
-            transition: 'opacity 0.05s ease-out',
+            opacity: innerGlowOpacity,
+          }}
+        />
+        
+        {/* Core bright spot */}
+        <ellipse
+          cx="20"
+          cy="25"
+          rx="6"
+          ry="10"
+          fill="white"
+          style={{
+            opacity: 0.5 + beatDecay * 0.5,
           }}
         />
         
@@ -117,9 +166,19 @@ export const LightStick: React.FC<LightStickProps> = ({
           rx="4"
           ry="6"
           fill="white"
-          opacity="0.5"
+          opacity="0.6"
         />
       </svg>
+      
+      {/* External glow rays on beat */}
+      {isBeat && (
+        <div 
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `radial-gradient(ellipse 80% 60% at 50% 30%, ${color.replace(')', ' / 0.4)')}, transparent 50%)`,
+          }}
+        />
+      )}
     </div>
   );
 };

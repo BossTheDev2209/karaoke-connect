@@ -72,7 +72,7 @@ const Room = () => {
   const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded);
 
   // Audio reactive for light sticks (after isPlaying is defined)
-  const { intensity: audioIntensity, beatPhase, isBeat } = useAudioReactive({ enabled: isPlaying, sensitivity: 6, targetBpm: 120 });
+  const { intensity: audioIntensity, beatPhase, isBeat, bpm } = useAudioReactive({ enabled: isPlaying, sensitivity: 6, targetBpm: 120 });
 
   const remainingSeconds = duration > 0 ? Math.ceil(duration - currentTime) : null;
   const showCountdown = isPlaying && remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 5;
@@ -277,7 +277,7 @@ const Room = () => {
       </div>
 
       {/* User avatars */}
-      <UserAvatarRow users={users} currentUserId={user.id} wavingUsers={wavingUsers} audioIntensity={audioIntensity} beatPhase={beatPhase} isBeat={isBeat} />
+      <UserAvatarRow users={users} currentUserId={user.id} wavingUsers={wavingUsers} audioIntensity={audioIntensity} beatPhase={beatPhase} isBeat={isBeat} bpm={bpm} />
     </div>
   );
 };
