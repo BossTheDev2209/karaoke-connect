@@ -99,45 +99,18 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
           </Button>
         </div>
 
-        {/* Focused lyrics */}
-        <div className="flex-1 flex flex-col items-center justify-center px-4 text-center gap-6 overflow-hidden">
-          {/* Previous line */}
-          <div 
-            key={`prev-${currentLineIndex}`}
-            className="text-muted-foreground/40 text-lg animate-slide-up opacity-50"
-          >
-            {prevLine?.text || ''}
-          </div>
+        {/* Focused lyrics - compact */}
+        <div className="flex-1 flex flex-col items-center justify-center px-4 text-center gap-2 overflow-hidden">
 
-          {/* Current line - sentence highlighting */}
-          <div 
-            key={`current-${currentLineIndex}`}
-            className="animate-lyric-enter"
-          >
-            <p className="text-2xl md:text-3xl font-bold leading-relaxed text-primary">
-              {currentLine?.text || '♫ ♫ ♫'}
-            </p>
-          </div>
-
-          {/* Next line */}
-          <div 
-            key={`next-${currentLineIndex}`}
-            className="text-muted-foreground/60 text-lg animate-slide-up-delayed opacity-60"
-          >
+          {/* Current line only */}
+          <p className="text-xl md:text-2xl font-bold text-primary leading-tight">
+            {currentLine?.text || '♫ ♫ ♫'}
+          </p>
+          {/* Next line hint */}
+          <p className="text-sm text-muted-foreground/50 truncate max-w-full">
             {nextLine?.text || ''}
-          </div>
+          </p>
 
-          {/* Progress indicator */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-4">
-            <span>{currentLineIndex + 1}</span>
-            <div className="w-24 h-1 bg-muted rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-neon-purple to-neon-pink transition-all duration-300"
-                style={{ width: `${((currentLineIndex + 1) / lyrics.length) * 100}%` }}
-              />
-            </div>
-            <span>{lyrics.length}</span>
-          </div>
         </div>
       </div>
     );
