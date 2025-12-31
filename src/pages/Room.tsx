@@ -42,30 +42,38 @@ const Room = () => {
   // Auto theme from thumbnail
   const autoColors = useThemeFromThumbnail(currentSong?.videoId || null, theme === 'auto');
 
-  // Apply theme CSS variables - update ALL theme colors
+  // Apply theme CSS variables - update ALL theme colors including computed gradients/shadows
   useEffect(() => {
     const root = document.documentElement;
     
     // All theme-related CSS variables that should be updated
     const themeVars = [
       '--neon-pink', '--neon-purple', '--neon-blue',
-      '--primary', '--secondary', '--accent', '--ring'
+      '--primary', '--secondary', '--accent', '--ring',
+      '--gradient-neon', '--gradient-glow', '--shadow-neon', '--shadow-glow'
     ];
     
+    const applyTheme = (pink: string, purple: string, blue: string) => {
+      root.style.setProperty('--neon-pink', pink);
+      root.style.setProperty('--neon-purple', purple);
+      root.style.setProperty('--neon-blue', blue);
+      root.style.setProperty('--primary', purple);
+      root.style.setProperty('--secondary', blue);
+      root.style.setProperty('--accent', pink);
+      root.style.setProperty('--ring', purple);
+      
+      // Update computed gradient/shadow values
+      root.style.setProperty('--gradient-neon', `linear-gradient(135deg, hsl(${purple}), hsl(${pink}), hsl(${blue}))`);
+      root.style.setProperty('--gradient-glow', `radial-gradient(ellipse at center, hsl(${purple} / 0.3), transparent 70%)`);
+      root.style.setProperty('--shadow-neon', `0 0 20px hsl(${purple} / 0.5), 0 0 40px hsl(${pink} / 0.3)`);
+      root.style.setProperty('--shadow-glow', `0 4px 30px hsl(${purple} / 0.4)`);
+    };
+    
     if (theme === 'auto' && autoColors) {
-      root.style.setProperty('--neon-pink', autoColors.primary);
-      root.style.setProperty('--neon-purple', autoColors.secondary);
-      root.style.setProperty('--neon-blue', autoColors.accent);
-      root.style.setProperty('--primary', autoColors.secondary);
-      root.style.setProperty('--secondary', autoColors.accent);
-      root.style.setProperty('--accent', autoColors.primary);
-      root.style.setProperty('--ring', autoColors.secondary);
+      applyTheme(autoColors.primary, autoColors.secondary, autoColors.accent);
     } else if (theme !== 'auto') {
       const styles = themeStyles[theme];
-      // Apply all theme variables from the themeStyles object
-      Object.entries(styles).forEach(([key, value]) => {
-        root.style.setProperty(key, value);
-      });
+      applyTheme(styles['--neon-pink'], styles['--neon-purple'], styles['--neon-blue']);
     }
 
     return () => {
