@@ -12,7 +12,7 @@ import { SongQueue } from '@/components/SongQueue';
 import { SongSearch } from '@/components/SongSearch';
 import { UserAvatarRow } from '@/components/UserAvatarRow';
 import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
-import { RoomThemePicker } from '@/components/RoomThemePicker';
+import { RoomSettings } from '@/components/RoomSettings';
 import { CelebrationOverlay, getCurrentCelebration } from '@/components/effects/CelebrationOverlay';
 import { ReactionBar, FloatingReactions, useReactions, useWaving } from '@/components/Reactions';
 import { SingReactOverlay } from '@/components/effects/SingReactOverlay';
@@ -26,6 +26,7 @@ const Room = () => {
   const [user, setUser] = useState<User | null>(null);
   const [volume, setVolume] = useState(80);
   const [celebration] = useState(getCurrentCelebration());
+  const [celebrationEnabled, setCelebrationEnabled] = useState(true);
   
   // Theme context
   const { setVideoId } = useTheme();
@@ -143,7 +144,7 @@ const Room = () => {
   return (
     <div className="min-h-screen flex flex-col p-4 gap-4">
       {/* Celebration effects */}
-      <CelebrationOverlay theme={celebration} />
+      {celebrationEnabled && <CelebrationOverlay theme={celebration} />}
       
       {/* Floating reactions */}
       <FloatingReactions reactions={reactions} />
@@ -154,7 +155,10 @@ const Room = () => {
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-neon-green' : 'bg-destructive'}`} />
           <span className="text-sm text-muted-foreground">{users.length} online</span>
-          <RoomThemePicker />
+          <RoomSettings 
+            celebrationEnabled={celebrationEnabled} 
+            onCelebrationToggle={setCelebrationEnabled} 
+          />
           <Button variant="ghost" size="icon" onClick={handleLeave}>
             <LogOut className="w-4 h-4" />
           </Button>
