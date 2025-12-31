@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { LyricLine } from '@/types/karaoke';
 import { supabase } from '@/integrations/supabase/client';
+import { PreloadedLyrics } from './useLyricsPreload';
 
 interface UseLyricsReturn {
   lyrics: LyricLine[];
@@ -9,29 +10,69 @@ interface UseLyricsReturn {
   error: string | null;
   offset: number;
   setOffset: (offset: number) => void;
+  isSynced: boolean;
 }
 
 export const useLyrics = (
   artist: string | null,
   title: string | null,
-  currentTime: number
+  currentTime: number,
+  preloadedData?: PreloadedLyrics | null
 ): UseLyricsReturn => {
   const [lyrics, setLyrics] = useState<LyricLine[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSynced, setIsSynced] = useState(false);
   // Offset in seconds: positive = lyrics delayed (for lyrics ahead of audio)
   const [offset, setOffset] = useState(0);
 
   useEffect(() => {
     if (!artist || !title) {
       setLyrics([]);
+      setIsSynced(false);
       return;
     }
 
+    // Use preloaded data if available and loaded
+    if (preloadedData && preloadedData.status === 'loaded') {
+      console.log('Using preloaded lyrics for:', title);
+      setLyrics(preloadedData.lyrics);
+      setIsSynced(preloadedData.isSynced);
+      setError(null);
+      setIsLoading(false);
+      setOffset(0);
+      return;
+    }
+
+    // If preloaded data is not found
+    if (preloadedData && preloadedData.status === 'not_found') {
+      setLyrics([]);
+      setIsSynced(false);
+      setError('No lyrics found');
+      setIsLoading(false);
+      return;
+    }
+
+    // If preloaded data has error
+    if (preloadedData && preloadedData.status === 'error') {
+      setLyrics([]);
+      setIsSynced(false);
+      setError('Could not load lyrics');
+      setIsLoading(false);
+      return;
+    }
+
+    // If preloading is in progress, show loading state
+    if (preloadedData && preloadedData.status === 'loading') {
+      setIsLoading(true);
+      return;
+    }
+
+    // Fallback: fetch if no preloaded data (shouldn't happen often)
     const fetchLyrics = async () => {
       setIsLoading(true);
       setError(null);
-      setOffset(0); // Reset offset when loading new lyrics
+      setOffset(0);
 
       try {
         const { data, error: fnError } = await supabase.functions.invoke('fetch-lyrics', {
@@ -43,25 +84,31 @@ export const useLyrics = (
         if (data.syncedLyrics) {
           const parsed = parseSyncedLyrics(data.syncedLyrics);
           setLyrics(parsed);
+          setIsSynced(true);
         } else if (data.plainLyrics) {
-          // Split plain lyrics into lines for better display
           const lines = parsePlainLyrics(data.plainLyrics);
           setLyrics(lines);
+          setIsSynced(false);
         } else {
           setLyrics([]);
+          setIsSynced(false);
           setError('No lyrics found');
         }
       } catch (err) {
         console.error('Error fetching lyrics:', err);
         setError('Could not load lyrics');
         setLyrics([]);
+        setIsSynced(false);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchLyrics();
-  }, [artist, title]);
+    // Only fetch if no preload data at all
+    if (!preloadedData) {
+      fetchLyrics();
+    }
+  }, [artist, title, preloadedData]);
 
   const currentLineIndex = useMemo(() => {
     if (lyrics.length === 0) return -1;
@@ -77,7 +124,7 @@ export const useLyrics = (
     return -1;
   }, [lyrics, currentTime, offset]);
 
-  return { lyrics, currentLineIndex, isLoading, error, offset, setOffset };
+  return { lyrics, currentLineIndex, isLoading, error, offset, setOffset, isSynced };
 };
 
 // Parse LRC format: [mm:ss.xx] lyrics text
