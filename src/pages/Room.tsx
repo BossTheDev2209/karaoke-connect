@@ -5,6 +5,7 @@ import { useRoom } from '@/hooks/useRoom';
 import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
 import { useLyrics } from '@/hooks/useLyrics';
 import { useMicrophone } from '@/hooks/useMicrophone';
+import { useThemeFromThumbnail } from '@/hooks/useThemeFromThumbnail';
 import { LyricsDisplay } from '@/components/LyricsDisplay';
 import { PlayerControls } from '@/components/PlayerControls';
 import { SongQueue } from '@/components/SongQueue';
@@ -34,29 +35,38 @@ const Room = () => {
     }
   }, [navigate]);
 
+  const { users, queue, playbackState, isConnected, channel, updatePlayback, updateQueue, updateSpeaking, requestSync } = useRoom(code || '', user);
+  
+  const currentSong = queue[playbackState.currentSongIndex];
+  
+  // Auto theme from thumbnail
+  const autoColors = useThemeFromThumbnail(currentSong?.videoId || null, theme === 'auto');
+
   // Apply theme CSS variables
   useEffect(() => {
     const root = document.documentElement;
-    const styles = themeStyles[theme];
-    Object.entries(styles).forEach(([key, value]) => {
-      root.style.setProperty(key, value);
-    });
+    
+    if (theme === 'auto' && autoColors) {
+      root.style.setProperty('--neon-pink', autoColors.primary);
+      root.style.setProperty('--neon-purple', autoColors.secondary);
+      root.style.setProperty('--neon-blue', autoColors.accent);
+    } else if (theme !== 'auto') {
+      const styles = themeStyles[theme];
+      Object.entries(styles).forEach(([key, value]) => {
+        root.style.setProperty(key, value);
+      });
+    }
 
     return () => {
-      // Reset to default on unmount
-      Object.keys(styles).forEach((key) => {
-        root.style.removeProperty(key);
-      });
+      root.style.removeProperty('--neon-pink');
+      root.style.removeProperty('--neon-purple');
+      root.style.removeProperty('--neon-blue');
     };
-  }, [theme]);
+  }, [theme, autoColors]);
 
-  const { users, queue, playbackState, isConnected, channel, updatePlayback, updateQueue, updateSpeaking, requestSync } = useRoom(code || '', user);
-  
   // Reactions
   const { reactions, sendReaction } = useReactions(channel, user?.id || '');
 
-  const currentSong = queue[playbackState.currentSongIndex];
-  
   const handleStateChange = useCallback((isPlaying: boolean) => {
     updatePlayback({ isPlaying });
   }, [updatePlayback]);
