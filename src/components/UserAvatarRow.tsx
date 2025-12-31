@@ -2,6 +2,7 @@ import React from 'react';
 import { User } from '@/types/karaoke';
 import { UserAvatar } from './UserAvatar';
 import { LightStick, LIGHTSTICK_COLORS } from './effects/LightStick';
+import { VoteKickButton } from './VoteKick';
 import { cn } from '@/lib/utils';
 
 interface UserAvatarRowProps {
@@ -12,6 +13,8 @@ interface UserAvatarRowProps {
   beatPhase?: number;
   isBeat?: boolean;
   bpm?: number;
+  onStartVoteKick?: (user: User) => void;
+  voteKickDisabled?: boolean;
 }
 
 export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({ 
@@ -22,6 +25,8 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
   beatPhase = 0,
   isBeat = false,
   bpm = 120,
+  onStartVoteKick,
+  voteKickDisabled = false,
 }) => {
   // Sort to put current user first
   const sortedUsers = [...users].sort((a, b) => {
@@ -45,7 +50,19 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
           const color = getUserColor(user.id);
           
           return (
-            <div key={user.id} className="flex items-end gap-1">
+            <div key={user.id} className="flex items-end gap-1 group relative">
+              {/* Vote kick button */}
+              {onStartVoteKick && users.length > 2 && (
+                <div className="absolute -top-2 -right-2 z-10">
+                  <VoteKickButton
+                    user={user}
+                    currentUserId={currentUserId || ''}
+                    onStartVote={onStartVoteKick}
+                    disabled={voteKickDisabled}
+                  />
+                </div>
+              )}
+
               {/* Light stick on left side - synced to BPM */}
               {isWaving && (
                 <div className="relative -mr-2 z-10">

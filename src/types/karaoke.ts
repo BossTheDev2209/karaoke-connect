@@ -2,6 +2,8 @@ export interface User {
   id: string;
   nickname: string;
   avatarId: string; // Changed to string for human avatar customization
+  customAvatarNormal?: string; // Custom image URL when not speaking
+  customAvatarSpeaking?: string; // Custom image URL when speaking
   isSpeaking: boolean;
 }
 
@@ -26,6 +28,7 @@ export interface Song {
 export interface LyricLine {
   time: number;
   text: string;
+  romanization?: string; // Optional romanization for CJK lyrics
 }
 
 export interface PlaybackState {
@@ -60,7 +63,14 @@ export interface YouTubeChannel {
   videoCount: string;
 }
 
+export interface VoteKick {
+  targetUserId: string;
+  initiatorId: string;
+  votes: Set<string>; // User IDs who voted
+  createdAt: number;
+}
+
 export type RealtimePayload = {
-  type: 'playback_update' | 'queue_update' | 'speaking_update' | 'sync_request';
+  type: 'playback_update' | 'queue_update' | 'speaking_update' | 'sync_request' | 'vote_kick_start' | 'vote_kick_vote' | 'kick_user';
   payload: unknown;
 };
