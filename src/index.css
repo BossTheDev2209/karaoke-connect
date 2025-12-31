@@ -319,4 +319,18 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* Light stick wave animation */
+  @keyframes lightstick-wave {
+    0%, 100% {
+      transform: rotate(-15deg);
+    }
+    50% {
+      transform: rotate(15deg);
+    }
+  }
+
+  .animate-lightstick-wave {
+    animation: lightstick-wave 0.4s ease-in-out infinite;
+  }
 }

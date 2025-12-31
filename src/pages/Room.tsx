@@ -15,6 +15,7 @@ import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
 import { RoomThemePicker } from '@/components/RoomThemePicker';
 import { CelebrationOverlay, getCurrentCelebration } from '@/components/effects/CelebrationOverlay';
 import { ReactionBar, FloatingReactions, useReactions } from '@/components/Reactions';
+import { SingReactOverlay } from '@/components/effects/SingReactOverlay';
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -172,6 +173,14 @@ const Room = () => {
         <div className="lg:col-span-6 flex flex-col gap-4">
           <div className="card-karaoke aspect-video relative flex-1">
             <div id="youtube-player" className="w-full h-full rounded-lg overflow-hidden" />
+
+            {/* Sing React overlay with light sticks */}
+            <SingReactOverlay
+              isPlaying={isPlaying}
+              userId={user.id}
+              channel={channel}
+              className="absolute inset-0 rounded-lg overflow-hidden"
+            />
 
             {showCountdown && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
