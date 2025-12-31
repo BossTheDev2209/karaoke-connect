@@ -13,6 +13,7 @@ interface LyricsDisplayProps {
   offset?: number;
   onOffsetChange?: (offset: number) => void;
   areCaptionsEnabled?: boolean;
+  hasCaptionsAvailable?: boolean;
   onEnableCaptions?: () => void;
   onDisableCaptions?: () => void;
 }
@@ -25,6 +26,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   offset = 0,
   onOffsetChange,
   areCaptionsEnabled = false,
+  hasCaptionsAvailable = false,
   onEnableCaptions,
   onDisableCaptions,
 }) => {
@@ -69,7 +71,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
         <Music className="w-6 h-6 opacity-50" />
         <p className="text-sm">{error || 'No lyrics available'}</p>
-        {onEnableCaptions && (
+        {hasCaptionsAvailable && onEnableCaptions && (
           <Button
             variant="outline"
             size="sm"

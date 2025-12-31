@@ -35,6 +35,7 @@ interface UseYouTubePlayerReturn {
   enableCaptions: () => void;
   disableCaptions: () => void;
   areCaptionsEnabled: boolean;
+  hasCaptionsAvailable: boolean;
 }
 
 declare global {
@@ -77,6 +78,7 @@ export const useYouTubePlayer = (
   const [isMuted, setIsMuted] = useState(false);
   const [hasEnded, setHasEnded] = useState(false);
   const [areCaptionsEnabled, setAreCaptionsEnabled] = useState(false);
+  const [hasCaptionsAvailable, setHasCaptionsAvailable] = useState(false);
   const intervalRef = useRef<number>(0);
   const currentVideoIdRef = useRef<string | null>(null);
   const isPlayerReady = useRef(false);
@@ -105,6 +107,25 @@ export const useYouTubePlayer = (
     firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
   }, []);
 
+  const checkCaptionsAvailable = useCallback((player: YouTubePlayer) => {
+    try {
+      player.loadModule('captions');
+      // Small delay to let the module load
+      setTimeout(() => {
+        try {
+          const tracks = player.getOption('captions', 'tracklist');
+          const available = Array.isArray(tracks) && tracks.length > 0;
+          console.log('Captions available:', available, tracks);
+          setHasCaptionsAvailable(available);
+        } catch {
+          setHasCaptionsAvailable(false);
+        }
+      }, 500);
+    } catch {
+      setHasCaptionsAvailable(false);
+    }
+  }, []);
+
   const destroyPlayer = useCallback(() => {
     try {
       if (intervalRef.current) {
@@ -131,6 +152,8 @@ export const useYouTubePlayer = (
       setCurrentTime(0);
       setDuration(0);
       setIsMuted(false);
+      setAreCaptionsEnabled(false);
+      setHasCaptionsAvailable(false);
     } catch {
       // best-effort cleanup
     }
@@ -170,6 +193,10 @@ export const useYouTubePlayer = (
             setIsReady(true);
             setDuration(newPlayer.getDuration());
             newPlayer.playVideo();
+            // Check for captions availability after a short delay
+            setTimeout(() => {
+              checkCaptionsAvailable(newPlayer);
+            }, 1500);
           },
           onStateChange: (event) => {
             const playing = event.data === window.YT.PlayerState.PLAYING;
@@ -225,10 +252,18 @@ export const useYouTubePlayer = (
       endedHandledRef.current = false;
       setHasEnded(false);
       setCurrentTime(0);
+      setAreCaptionsEnabled(false);
+      setHasCaptionsAvailable(false);
       playerRef.current.loadVideoById(videoId);
       setIsPlaying(true);
+      // Check for captions on the new video
+      setTimeout(() => {
+        if (playerRef.current) {
+          checkCaptionsAvailable(playerRef.current);
+        }
+      }, 2000);
     }
-  }, [videoId]);
+  }, [videoId, checkCaptionsAvailable]);
 
   // Update current time periodically
   useEffect(() => {
@@ -336,5 +371,6 @@ export const useYouTubePlayer = (
     enableCaptions,
     disableCaptions,
     areCaptionsEnabled,
+    hasCaptionsAvailable,
   };
 };
