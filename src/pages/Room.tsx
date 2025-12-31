@@ -5,14 +5,14 @@ import { useRoom } from '@/hooks/useRoom';
 import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
 import { useLyrics } from '@/hooks/useLyrics';
 import { useMicrophone } from '@/hooks/useMicrophone';
-import { useThemeFromThumbnail } from '@/hooks/useThemeFromThumbnail';
+import { useTheme } from '@/contexts/ThemeContext';
 import { LyricsDisplay } from '@/components/LyricsDisplay';
 import { PlayerControls } from '@/components/PlayerControls';
 import { SongQueue } from '@/components/SongQueue';
 import { SongSearch } from '@/components/SongSearch';
 import { UserAvatarRow } from '@/components/UserAvatarRow';
 import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
-import { RoomThemePicker, RoomTheme, themeStyles } from '@/components/RoomThemePicker';
+import { RoomThemePicker } from '@/components/RoomThemePicker';
 import { CelebrationOverlay, getCurrentCelebration } from '@/components/effects/CelebrationOverlay';
 import { ReactionBar, FloatingReactions, useReactions } from '@/components/Reactions';
 import { LogOut } from 'lucide-react';
@@ -23,8 +23,10 @@ const Room = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [volume, setVolume] = useState(80);
-  const [theme, setTheme] = useState<RoomTheme>('neon');
   const [celebration] = useState(getCurrentCelebration());
+  
+  // Theme context
+  const { setVideoId } = useTheme();
 
   useEffect(() => {
     const stored = sessionStorage.getItem('karaoke_user');
@@ -39,48 +41,10 @@ const Room = () => {
   
   const currentSong = queue[playbackState.currentSongIndex];
   
-  // Auto theme from thumbnail
-  const autoColors = useThemeFromThumbnail(currentSong?.videoId || null, theme === 'auto');
-
-  // Apply theme CSS variables - update ALL theme colors including computed gradients/shadows
+  // Update theme context with current video ID for auto-theme
   useEffect(() => {
-    const root = document.documentElement;
-    
-    // All theme-related CSS variables that should be updated
-    const themeVars = [
-      '--neon-pink', '--neon-purple', '--neon-blue',
-      '--primary', '--secondary', '--accent', '--ring',
-      '--gradient-neon', '--gradient-glow', '--shadow-neon', '--shadow-glow'
-    ];
-    
-    const applyTheme = (pink: string, purple: string, blue: string) => {
-      root.style.setProperty('--neon-pink', pink);
-      root.style.setProperty('--neon-purple', purple);
-      root.style.setProperty('--neon-blue', blue);
-      root.style.setProperty('--primary', purple);
-      root.style.setProperty('--secondary', blue);
-      root.style.setProperty('--accent', pink);
-      root.style.setProperty('--ring', purple);
-      
-      // Update computed gradient/shadow values
-      root.style.setProperty('--gradient-neon', `linear-gradient(135deg, hsl(${purple}), hsl(${pink}), hsl(${blue}))`);
-      root.style.setProperty('--gradient-glow', `radial-gradient(ellipse at center, hsl(${purple} / 0.3), transparent 70%)`);
-      root.style.setProperty('--shadow-neon', `0 0 20px hsl(${purple} / 0.5), 0 0 40px hsl(${pink} / 0.3)`);
-      root.style.setProperty('--shadow-glow', `0 4px 30px hsl(${purple} / 0.4)`);
-    };
-    
-    if (theme === 'auto' && autoColors) {
-      applyTheme(autoColors.primary, autoColors.secondary, autoColors.accent);
-    } else if (theme !== 'auto') {
-      const styles = themeStyles[theme];
-      applyTheme(styles['--neon-pink'], styles['--neon-purple'], styles['--neon-blue']);
-    }
-
-    return () => {
-      // Reset all theme variables on unmount
-      themeVars.forEach(v => root.style.removeProperty(v));
-    };
-  }, [theme, autoColors]);
+    setVideoId(currentSong?.videoId || null);
+  }, [currentSong?.videoId, setVideoId]);
 
   // Reactions
   const { reactions, sendReaction } = useReactions(channel, user?.id || '');
@@ -184,7 +148,7 @@ const Room = () => {
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-neon-green' : 'bg-destructive'}`} />
           <span className="text-sm text-muted-foreground">{users.length} online</span>
-          <RoomThemePicker currentTheme={theme} onThemeChange={setTheme} />
+          <RoomThemePicker />
           <Button variant="ghost" size="icon" onClick={handleLeave}>
             <LogOut className="w-4 h-4" />
           </Button>
