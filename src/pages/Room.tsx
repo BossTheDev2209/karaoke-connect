@@ -14,8 +14,9 @@ import { UserAvatarRow } from '@/components/UserAvatarRow';
 import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
 import { RoomThemePicker } from '@/components/RoomThemePicker';
 import { CelebrationOverlay, getCurrentCelebration } from '@/components/effects/CelebrationOverlay';
-import { ReactionBar, FloatingReactions, useReactions } from '@/components/Reactions';
+import { ReactionBar, FloatingReactions, useReactions, useWaving } from '@/components/Reactions';
 import { SingReactOverlay } from '@/components/effects/SingReactOverlay';
+import { useAudioReactive } from '@/hooks/useAudioReactive';
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -47,8 +48,9 @@ const Room = () => {
     setVideoId(currentSong?.videoId || null);
   }, [currentSong?.videoId, setVideoId]);
 
-  // Reactions
+  // Reactions and waving
   const { reactions, sendReaction } = useReactions(channel, user?.id || '');
+  const { isWaving, toggleWaving, wavingUsers } = useWaving(channel, user?.id || '');
 
   const handleStateChange = useCallback((isPlaying: boolean) => {
     updatePlayback({ isPlaying });
@@ -66,6 +68,9 @@ const Room = () => {
   }, [queue.length, playbackState.currentSongIndex, updatePlayback]);
 
   const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded);
+
+  // Audio reactive for light sticks (after isPlaying is defined)
+  const { intensity: audioIntensity } = useAudioReactive({ enabled: isPlaying, sensitivity: 6 });
 
   const remainingSeconds = duration > 0 ? Math.ceil(duration - currentTime) : null;
   const showCountdown = isPlaying && remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 5;
@@ -248,13 +253,13 @@ const Room = () => {
           
           {/* Reactions */}
           <div className="mt-auto pt-4">
-            <ReactionBar onReact={sendReaction} />
+            <ReactionBar onReact={sendReaction} isWaving={isWaving} onWaveToggle={toggleWaving} />
           </div>
         </div>
       </div>
 
       {/* User avatars */}
-      <UserAvatarRow users={users} currentUserId={user.id} />
+      <UserAvatarRow users={users} currentUserId={user.id} wavingUsers={wavingUsers} audioIntensity={audioIntensity} />
     </div>
   );
 };
