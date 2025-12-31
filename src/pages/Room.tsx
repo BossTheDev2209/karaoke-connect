@@ -173,7 +173,7 @@ const Room = () => {
               </div>
             )}
           </div>
-          <div className="card-karaoke flex-1 min-h-[200px]">
+          <div className="card-karaoke h-[120px] shrink-0">
             <LyricsDisplay lyrics={lyrics} currentLineIndex={currentLineIndex} currentTime={currentTime} isLoading={lyricsLoading} error={lyricsError} />
           </div>
         </div>
