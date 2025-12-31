@@ -1,7 +1,8 @@
 import React, { useRef, useEffect } from 'react';
 import { LyricLine } from '@/types/karaoke';
 import { cn } from '@/lib/utils';
-import { Music } from 'lucide-react';
+import { Music, Minus, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface LyricsDisplayProps {
   lyrics: LyricLine[];
@@ -9,6 +10,8 @@ interface LyricsDisplayProps {
   currentTime: number;
   isLoading: boolean;
   error: string | null;
+  offset?: number;
+  onOffsetChange?: (offset: number) => void;
 }
 
 export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
@@ -16,6 +19,8 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   currentLineIndex,
   isLoading,
   error,
+  offset = 0,
+  onOffsetChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const activeLineRef = useRef<HTMLDivElement>(null);
@@ -35,6 +40,12 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
       });
     }
   }, [currentLineIndex]);
+
+  const adjustOffset = (delta: number) => {
+    if (onOffsetChange) {
+      onOffsetChange(offset + delta);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -58,6 +69,33 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
 
   return (
     <div className="h-full flex flex-col relative overflow-hidden">
+      {/* Offset controls - only show if synced lyrics exist */}
+      {lyrics.length > 1 && onOffsetChange && (
+        <div className="absolute top-1 right-1 z-10 flex items-center gap-1 bg-background/80 backdrop-blur rounded-lg px-1.5 py-0.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5"
+            onClick={() => adjustOffset(-0.5)}
+            title="Lyrics too slow (speed up)"
+          >
+            <Minus className="w-3 h-3" />
+          </Button>
+          <span className="text-[10px] font-mono min-w-[40px] text-center text-muted-foreground">
+            {offset > 0 ? '+' : ''}{offset.toFixed(1)}s
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5"
+            onClick={() => adjustOffset(0.5)}
+            title="Lyrics too fast (slow down)"
+          >
+            <Plus className="w-3 h-3" />
+          </Button>
+        </div>
+      )}
+      
       <div 
         ref={containerRef}
         className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4"

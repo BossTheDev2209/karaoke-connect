@@ -98,7 +98,7 @@ const Room = () => {
   const remainingSeconds = duration > 0 ? Math.ceil(duration - currentTime) : null;
   const showCountdown = isPlaying && remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 5;
 
-  const { lyrics, currentLineIndex, isLoading: lyricsLoading, error: lyricsError } = useLyrics(
+  const { lyrics, currentLineIndex, isLoading: lyricsLoading, error: lyricsError, offset: lyricsOffset, setOffset: setLyricsOffset } = useLyrics(
     currentSong?.artist || null,
     currentSong?.title || null,
     currentTime
@@ -222,7 +222,15 @@ const Room = () => {
             )}
           </div>
           <div className="card-karaoke h-[100px] shrink-0">
-            <LyricsDisplay lyrics={lyrics} currentLineIndex={currentLineIndex} currentTime={currentTime} isLoading={lyricsLoading} error={lyricsError} />
+            <LyricsDisplay 
+              lyrics={lyrics} 
+              currentLineIndex={currentLineIndex} 
+              currentTime={currentTime} 
+              isLoading={lyricsLoading} 
+              error={lyricsError}
+              offset={lyricsOffset}
+              onOffsetChange={setLyricsOffset}
+            />
           </div>
         </div>
 
