@@ -4,6 +4,7 @@ import { User, Song } from '@/types/karaoke';
 import { useRoom } from '@/hooks/useRoom';
 import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
 import { useLyrics } from '@/hooks/useLyrics';
+import { useLyricsPreload } from '@/hooks/useLyricsPreload';
 import { useMicrophone } from '@/hooks/useMicrophone';
 import { useTheme } from '@/contexts/ThemeContext';
 import { LyricsDisplay } from '@/components/LyricsDisplay';
@@ -81,6 +82,9 @@ const Room = () => {
     currentSong?.title || null,
     currentTime
   );
+
+  // Preload lyrics for queued songs
+  const { getStatusForSong } = useLyricsPreload(queue, playbackState.currentSongIndex);
 
   const handleSpeakingChange = useCallback((isSpeaking: boolean) => {
     updateSpeaking(isSpeaking);
@@ -174,7 +178,13 @@ const Room = () => {
             <SongSearch onAddSong={handleAddSong} userId={user.id} />
           </div>
           <div className="flex-1 overflow-y-auto">
-            <SongQueue queue={queue} currentIndex={playbackState.currentSongIndex} onRemove={handleRemoveSong} onSelect={handleSelectSong} />
+            <SongQueue 
+              queue={queue} 
+              currentIndex={playbackState.currentSongIndex} 
+              onRemove={handleRemoveSong} 
+              onSelect={handleSelectSong}
+              getLyricStatus={getStatusForSong}
+            />
           </div>
         </div>
 
