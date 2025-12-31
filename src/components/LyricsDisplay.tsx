@@ -81,21 +81,30 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
         </div>
 
         {/* Focused lyrics */}
-        <div className="flex-1 flex flex-col items-center justify-center px-4 text-center gap-4">
+        <div className="flex-1 flex flex-col items-center justify-center px-4 text-center gap-6 overflow-hidden">
           {/* Previous line */}
-          <div className="transition-all duration-500 text-muted-foreground/40 text-lg">
+          <div 
+            key={`prev-${currentLineIndex}`}
+            className="text-muted-foreground/40 text-lg animate-slide-up opacity-50"
+          >
             {prevLine?.text || ''}
           </div>
 
           {/* Current line */}
-          <div className="transition-all duration-300">
-            <p className="text-2xl md:text-3xl font-bold text-neon-pink glow-text leading-relaxed">
+          <div 
+            key={`current-${currentLineIndex}`}
+            className="animate-lyric-enter"
+          >
+            <p className="text-2xl md:text-3xl font-bold leading-relaxed lyric-line active">
               {currentLine?.text || '♪ ♪ ♪'}
             </p>
           </div>
 
           {/* Next line */}
-          <div className="transition-all duration-500 text-muted-foreground/60 text-lg">
+          <div 
+            key={`next-${currentLineIndex}`}
+            className="text-muted-foreground/60 text-lg animate-slide-up-delayed opacity-60"
+          >
             {nextLine?.text || ''}
           </div>
 
