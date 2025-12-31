@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { LyricLine } from '@/types/karaoke';
 import { cn } from '@/lib/utils';
-import { Music, Minus, Plus } from 'lucide-react';
+import { Music, Minus, Plus, Subtitles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface LyricsDisplayProps {
@@ -12,6 +12,9 @@ interface LyricsDisplayProps {
   error: string | null;
   offset?: number;
   onOffsetChange?: (offset: number) => void;
+  areCaptionsEnabled?: boolean;
+  onEnableCaptions?: () => void;
+  onDisableCaptions?: () => void;
 }
 
 export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
@@ -21,6 +24,9 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   error,
   offset = 0,
   onOffsetChange,
+  areCaptionsEnabled = false,
+  onEnableCaptions,
+  onDisableCaptions,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const activeLineRef = useRef<HTMLDivElement>(null);
@@ -60,9 +66,23 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
 
   if (error || lyrics.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-        <Music className="w-8 h-8 mb-2 opacity-50" />
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
+        <Music className="w-6 h-6 opacity-50" />
         <p className="text-sm">{error || 'No lyrics available'}</p>
+        {onEnableCaptions && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={areCaptionsEnabled ? onDisableCaptions : onEnableCaptions}
+            className={cn(
+              "flex items-center gap-1.5 text-xs",
+              areCaptionsEnabled && "bg-primary text-primary-foreground"
+            )}
+          >
+            <Subtitles className="w-3.5 h-3.5" />
+            {areCaptionsEnabled ? 'CC On' : 'Show YouTube CC'}
+          </Button>
+        )}
       </div>
     );
   }
