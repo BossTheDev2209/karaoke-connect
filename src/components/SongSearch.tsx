@@ -87,18 +87,16 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
       addedBy: userId,
     };
     onAddSong(song);
-    setIsOpen(false);
-    setQuery('');
-    setResults([]);
-    setChannels([]);
-    setSelectedChannel(null);
-    setChannelVideos([]);
+    // Don't close anything - let user continue browsing/adding songs
   };
 
   const handleClose = () => {
     setIsOpen(false);
     setSelectedChannel(null);
     setChannelVideos([]);
+    setQuery('');
+    setResults([]);
+    setChannels([]);
   };
 
   const handleTabChange = (tab: SearchTab) => {

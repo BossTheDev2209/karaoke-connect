@@ -12,6 +12,10 @@ interface YouTubePlayer {
   loadVideoById: (videoId: string) => void;
   destroy: () => void;
   getPlayerState: () => number;
+  // Caption methods
+  loadModule: (module: string) => void;
+  setOption: (module: string, option: string, value: unknown) => void;
+  getOption: (module: string, option: string) => unknown;
 }
 
 interface UseYouTubePlayerReturn {
@@ -28,6 +32,9 @@ interface UseYouTubePlayerReturn {
   mute: () => void;
   unmute: () => void;
   isMuted: boolean;
+  enableCaptions: () => void;
+  disableCaptions: () => void;
+  areCaptionsEnabled: boolean;
 }
 
 declare global {
@@ -69,7 +76,7 @@ export const useYouTubePlayer = (
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [hasEnded, setHasEnded] = useState(false);
-
+  const [areCaptionsEnabled, setAreCaptionsEnabled] = useState(false);
   const intervalRef = useRef<number>(0);
   const currentVideoIdRef = useRef<string | null>(null);
   const isPlayerReady = useRef(false);
@@ -154,14 +161,15 @@ export const useYouTubePlayer = (
           showinfo: 0,
           iv_load_policy: 3,
           playsinline: 1,
+          cc_load_policy: 0, // Don't load captions by default
         },
         events: {
-          onReady: (event: { target: YouTubePlayer }) => {
+          onReady: () => {
             isPlayerReady.current = true;
             isInitializing.current = false;
             setIsReady(true);
             setDuration(newPlayer.getDuration());
-            event.target.playVideo();
+            newPlayer.playVideo();
           },
           onStateChange: (event) => {
             const playing = event.data === window.YT.PlayerState.PLAYING;
@@ -282,6 +290,35 @@ export const useYouTubePlayer = (
     }
   }, []);
 
+  const enableCaptions = useCallback(() => {
+    if (playerRef.current && isPlayerReady.current) {
+      try {
+        playerRef.current.loadModule('captions');
+        playerRef.current.setOption('captions', 'track', { languageCode: 'en' });
+        setAreCaptionsEnabled(true);
+      } catch {
+        // Fallback: try to enable any available captions
+        try {
+          playerRef.current.loadModule('cc');
+          setAreCaptionsEnabled(true);
+        } catch {
+          console.log('Captions not available for this video');
+        }
+      }
+    }
+  }, []);
+
+  const disableCaptions = useCallback(() => {
+    if (playerRef.current && isPlayerReady.current) {
+      try {
+        playerRef.current.setOption('captions', 'track', {});
+        setAreCaptionsEnabled(false);
+      } catch {
+        // best effort
+      }
+    }
+  }, []);
+
   return {
     player: playerRef.current,
     isReady,
@@ -296,5 +333,8 @@ export const useYouTubePlayer = (
     mute,
     unmute,
     isMuted,
+    enableCaptions,
+    disableCaptions,
+    areCaptionsEnabled,
   };
 };

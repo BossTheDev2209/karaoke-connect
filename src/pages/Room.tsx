@@ -93,7 +93,7 @@ const Room = () => {
     }
   }, [queue.length, playbackState.currentSongIndex, updatePlayback]);
 
-  const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded);
+  const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded);
 
   const remainingSeconds = duration > 0 ? Math.ceil(duration - currentTime) : null;
   const showCountdown = isPlaying && remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 5;
@@ -230,6 +230,9 @@ const Room = () => {
               error={lyricsError}
               offset={lyricsOffset}
               onOffsetChange={setLyricsOffset}
+              areCaptionsEnabled={areCaptionsEnabled}
+              onEnableCaptions={enableCaptions}
+              onDisableCaptions={disableCaptions}
             />
           </div>
         </div>
