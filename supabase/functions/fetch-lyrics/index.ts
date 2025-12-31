@@ -6,6 +6,7 @@ const corsHeaders = {
 };
 
 const LRCLIB_API = 'https://lrclib.net/api';
+const GENIUS_API = 'https://api.genius.com';
 
 // Thai character range detection
 function containsThai(text: string): boolean {
@@ -55,7 +56,6 @@ const THAI_ARTIST_MAPPINGS: Record<string, string[]> = {
   'ไททาเนียม': ['Titanium'],
   'แมว จิระศักดิ์': ['Mew Jirasakul'],
   'ออฟ ปองศักดิ์': ['Off Pongsak'],
-  // Additional popular Thai artists
   "AYLA's": ["AYLA", "Ayla"],
   "Jeff Satur": ["Jeff Satur", "Jeff"],
   'ต้น ธนษิต': ['Ton Thanasit'],
@@ -73,7 +73,6 @@ const THAI_ARTIST_MAPPINGS: Record<string, string[]> = {
 function getThaiArtistVariations(artist: string): string[] {
   const variations: string[] = [];
   
-  // Check direct mappings
   for (const [thai, romanized] of Object.entries(THAI_ARTIST_MAPPINGS)) {
     if (artist.includes(thai)) {
       variations.push(...romanized);
@@ -86,7 +85,6 @@ function getThaiArtistVariations(artist: string): string[] {
 // Clean YouTube-specific patterns from title
 function cleanTitle(title: string): string {
   return title
-    // Remove content in brackets/parentheses with common YouTube tags
     .replace(/\[Official\s*(Music\s*)?Video\]/gi, '')
     .replace(/\[Official\s*MV\]/gi, '')
     .replace(/\[MV\]/gi, '')
@@ -115,24 +113,42 @@ function cleanTitle(title: string): string {
     .replace(/\(\d+K\)/gi, '')
     .replace(/\(HD\)/gi, '')
     .replace(/\(HQ\)/gi, '')
-    // Remove common suffixes
     .replace(/Official\s*(Music\s*)?Video/gi, '')
     .replace(/Official\s*MV/gi, '')
     .replace(/Music\s*Video/gi, '')
     .replace(/Lyric\s*Video/gi, '')
-    .replace(/\|\s*.*$/g, '') // Remove everything after |
-    .replace(/#\w+/g, '') // Remove hashtags
-    // Remove quotes around song names
+    .replace(/Official\s*English\s*Lyrics/gi, '')
+    .replace(/English\s*Lyrics/gi, '')
+    .replace(/Full\s*Lyrics/gi, '')
+    .replace(/\|\s*.*$/g, '')
+    .replace(/#\w+/g, '')
     .replace(/[''""]/g, "'")
     .replace(/'([^']+)'/g, '$1')
-    // Clean up whitespace
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+// Extract the FIRST part before any dash (usually the actual song name)
+function extractFirstPart(title: string): string {
+  const parts = title.split(/\s*[-–—]\s*/);
+  if (parts.length > 0 && parts[0].trim().length >= 2) {
+    return parts[0].trim();
+  }
+  return title;
 }
 
 // Extract song name from title (often in quotes or after dash)
 function extractSongName(title: string, artist?: string): string {
   const cleanedTitle = cleanTitle(title);
+  
+  // First try: extract the first part before any dash
+  const firstPart = extractFirstPart(cleanedTitle);
+  if (firstPart && firstPart.length >= 2 && firstPart !== cleanedTitle) {
+    // Make sure it's not just the artist name
+    if (!artist || similarity(firstPart, artist) < 0.7) {
+      return firstPart;
+    }
+  }
   
   // For Thai songs: extract the Thai portion as the primary song name
   if (containsThai(cleanedTitle)) {
@@ -142,7 +158,7 @@ function extractSongName(title: string, artist?: string): string {
     }
   }
   
-  // Try to find quoted song name first
+  // Try to find quoted song name
   const quotedMatch = cleanedTitle.match(/[''""]([^''""\(\)]+)[''""]/) ||
                       cleanedTitle.match(/'([^'\(\)]+)'/) ||
                       cleanedTitle.match(/"([^"\(\)]+)"/);
@@ -150,13 +166,11 @@ function extractSongName(title: string, artist?: string): string {
     return quotedMatch[1].trim();
   }
   
-  // Try "Artist - Song" format, but make sure we don't extract artist name as song
+  // Try "Artist - Song" format
   const dashMatch = cleanedTitle.match(/[-–—]\s*(.+?)(?:\s*[\(\[\|]|$)/);
   if (dashMatch) {
     const extracted = dashMatch[1].trim();
-    // If extracted looks like artist name (same as channel), skip it
     if (artist && similarity(extracted, artist) > 0.7) {
-      // Try the part before the dash instead
       const beforeDash = cleanedTitle.split(/[-–—]/)[0].trim();
       if (beforeDash && beforeDash.length > 2) {
         return beforeDash;
@@ -183,7 +197,7 @@ function cleanArtist(artist: string): string {
 function removeFeaturing(text: string): string {
   return text
     .replace(/\s*[\(\[]?\s*(?:feat\.?|ft\.?|featuring|with|prod\.?\s*by|×|x)\s+[^\)\]]+[\)\]]?/gi, '')
-    .replace(/\s*&\s+[^-\(\[]+$/gi, '') // Remove "& Artist" at end
+    .replace(/\s*&\s+[^-\(\[]+$/gi, '')
     .trim();
 }
 
@@ -193,7 +207,6 @@ function extractPrimaryArtist(text: string): string {
   if (match) {
     return match[1].trim();
   }
-  // Handle "Artist1 & Artist2" - take first
   const ampMatch = text.match(/^([^&]+?)\s*&/);
   if (ampMatch) {
     return ampMatch[1].trim();
@@ -201,12 +214,12 @@ function extractPrimaryArtist(text: string): string {
   return text;
 }
 
-// Remove Korean/Japanese/Chinese/Thai text in parentheses (romanization kept)
+// Remove Korean/Japanese/Chinese/Thai text in parentheses
 function removeAsianParentheses(text: string): string {
   return text
-    .replace(/\([가-힣ㄱ-ㅎㅏ-ㅣ]+\)/g, '') // Korean
-    .replace(/\([一-龯ぁ-んァ-ン]+\)/g, '') // Japanese/Chinese
-    .replace(/\([\u0E00-\u0E7F]+\)/g, '') // Thai
+    .replace(/\([가-힣ㄱ-ㅎㅏ-ㅣ]+\)/g, '')
+    .replace(/\([一-龯ぁ-んァ-ン]+\)/g, '')
+    .replace(/\([\u0E00-\u0E7F]+\)/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -219,7 +232,6 @@ function similarity(s1: string, s2: string): number {
   if (str1 === str2) return 1;
   if (str1.includes(str2) || str2.includes(str1)) return 0.8;
   
-  // Simple word overlap score
   const words1 = str1.split(/\s+/);
   const words2 = str2.split(/\s+/);
   const commonWords = words1.filter(w => words2.some(w2 => w2.includes(w) || w.includes(w2)));
@@ -228,11 +240,10 @@ function similarity(s1: string, s2: string): number {
 }
 
 // Score a result based on how well it matches our query
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function scoreResult(result: any, queryArtist: string, queryTitle: string): number {
   const artistScore = similarity(result.artistName || '', queryArtist);
   const titleScore = similarity(result.trackName || '', queryTitle);
-  const hasSynced = result.syncedLyrics ? 0.5 : 0; // Bonus for synced lyrics
+  const hasSynced = result.syncedLyrics ? 0.5 : 0;
   
   return (artistScore * 0.4) + (titleScore * 0.4) + hasSynced;
 }
@@ -264,6 +275,88 @@ async function searchLRCLIB(trackName: string, artistName?: string): Promise<any
   }
 }
 
+// Search Genius API for lyrics
+async function searchGenius(query: string, apiKey: string): Promise<{ lyrics: string | null; artist: string | null; title: string | null }> {
+  console.log(`Searching Genius: "${query}"`);
+  
+  try {
+    const searchUrl = new URL(`${GENIUS_API}/search`);
+    searchUrl.searchParams.set('q', query);
+
+    const response = await fetch(searchUrl.toString(), {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      console.error('Genius search failed:', response.status);
+      return { lyrics: null, artist: null, title: null };
+    }
+
+    const data = await response.json();
+    const hits = data.response?.hits || [];
+    
+    if (hits.length === 0) {
+      console.log('No Genius results found');
+      return { lyrics: null, artist: null, title: null };
+    }
+
+    // Get the first result
+    const firstHit = hits[0].result;
+    const songPath = firstHit.path;
+    const artist = firstHit.primary_artist?.name || null;
+    const title = firstHit.title || null;
+    
+    console.log(`Genius found: "${artist}" - "${title}"`);
+
+    // Fetch the actual lyrics page and scrape
+    const lyricsUrl = `https://genius.com${songPath}`;
+    const lyricsResponse = await fetch(lyricsUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    });
+
+    if (!lyricsResponse.ok) {
+      console.error('Failed to fetch Genius lyrics page');
+      return { lyrics: null, artist, title };
+    }
+
+    const html = await lyricsResponse.text();
+    
+    // Extract lyrics from Genius HTML
+    // Look for data-lyrics-container="true" divs
+    const lyricsMatch = html.match(/data-lyrics-container="true"[^>]*>([\s\S]*?)<\/div>/g);
+    
+    if (!lyricsMatch) {
+      console.log('Could not parse Genius lyrics from HTML');
+      return { lyrics: null, artist, title };
+    }
+
+    // Clean up the extracted lyrics
+    let lyrics = lyricsMatch
+      .join('\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#x27;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\[.*?\]/g, '') // Remove section headers like [Verse 1]
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    console.log(`Genius lyrics extracted: ${lyrics.length} chars`);
+    return { lyrics, artist, title };
+  } catch (err) {
+    console.error('Genius fetch error:', err);
+    return { lyrics: null, artist: null, title: null };
+  }
+}
+
 // Generate Thai-specific search strategies
 function generateThaiSearchStrategies(
   artist: string,
@@ -281,10 +374,8 @@ function generateThaiSearchStrategies(
   
   console.log('Thai content detected, adding Thai-specific strategies');
   
-  // Extract Thai and non-Thai parts from title
   const thaiTitle = extractThai(title);
   const romanizedTitle = extractNonThai(title)
-    // Remove artist name from romanized title if present
     .replace(new RegExp(cleanedArtist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '')
     .replace(/^[-–—\s]+|[-–—\s]+$/g, '')
     .trim();
@@ -292,24 +383,18 @@ function generateThaiSearchStrategies(
   const thaiArtist = extractThai(artist);
   const romanizedArtist = extractNonThai(artist);
   
-  // Get known romanizations for Thai artists
   const artistVariations = getThaiArtistVariations(artist);
   
-  // PRIORITY: Thai title with Thai/romanized artist - most accurate for Thai songs
   if (thaiTitle && thaiTitle.length >= 3) {
-    // First try with specific artist
     if (thaiArtist) {
       strategies.push({ track: thaiTitle, artist: thaiArtist });
     }
     if (romanizedArtist && romanizedArtist !== thaiArtist) {
       strategies.push({ track: thaiTitle, artist: romanizedArtist });
     }
-    // Then try without artist (broader but might find Thai databases)
     strategies.push({ track: thaiTitle, artist: undefined });
   }
   
-  // Try romanized version of title (English in parentheses)
-  // Extract English from parentheses like "(Vanishing)" or "(Can I ask?)"
   const englishInParens = title.match(/\(([A-Za-z][^)]*)\)/);
   if (englishInParens) {
     const englishTitle = englishInParens[1].trim();
@@ -321,12 +406,10 @@ function generateThaiSearchStrategies(
     }
   }
   
-  // Strategy: Romanized title + romanized artist
   if (romanizedTitle && romanizedTitle.length >= 3 && romanizedArtist) {
     strategies.push({ track: romanizedTitle, artist: romanizedArtist });
   }
   
-  // Strategy: Use known artist romanizations
   for (const romanizedVariation of artistVariations) {
     if (thaiTitle && thaiTitle.length >= 3) {
       strategies.push({ track: thaiTitle, artist: romanizedVariation });
@@ -364,25 +447,31 @@ serve(async (req) => {
     
     const cleanedTitle = cleanTitle(title);
     const songName = extractSongName(title, cleanedArtist);
+    const firstPart = extractFirstPart(cleanedTitle);
     const titleNoFeat = removeFeaturing(cleanedTitle);
     const titleNoAsian = removeAsianParentheses(cleanedTitle);
 
     console.log(`Cleaned artist: "${cleanedArtist}" | Primary: "${primaryArtist}"`);
-    console.log(`Cleaned title: "${cleanedTitle}" | Song name: "${songName}"`);
+    console.log(`Cleaned title: "${cleanedTitle}" | Song name: "${songName}" | First part: "${firstPart}"`);
 
-    // Base search strategies
+    // IMPROVED: Search strategies - prioritize simple song name first
     const searchStrategies: Array<{ track: string; artist: string | undefined }> = [
-      // Strategy 1: Extracted song name + cleaned artist
+      // Strategy 0: PRIORITY - Just the first part of the title (before any dash)
+      { track: firstPart, artist: undefined },
+      // Strategy 1: First part + any artist variation
+      { track: firstPart, artist: cleanedArtist },
+      { track: firstPart, artist: primaryArtist },
+      // Strategy 2: Extracted song name + cleaned artist
       { track: songName, artist: cleanedArtist },
-      // Strategy 2: Cleaned title + cleaned artist  
+      // Strategy 3: Cleaned title + cleaned artist  
       { track: cleanedTitle, artist: cleanedArtist },
-      // Strategy 3: Title without featuring + primary artist
+      // Strategy 4: Title without featuring + primary artist
       { track: titleNoFeat, artist: primaryArtist },
-      // Strategy 4: Title without Asian text + artist without Asian text
+      // Strategy 5: Title without Asian text + artist without Asian text
       { track: titleNoAsian, artist: artistNoAsian },
-      // Strategy 5: Just the song name (broader search)
+      // Strategy 6: Just the song name (broader search)
       { track: songName, artist: undefined },
-      // Strategy 6: Cleaned title only
+      // Strategy 7: Cleaned title only
       { track: cleanedTitle, artist: undefined },
     ];
     
@@ -397,7 +486,6 @@ serve(async (req) => {
       )
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let allResults: any[] = [];
 
     for (const search of uniqueSearches) {
@@ -406,8 +494,6 @@ serve(async (req) => {
       const results = await searchLRCLIB(search.track, search.artist);
       if (results.length > 0) {
         allResults = [...allResults, ...results];
-        // If we found results with synced lyrics, we can stop
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (results.some((r: any) => r.syncedLyrics)) {
           console.log(`Found synced lyrics on strategy: track="${search.track}" artist="${search.artist || 'any'}"`);
           break;
@@ -415,38 +501,73 @@ serve(async (req) => {
       }
     }
 
-    if (allResults.length === 0) {
-      console.log('No lyrics found after all strategies');
+    // If LRCLIB found results, use them
+    if (allResults.length > 0) {
+      const uniqueResults = allResults.filter((result, index, self) =>
+        index === self.findIndex(r => r.id === result.id)
+      );
+
+      const scoredResults = uniqueResults.map(result => ({
+        ...result,
+        score: scoreResult(result, cleanedArtist, songName || cleanedTitle)
+      })).sort((a, b) => b.score - a.score);
+
+      const bestMatch = scoredResults[0];
+
+      console.log(`Found ${uniqueResults.length} unique results, best match score: ${bestMatch.score.toFixed(2)}`);
+      console.log(`Best match: "${bestMatch.artistName}" - "${bestMatch.trackName}"`);
+      console.log(`Has synced: ${!!bestMatch.syncedLyrics}, Has plain: ${!!bestMatch.plainLyrics}`);
+
       return new Response(
-        JSON.stringify({ syncedLyrics: null, plainLyrics: null }),
+        JSON.stringify({
+          syncedLyrics: bestMatch.syncedLyrics || null,
+          plainLyrics: bestMatch.plainLyrics || null,
+          trackName: bestMatch.trackName,
+          artistName: bestMatch.artistName,
+          source: 'lrclib',
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Remove duplicates by ID
-    const uniqueResults = allResults.filter((result, index, self) =>
-      index === self.findIndex(r => r.id === result.id)
-    );
+    // FALLBACK: Try Genius API
+    console.log('LRCLIB found nothing, trying Genius API...');
+    const geniusApiKey = Deno.env.get('GENIUS_API_KEY');
+    
+    if (geniusApiKey) {
+      // Try multiple Genius search queries
+      const geniusQueries = [
+        firstPart, // Just song name
+        `${firstPart} ${primaryArtist}`, // Song + artist
+        songName,
+        `${songName} ${cleanedArtist}`,
+      ].filter((q, i, arr) => q && q.length >= 2 && arr.indexOf(q) === i);
 
-    // Score and sort results
-    const scoredResults = uniqueResults.map(result => ({
-      ...result,
-      score: scoreResult(result, cleanedArtist, songName || cleanedTitle)
-    })).sort((a, b) => b.score - a.score);
+      for (const query of geniusQueries) {
+        const geniusResult = await searchGenius(query, geniusApiKey);
+        
+        if (geniusResult.lyrics) {
+          console.log(`Genius found lyrics for: "${geniusResult.artist}" - "${geniusResult.title}"`);
+          return new Response(
+            JSON.stringify({
+              syncedLyrics: null,
+              plainLyrics: geniusResult.lyrics,
+              trackName: geniusResult.title,
+              artistName: geniusResult.artist,
+              source: 'genius',
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+      console.log('Genius also found nothing');
+    } else {
+      console.log('GENIUS_API_KEY not configured, skipping Genius fallback');
+    }
 
-    const bestMatch = scoredResults[0];
-
-    console.log(`Found ${uniqueResults.length} unique results, best match score: ${bestMatch.score.toFixed(2)}`);
-    console.log(`Best match: "${bestMatch.artistName}" - "${bestMatch.trackName}"`);
-    console.log(`Has synced: ${!!bestMatch.syncedLyrics}, Has plain: ${!!bestMatch.plainLyrics}`);
-
+    console.log('No lyrics found after all strategies');
     return new Response(
-      JSON.stringify({
-        syncedLyrics: bestMatch.syncedLyrics || null,
-        plainLyrics: bestMatch.plainLyrics || null,
-        trackName: bestMatch.trackName,
-        artistName: bestMatch.artistName,
-      }),
+      JSON.stringify({ syncedLyrics: null, plainLyrics: null }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
