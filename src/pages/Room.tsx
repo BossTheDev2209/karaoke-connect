@@ -82,11 +82,14 @@ const Room = () => {
     updatePlayback({ isPlaying });
   }, [updatePlayback]);
 
-  // Auto-play next song when current ends
+  // Auto-play next song when current ends (no looping)
   const handleVideoEnded = useCallback(() => {
-    if (queue.length > 1) {
-      const nextIndex = (playbackState.currentSongIndex + 1) % queue.length;
+    const nextIndex = playbackState.currentSongIndex + 1;
+    if (nextIndex < queue.length) {
       updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
+    } else {
+      // End of queue - stop playing
+      updatePlayback({ isPlaying: false });
     }
   }, [queue.length, playbackState.currentSongIndex, updatePlayback]);
 
