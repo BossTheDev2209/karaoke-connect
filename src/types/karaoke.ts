@@ -1,8 +1,16 @@
 export interface User {
   id: string;
   nickname: string;
-  avatarId: number;
+  avatarId: string; // Changed to string for human avatar customization
   isSpeaking: boolean;
+}
+
+// Human avatar customization
+export interface AvatarConfig {
+  bodyColor: string;
+  hairStyle: 'short' | 'long' | 'spiky' | 'curly' | 'bald' | 'ponytail';
+  hairColor: string;
+  accessory: 'none' | 'glasses' | 'headphones' | 'hat' | 'bow' | 'crown';
 }
 
 export interface Song {

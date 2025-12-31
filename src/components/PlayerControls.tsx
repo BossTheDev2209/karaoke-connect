@@ -2,7 +2,8 @@ import React from 'react';
 import { 
   Play, 
   Pause, 
-  SkipForward, 
+  SkipForward,
+  SkipBack,
   Volume2, 
   VolumeX,
   Mic,
@@ -20,8 +21,11 @@ interface PlayerControlsProps {
   currentTime: number;
   duration: number;
   isMicEnabled: boolean;
+  canGoPrevious: boolean;
+  canGoNext: boolean;
   onPlayPause: () => void;
   onNext: () => void;
+  onPrevious: () => void;
   onSeek: (time: number) => void;
   onVolumeChange: (volume: number) => void;
   onMuteToggle: () => void;
@@ -36,8 +40,11 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   currentTime,
   duration,
   isMicEnabled,
+  canGoPrevious,
+  canGoNext,
   onPlayPause,
   onNext,
+  onPrevious,
   onSeek,
   onVolumeChange,
   onMuteToggle,
@@ -68,7 +75,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
       </div>
 
       {/* Main controls */}
-      <div className="flex items-center justify-center gap-4">
+      <div className="flex items-center justify-center gap-3">
         <Button
           variant="ghost"
           size="icon"
@@ -88,17 +95,27 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           className="rounded-full"
           title="Sync with room"
         >
-          <RefreshCw className="w-5 h-5" />
+          <RefreshCw className="w-4 h-4" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onPrevious}
+          disabled={!canGoPrevious}
+          className="rounded-full"
+        >
+          <SkipBack className="w-5 h-5" />
         </Button>
 
         <Button
           onClick={onPlayPause}
-          className="btn-neon w-14 h-14 rounded-full flex items-center justify-center"
+          className="btn-neon w-12 h-12 rounded-full flex items-center justify-center"
         >
           {isPlaying ? (
-            <Pause className="w-6 h-6" />
+            <Pause className="w-5 h-5" />
           ) : (
-            <Play className="w-6 h-6 ml-1" />
+            <Play className="w-5 h-5 ml-0.5" />
           )}
         </Button>
 
@@ -106,28 +123,28 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           variant="ghost"
           size="icon"
           onClick={onNext}
+          disabled={!canGoNext}
           className="rounded-full"
         >
           <SkipForward className="w-5 h-5" />
         </Button>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onMuteToggle}
-            className="rounded-full"
-          >
-            {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-          </Button>
-          <Slider
-            value={[isMuted ? 0 : volume]}
-            max={100}
-            step={1}
-            onValueChange={([value]) => onVolumeChange(value)}
-            className="w-24"
-          />
-        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onMuteToggle}
+          className="rounded-full"
+        >
+          {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+        </Button>
+
+        <Slider
+          value={[isMuted ? 0 : volume]}
+          max={100}
+          step={1}
+          onValueChange={([value]) => onVolumeChange(value)}
+          className="w-20"
+        />
       </div>
     </div>
   );
