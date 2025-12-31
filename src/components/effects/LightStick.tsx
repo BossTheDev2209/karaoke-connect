@@ -5,6 +5,8 @@ interface LightStickProps {
   color?: string;
   isWaving?: boolean;
   intensity?: number; // 0-1 for audio reactivity
+  beatPhase?: number; // 0-1 phase within beat cycle
+  isBeat?: boolean;   // true on beat moment
   size?: 'sm' | 'md' | 'lg';
   className?: string;
 }
@@ -13,6 +15,8 @@ export const LightStick: React.FC<LightStickProps> = ({
   color = 'hsl(var(--primary))',
   isWaving = false,
   intensity = 0,
+  beatPhase = 0,
+  isBeat = false,
   size = 'md',
   className,
 }) => {
@@ -25,16 +29,26 @@ export const LightStick: React.FC<LightStickProps> = ({
   const { width, height } = sizeConfig[size];
   const glowIntensity = Math.max(0.3, intensity);
   
+  // Calculate wave rotation based on beat phase (synced to BPM)
+  // Swing from -20deg to +20deg following the beat
+  const beatWaveAngle = isWaving 
+    ? Math.sin(beatPhase * Math.PI * 2) * 20 
+    : 0;
+  
+  // Extra "pop" on beat
+  const beatScale = isBeat ? 1.1 : 1;
+  const beatGlow = isBeat ? 30 : 8 + intensity * 20;
+  
   return (
     <div
       className={cn(
-        'relative transition-transform duration-150',
-        isWaving && 'animate-lightstick-wave',
+        'relative transition-all duration-75',
         className
       )}
       style={{
         transformOrigin: 'bottom center',
-        filter: `drop-shadow(0 0 ${8 + intensity * 20}px ${color})`,
+        transform: `rotate(${beatWaveAngle}deg) scale(${beatScale})`,
+        filter: `drop-shadow(0 0 ${beatGlow}px ${color})`,
       }}
     >
       <svg
@@ -83,7 +97,7 @@ export const LightStick: React.FC<LightStickProps> = ({
           }}
         />
         
-        {/* Inner glow */}
+        {/* Inner glow - pulses brighter on beat */}
         <ellipse
           cx="20"
           cy="28"
@@ -91,7 +105,8 @@ export const LightStick: React.FC<LightStickProps> = ({
           ry="18"
           fill="white"
           style={{
-            opacity: 0.3 + glowIntensity * 0.4,
+            opacity: isBeat ? 0.8 : 0.3 + glowIntensity * 0.4,
+            transition: 'opacity 0.05s ease-out',
           }}
         />
         

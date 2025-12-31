@@ -9,6 +9,8 @@ interface UserAvatarRowProps {
   currentUserId: string | null;
   wavingUsers?: Set<string>;
   audioIntensity?: number;
+  beatPhase?: number;
+  isBeat?: boolean;
 }
 
 export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({ 
@@ -16,6 +18,8 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
   currentUserId,
   wavingUsers = new Set(),
   audioIntensity = 0,
+  beatPhase = 0,
+  isBeat = false,
 }) => {
   // Sort to put current user first
   const sortedUsers = [...users].sort((a, b) => {
@@ -40,13 +44,15 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
           
           return (
             <div key={user.id} className="flex items-end gap-1">
-              {/* Light stick on left side */}
+              {/* Light stick on left side - synced to BPM */}
               {isWaving && (
                 <div className="relative -mr-2 z-10">
                   <LightStick
                     color={color}
                     isWaving={true}
                     intensity={audioIntensity}
+                    beatPhase={beatPhase}
+                    isBeat={isBeat}
                     size="sm"
                     className="transform -rotate-12"
                   />
