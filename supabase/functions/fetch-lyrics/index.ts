@@ -55,6 +55,18 @@ const THAI_ARTIST_MAPPINGS: Record<string, string[]> = {
   'ไททาเนียม': ['Titanium'],
   'แมว จิระศักดิ์': ['Mew Jirasakul'],
   'ออฟ ปองศักดิ์': ['Off Pongsak'],
+  // Additional popular Thai artists
+  "AYLA's": ["AYLA", "Ayla"],
+  "Jeff Satur": ["Jeff Satur", "Jeff"],
+  'ต้น ธนษิต': ['Ton Thanasit'],
+  'ว่าน ธนกฤต': ['Wan Thanakrit'],
+  'แพรวา ณิชาภัทร': ['Praewa Nichapat'],
+  'เอิ๊ต ภัทรวี': ['Earth Patravee', 'Earth'],
+  'นนท์ ธนนท์': ['Non Thanon'],
+  'ไอซ์ พาริส': ['Ice Paris'],
+  'บุรินทร์': ['Burin'],
+  'เป๊ก ผลิตโชค': ['Peck Palitchoke', 'Peck'],
+  'โบว์': ['Bow Maylada', 'Bow'],
 };
 
 // Get romanized variations for Thai artist
@@ -119,22 +131,41 @@ function cleanTitle(title: string): string {
 }
 
 // Extract song name from title (often in quotes or after dash)
-function extractSongName(title: string): string {
+function extractSongName(title: string, artist?: string): string {
+  const cleanedTitle = cleanTitle(title);
+  
+  // For Thai songs: extract the Thai portion as the primary song name
+  if (containsThai(cleanedTitle)) {
+    const thaiPart = extractThai(cleanedTitle);
+    if (thaiPart && thaiPart.length >= 3) {
+      return thaiPart;
+    }
+  }
+  
   // Try to find quoted song name first
-  const quotedMatch = title.match(/[''""]([^''""\(\)]+)[''""]/) ||
-                      title.match(/'([^'\(\)]+)'/) ||
-                      title.match(/"([^"\(\)]+)"/);
+  const quotedMatch = cleanedTitle.match(/[''""]([^''""\(\)]+)[''""]/) ||
+                      cleanedTitle.match(/'([^'\(\)]+)'/) ||
+                      cleanedTitle.match(/"([^"\(\)]+)"/);
   if (quotedMatch) {
     return quotedMatch[1].trim();
   }
   
-  // Try "Artist - Song" format
-  const dashMatch = title.match(/[-–—]\s*(.+?)(?:\s*[\(\[\|]|$)/);
+  // Try "Artist - Song" format, but make sure we don't extract artist name as song
+  const dashMatch = cleanedTitle.match(/[-–—]\s*(.+?)(?:\s*[\(\[\|]|$)/);
   if (dashMatch) {
-    return cleanTitle(dashMatch[1]);
+    const extracted = dashMatch[1].trim();
+    // If extracted looks like artist name (same as channel), skip it
+    if (artist && similarity(extracted, artist) > 0.7) {
+      // Try the part before the dash instead
+      const beforeDash = cleanedTitle.split(/[-–—]/)[0].trim();
+      if (beforeDash && beforeDash.length > 2) {
+        return beforeDash;
+      }
+    }
+    return extracted;
   }
   
-  return cleanTitle(title);
+  return cleanedTitle;
 }
 
 // Clean artist name from YouTube channel conventions
@@ -250,46 +281,60 @@ function generateThaiSearchStrategies(
   
   console.log('Thai content detected, adding Thai-specific strategies');
   
-  // Extract Thai and non-Thai parts
+  // Extract Thai and non-Thai parts from title
   const thaiTitle = extractThai(title);
-  const romanizedTitle = extractNonThai(title);
+  const romanizedTitle = extractNonThai(title)
+    // Remove artist name from romanized title if present
+    .replace(new RegExp(cleanedArtist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '')
+    .replace(/^[-–—\s]+|[-–—\s]+$/g, '')
+    .trim();
+  
   const thaiArtist = extractThai(artist);
   const romanizedArtist = extractNonThai(artist);
   
   // Get known romanizations for Thai artists
   const artistVariations = getThaiArtistVariations(artist);
   
-  // Strategy: Thai title only
-  if (thaiTitle) {
-    strategies.push({ track: thaiTitle, artist: undefined });
+  // PRIORITY: Thai title with Thai/romanized artist - most accurate for Thai songs
+  if (thaiTitle && thaiTitle.length >= 3) {
+    // First try with specific artist
     if (thaiArtist) {
       strategies.push({ track: thaiTitle, artist: thaiArtist });
+    }
+    if (romanizedArtist && romanizedArtist !== thaiArtist) {
+      strategies.push({ track: thaiTitle, artist: romanizedArtist });
+    }
+    // Then try without artist (broader but might find Thai databases)
+    strategies.push({ track: thaiTitle, artist: undefined });
+  }
+  
+  // Try romanized version of title (English in parentheses)
+  // Extract English from parentheses like "(Vanishing)" or "(Can I ask?)"
+  const englishInParens = title.match(/\(([A-Za-z][^)]*)\)/);
+  if (englishInParens) {
+    const englishTitle = englishInParens[1].trim();
+    if (englishTitle.length >= 3) {
+      if (romanizedArtist) {
+        strategies.push({ track: englishTitle, artist: romanizedArtist });
+      }
+      strategies.push({ track: englishTitle, artist: undefined });
     }
   }
   
   // Strategy: Romanized title + romanized artist
-  if (romanizedTitle && romanizedArtist) {
+  if (romanizedTitle && romanizedTitle.length >= 3 && romanizedArtist) {
     strategies.push({ track: romanizedTitle, artist: romanizedArtist });
-  }
-  
-  // Strategy: Romanized title only
-  if (romanizedTitle) {
-    strategies.push({ track: romanizedTitle, artist: undefined });
   }
   
   // Strategy: Use known artist romanizations
   for (const romanizedVariation of artistVariations) {
-    if (romanizedTitle) {
-      strategies.push({ track: romanizedTitle, artist: romanizedVariation });
-    }
-    if (thaiTitle) {
+    if (thaiTitle && thaiTitle.length >= 3) {
       strategies.push({ track: thaiTitle, artist: romanizedVariation });
     }
-    strategies.push({ track: cleanedTitle, artist: romanizedVariation });
+    if (romanizedTitle && romanizedTitle.length >= 3) {
+      strategies.push({ track: romanizedTitle, artist: romanizedVariation });
+    }
   }
-  
-  // Strategy: Search with just cleaned title (no artist) - wider net
-  strategies.push({ track: cleanedTitle, artist: undefined });
   
   return strategies;
 }
@@ -318,7 +363,7 @@ serve(async (req) => {
     const artistNoAsian = removeAsianParentheses(cleanedArtist);
     
     const cleanedTitle = cleanTitle(title);
-    const songName = extractSongName(title);
+    const songName = extractSongName(title, cleanedArtist);
     const titleNoFeat = removeFeaturing(cleanedTitle);
     const titleNoAsian = removeAsianParentheses(cleanedTitle);
 
