@@ -77,14 +77,18 @@ const Room = () => {
   const remainingSeconds = duration > 0 ? Math.ceil(duration - currentTime) : null;
   const showCountdown = isPlaying && remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 5;
 
+  // Preload lyrics for queued songs
+  const { getStatusForSong, getLyricsForSong } = useLyricsPreload(queue, playbackState.currentSongIndex);
+
+  // Get preloaded lyrics for current song
+  const preloadedLyrics = currentSong ? getLyricsForSong(currentSong.id) : undefined;
+
   const { lyrics, currentLineIndex, isLoading: lyricsLoading, error: lyricsError, offset: lyricsOffset, setOffset: setLyricsOffset } = useLyrics(
     currentSong?.artist || null,
     currentSong?.title || null,
-    currentTime
+    currentTime,
+    preloadedLyrics
   );
-
-  // Preload lyrics for queued songs
-  const { getStatusForSong } = useLyricsPreload(queue, playbackState.currentSongIndex);
 
   const handleSpeakingChange = useCallback((isSpeaking: boolean) => {
     updateSpeaking(isSpeaking);
