@@ -17,9 +17,9 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   const avatar = getAvatar(user.avatarId);
   
   const sizeClasses = {
-    sm: 'w-10 h-10 text-lg',
-    md: 'w-14 h-14 text-2xl',
-    lg: 'w-20 h-20 text-4xl',
+    sm: 'w-12 h-12 text-xl',
+    md: 'w-20 h-20 text-4xl',
+    lg: 'w-28 h-28 text-5xl',
   };
 
   return (
@@ -38,8 +38,8 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
       </div>
       {showName && (
         <span className={cn(
-          'text-xs text-muted-foreground truncate max-w-16',
-          user.isSpeaking && 'text-neon-green font-medium'
+          'text-sm font-medium truncate max-w-24',
+          user.isSpeaking ? 'text-neon-green' : 'text-foreground/80'
         )}>
           {user.nickname}
         </span>
