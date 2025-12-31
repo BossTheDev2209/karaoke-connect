@@ -14,75 +14,6 @@ interface LyricsDisplayProps {
 
 type DisplayMode = 'scroll' | 'focus';
 
-// Component for word-by-word highlighting
-const KaraokeWord: React.FC<{
-  word: string;
-  isHighlighted: boolean;
-  isPast: boolean;
-}> = ({ word, isHighlighted, isPast }) => {
-  return (
-    <span
-      className={cn(
-        'inline-block transition-all duration-200 mx-[0.15em]',
-        isHighlighted && 'karaoke-word-active',
-        isPast && !isHighlighted && 'karaoke-word-past',
-        !isPast && !isHighlighted && 'karaoke-word-upcoming'
-      )}
-    >
-      {word}
-    </span>
-  );
-};
-
-// Component for a line with word-by-word highlighting
-const KaraokeLine: React.FC<{
-  text: string;
-  lineProgress: number; // 0 to 1 progress through the line
-  isActive: boolean;
-}> = ({ text, lineProgress, isActive }) => {
-  const words = text.split(/\s+/).filter(Boolean);
-  const totalWords = words.length;
-
-  // LRC only gives line-level timestamps, so we approximate word timing.
-  // Weight by word length so longer words take slightly longer than short ones.
-  const weights = useMemo(() => {
-    return words.map((w) => {
-      const cleaned = w.replace(/[^\p{L}\p{N}]+/gu, '');
-      return Math.max(1, cleaned.length);
-    });
-  }, [words]);
-
-  const totalWeight = useMemo(() => weights.reduce((sum, w) => sum + w, 0), [weights]);
-
-  // Calculate which word index should be highlighted
-  const currentWordIndex = useMemo(() => {
-    if (!isActive || totalWords === 0 || totalWeight === 0) return -1;
-    // Clamp progress to keep the highlight on the last word at the end.
-    const clamped = Math.max(0, Math.min(0.999999, lineProgress));
-    const target = clamped * totalWeight;
-
-    let acc = 0;
-    for (let i = 0; i < weights.length; i++) {
-      acc += weights[i];
-      if (target < acc) return i;
-    }
-    return totalWords - 1;
-  }, [isActive, lineProgress, totalWords, totalWeight, weights]);
-
-  return (
-    <span className="inline">
-      {words.map((word, index) => (
-        <KaraokeWord
-          key={`${word}-${index}`}
-          word={word}
-          isHighlighted={isActive && index === currentWordIndex}
-          isPast={isActive && index < currentWordIndex}
-        />
-      ))}
-    </span>
-  );
-};
-
 export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   lyrics,
   currentLineIndex,
@@ -178,21 +109,13 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
             {prevLine?.text || ''}
           </div>
 
-          {/* Current line with word-by-word highlighting */}
+          {/* Current line - sentence highlighting */}
           <div 
             key={`current-${currentLineIndex}`}
             className="animate-lyric-enter"
           >
-            <p className="text-2xl md:text-3xl font-bold leading-relaxed">
-              {currentLine ? (
-                <KaraokeLine
-                  text={currentLine.text}
-                  lineProgress={lineProgress}
-                  isActive={true}
-                />
-              ) : (
-                <span className="karaoke-word-active">&#9835; &#9835; &#9835;</span>
-              )}
+            <p className="text-2xl md:text-3xl font-bold leading-relaxed text-primary">
+              {currentLine?.text || '♫ ♫ ♫'}
             </p>
           </div>
 
@@ -250,15 +173,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
                 index < currentLineIndex && 'past'
               )}
             >
-              {index === currentLineIndex ? (
-                <KaraokeLine
-                  text={line.text}
-                  lineProgress={lineProgress}
-                  isActive={true}
-                />
-              ) : (
-                line.text
-              )}
+              {line.text}
             </div>
           ))}
         </div>
