@@ -174,7 +174,7 @@ const Room = () => {
             )}
           </div>
           <div className="card-karaoke flex-1 min-h-[200px]">
-            <LyricsDisplay lyrics={lyrics} currentLineIndex={currentLineIndex} isLoading={lyricsLoading} error={lyricsError} />
+            <LyricsDisplay lyrics={lyrics} currentLineIndex={currentLineIndex} currentTime={playbackState.currentTime} isLoading={lyricsLoading} error={lyricsError} />
           </div>
         </div>
 

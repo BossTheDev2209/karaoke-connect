@@ -198,10 +198,7 @@
 
   .lyric-line.active {
     @apply text-2xl font-bold opacity-100;
-    color: hsl(var(--neon-pink));
-    text-shadow: 0 0 20px hsl(var(--neon-pink) / 0.8), 0 0 40px hsl(var(--neon-pink) / 0.4);
     transform: translateY(0) scale(1.05);
-    animation: lyric-pulse 2s ease-in-out infinite;
   }
 
   .lyric-line.past {
@@ -209,9 +206,37 @@
     transform: translateY(-2px) scale(0.98);
   }
 
-  @keyframes lyric-pulse {
-    0%, 100% { text-shadow: 0 0 20px hsl(var(--neon-pink) / 0.8), 0 0 40px hsl(var(--neon-pink) / 0.4); }
-    50% { text-shadow: 0 0 30px hsl(var(--neon-pink) / 1), 0 0 60px hsl(var(--neon-pink) / 0.6); }
+  /* Karaoke word-by-word styles */
+  .karaoke-word-active {
+    color: hsl(var(--neon-pink));
+    text-shadow: 0 0 20px hsl(var(--neon-pink) / 0.9), 0 0 40px hsl(var(--neon-pink) / 0.5);
+    transform: scale(1.1);
+    display: inline-block;
+    animation: word-glow 0.3s ease-out;
+  }
+
+  .karaoke-word-past {
+    color: hsl(var(--neon-purple));
+    text-shadow: 0 0 10px hsl(var(--neon-purple) / 0.5);
+  }
+
+  .karaoke-word-upcoming {
+    color: hsl(var(--foreground) / 0.5);
+  }
+
+  @keyframes word-glow {
+    0% {
+      transform: scale(1);
+      text-shadow: 0 0 5px hsl(var(--neon-pink) / 0.3);
+    }
+    50% {
+      transform: scale(1.15);
+      text-shadow: 0 0 30px hsl(var(--neon-pink) / 1), 0 0 60px hsl(var(--neon-pink) / 0.7);
+    }
+    100% {
+      transform: scale(1.1);
+      text-shadow: 0 0 20px hsl(var(--neon-pink) / 0.9), 0 0 40px hsl(var(--neon-pink) / 0.5);
+    }
   }
 
   .avatar-speaking {
