@@ -18,6 +18,7 @@ import { CelebrationOverlay, getCurrentCelebration } from '@/components/effects/
 import { ReactionBar, FloatingReactions, useReactions, useWaving } from '@/components/Reactions';
 import { SingReactOverlay } from '@/components/effects/SingReactOverlay';
 import { useAudioReactive } from '@/hooks/useAudioReactive';
+import { useVoteKick, VoteKickBanner } from '@/components/VoteKick';
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -53,6 +54,19 @@ const Room = () => {
   // Reactions and waving
   const { reactions, sendReaction } = useReactions(channel, user?.id || '');
   const { isWaving, toggleWaving, wavingUsers } = useWaving(channel, user?.id || '');
+  
+  // Vote kick
+  const handleUserKicked = useCallback(() => {
+    sessionStorage.removeItem('karaoke_user');
+    navigate('/');
+  }, [navigate]);
+  
+  const { activeVoteKick, startVoteKick, voteYes, voteNo, hasVoted } = useVoteKick(
+    channel,
+    user?.id || '',
+    users,
+    handleUserKicked
+  );
 
   const handleStateChange = useCallback((isPlaying: boolean) => {
     updatePlayback({ isPlaying });
@@ -156,6 +170,17 @@ const Room = () => {
       
       {/* Floating reactions */}
       <FloatingReactions reactions={reactions} />
+      
+      {/* Vote kick banner */}
+      {activeVoteKick && (
+        <VoteKickBanner
+          voteKick={activeVoteKick}
+          currentUserId={user.id}
+          hasVoted={hasVoted}
+          onVoteYes={voteYes}
+          onVoteNo={voteNo}
+        />
+      )}
 
       {/* Header */}
       <header className="flex items-center justify-between">
@@ -277,7 +302,17 @@ const Room = () => {
       </div>
 
       {/* User avatars */}
-      <UserAvatarRow users={users} currentUserId={user.id} wavingUsers={wavingUsers} audioIntensity={audioIntensity} beatPhase={beatPhase} isBeat={isBeat} bpm={bpm} />
+      <UserAvatarRow 
+        users={users} 
+        currentUserId={user.id} 
+        wavingUsers={wavingUsers} 
+        audioIntensity={audioIntensity} 
+        beatPhase={beatPhase} 
+        isBeat={isBeat} 
+        bpm={bpm}
+        onStartVoteKick={startVoteKick}
+        voteKickDisabled={!!activeVoteKick}
+      />
     </div>
   );
 };

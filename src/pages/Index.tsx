@@ -14,6 +14,13 @@ const Index = () => {
   const [nickname, setNickname] = useState('');
   const [avatarId, setAvatarId] = useState(() => avatarConfigToId(generateRandomAvatar()));
   const [roomCode, setRoomCode] = useState('');
+  const [customAvatarNormal, setCustomAvatarNormal] = useState<string | undefined>();
+  const [customAvatarSpeaking, setCustomAvatarSpeaking] = useState<string | undefined>();
+
+  const handleCustomAvatarsChange = (normal: string | undefined, speaking: string | undefined) => {
+    setCustomAvatarNormal(normal);
+    setCustomAvatarSpeaking(speaking);
+  };
 
   const handleCreate = () => {
     if (!nickname.trim()) {
@@ -21,7 +28,14 @@ const Index = () => {
       return;
     }
     const code = generateRoomCode();
-    const userData = { id: crypto.randomUUID(), nickname: nickname.trim(), avatarId, isSpeaking: false };
+    const userData = { 
+      id: crypto.randomUUID(), 
+      nickname: nickname.trim(), 
+      avatarId, 
+      customAvatarNormal,
+      customAvatarSpeaking,
+      isSpeaking: false 
+    };
     sessionStorage.setItem('karaoke_user', JSON.stringify(userData));
     navigate(`/room/${code}`);
   };
@@ -35,7 +49,14 @@ const Index = () => {
       toast({ title: 'Invalid room code', variant: 'destructive' });
       return;
     }
-    const userData = { id: crypto.randomUUID(), nickname: nickname.trim(), avatarId, isSpeaking: false };
+    const userData = { 
+      id: crypto.randomUUID(), 
+      nickname: nickname.trim(), 
+      avatarId, 
+      customAvatarNormal,
+      customAvatarSpeaking,
+      isSpeaking: false 
+    };
     sessionStorage.setItem('karaoke_user', JSON.stringify(userData));
     navigate(`/room/${roomCode.toUpperCase()}`);
   };
@@ -71,7 +92,13 @@ const Index = () => {
           <p className="text-muted-foreground text-sm">Customize your avatar and nickname</p>
         </div>
 
-        <AvatarPicker selectedId={avatarId} onSelect={setAvatarId} />
+        <AvatarPicker 
+          selectedId={avatarId} 
+          onSelect={setAvatarId}
+          customAvatarNormal={customAvatarNormal}
+          customAvatarSpeaking={customAvatarSpeaking}
+          onCustomAvatarsChange={handleCustomAvatarsChange}
+        />
 
         <Input
           value={nickname}
