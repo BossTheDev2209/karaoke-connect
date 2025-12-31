@@ -9,6 +9,7 @@ interface UseRoomReturn {
   playbackState: PlaybackState;
   currentUser: User | null;
   isConnected: boolean;
+  channel: RealtimeChannel | null;
   updatePlayback: (state: Partial<PlaybackState>) => void;
   updateQueue: (queue: Song[]) => void;
   updateSpeaking: (isSpeaking: boolean) => void;
@@ -130,6 +131,7 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
     playbackState,
     currentUser: user,
     isConnected,
+    channel: channelRef.current,
     updatePlayback,
     updateQueue,
     updateSpeaking,

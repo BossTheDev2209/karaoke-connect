@@ -11,6 +11,9 @@ import { SongQueue } from '@/components/SongQueue';
 import { SongSearch } from '@/components/SongSearch';
 import { UserAvatarRow } from '@/components/UserAvatarRow';
 import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
+import { RoomThemePicker, RoomTheme, themeStyles } from '@/components/RoomThemePicker';
+import { CelebrationOverlay, getCurrentCelebration } from '@/components/effects/CelebrationOverlay';
+import { ReactionBar, FloatingReactions, useReactions } from '@/components/Reactions';
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -19,6 +22,8 @@ const Room = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [volume, setVolume] = useState(80);
+  const [theme, setTheme] = useState<RoomTheme>('neon');
+  const [celebration] = useState(getCurrentCelebration());
 
   useEffect(() => {
     const stored = sessionStorage.getItem('karaoke_user');
@@ -29,8 +34,27 @@ const Room = () => {
     }
   }, [navigate]);
 
-  const { users, queue, playbackState, isConnected, updatePlayback, updateQueue, updateSpeaking, requestSync } = useRoom(code || '', user);
+  // Apply theme CSS variables
+  useEffect(() => {
+    const root = document.documentElement;
+    const styles = themeStyles[theme];
+    Object.entries(styles).forEach(([key, value]) => {
+      root.style.setProperty(key, value);
+    });
+
+    return () => {
+      // Reset to default on unmount
+      Object.keys(styles).forEach((key) => {
+        root.style.removeProperty(key);
+      });
+    };
+  }, [theme]);
+
+  const { users, queue, playbackState, isConnected, channel, updatePlayback, updateQueue, updateSpeaking, requestSync } = useRoom(code || '', user);
   
+  // Reactions
+  const { reactions, sendReaction } = useReactions(channel, user?.id || '');
+
   const currentSong = queue[playbackState.currentSongIndex];
   
   const handleStateChange = useCallback((isPlaying: boolean) => {
@@ -97,12 +121,19 @@ const Room = () => {
 
   return (
     <div className="min-h-screen flex flex-col p-4 gap-4">
+      {/* Celebration effects */}
+      <CelebrationOverlay theme={celebration} />
+      
+      {/* Floating reactions */}
+      <FloatingReactions reactions={reactions} />
+
       {/* Header */}
       <header className="flex items-center justify-between">
         <RoomCodeDisplay code={code} />
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-neon-green' : 'bg-destructive'}`} />
           <span className="text-sm text-muted-foreground">{users.length} online</span>
+          <RoomThemePicker currentTheme={theme} onThemeChange={setTheme} />
           <Button variant="ghost" size="icon" onClick={handleLeave}>
             <LogOut className="w-4 h-4" />
           </Button>
@@ -124,7 +155,7 @@ const Room = () => {
 
         {/* Video & Lyrics */}
         <div className="lg:col-span-2 flex flex-col gap-4">
-          <div className="card-karaoke aspect-video">
+          <div className="card-karaoke aspect-video relative">
             <div id="youtube-player" className="w-full h-full rounded-lg overflow-hidden" />
             {!currentSong && (
               <div className="absolute inset-0 flex items-center justify-center bg-card/80 rounded-lg">
@@ -161,6 +192,11 @@ const Room = () => {
             onMicToggle={toggleMic}
             onSync={requestSync}
           />
+          
+          {/* Reactions */}
+          <div className="mt-auto pt-4">
+            <ReactionBar onReact={sendReaction} />
+          </div>
         </div>
       </div>
 

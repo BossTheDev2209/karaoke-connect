@@ -176,4 +176,83 @@
   .animate-float {
     animation: float 3s ease-in-out infinite;
   }
+
+  /* Confetti animation */
+  @keyframes confetti-fall {
+    0% {
+      transform: translateY(-100vh) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(100vh) rotate(720deg);
+      opacity: 0;
+    }
+  }
+
+  .animate-confetti-fall {
+    animation: confetti-fall linear infinite;
+  }
+
+  /* Firework animations */
+  @keyframes firework-explode {
+    0% {
+      transform: scale(0);
+      opacity: 0;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 0;
+    }
+  }
+
+  @keyframes firework-particle {
+    0% {
+      opacity: 1;
+      transform: rotate(var(--rotation)) translateY(0);
+    }
+    100% {
+      opacity: 0;
+      transform: rotate(var(--rotation)) translateY(-80px);
+    }
+  }
+
+  .animate-firework-explode {
+    animation: firework-explode 1.5s ease-out forwards;
+  }
+
+  .animate-firework-particle {
+    animation: firework-particle 1.2s ease-out forwards;
+  }
+
+  /* Reaction float animation */
+  @keyframes reaction-float {
+    0% {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: translateY(-150px) scale(1.2);
+      opacity: 0.8;
+    }
+    100% {
+      transform: translateY(-300px) scale(0.8);
+      opacity: 0;
+    }
+  }
+
+  .animate-reaction-float {
+    animation: reaction-float 3s ease-out forwards;
+  }
+
+  /* Scrollbar hide utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
