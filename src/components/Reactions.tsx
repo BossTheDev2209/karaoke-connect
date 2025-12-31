@@ -99,9 +99,7 @@ export const useReactions = (
 
     channel.on('broadcast', { event: 'reaction' }, handleReaction);
 
-    return () => {
-      channel.off('broadcast', { event: 'reaction' }, handleReaction);
-    };
+    // No cleanup needed - channel cleanup is handled by useRoom
   }, [channel, userId]);
 
   return { reactions, sendReaction };
