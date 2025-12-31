@@ -118,6 +118,7 @@ export const useYouTubePlayer = (
           controls: 0,
           disablekb: 1,
           fs: 0,
+          loop: 0,
           modestbranding: 1,
           rel: 0,
           showinfo: 0,
