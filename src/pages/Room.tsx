@@ -95,6 +95,9 @@ const Room = () => {
 
   const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded);
 
+  const remainingSeconds = duration > 0 ? Math.ceil(duration - currentTime) : null;
+  const showCountdown = isPlaying && remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 5;
+
   const { lyrics, currentLineIndex, isLoading: lyricsLoading, error: lyricsError } = useLyrics(
     currentSong?.artist || null,
     currentSong?.title || null,
@@ -123,17 +126,15 @@ const Room = () => {
   };
 
   const handleNext = () => {
-    if (queue.length > 0) {
-      const nextIndex = (playbackState.currentSongIndex + 1) % queue.length;
+    if (playbackState.currentSongIndex < queue.length - 1) {
+      const nextIndex = playbackState.currentSongIndex + 1;
       updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
     }
   };
 
   const handlePrevious = () => {
-    if (queue.length > 0) {
-      const prevIndex = playbackState.currentSongIndex > 0 
-        ? playbackState.currentSongIndex - 1 
-        : queue.length - 1;
+    if (playbackState.currentSongIndex > 0) {
+      const prevIndex = playbackState.currentSongIndex - 1;
       updatePlayback({ currentSongIndex: prevIndex, currentTime: 0, isPlaying: true });
     }
   };
@@ -200,6 +201,20 @@ const Room = () => {
         <div className="lg:col-span-6 flex flex-col gap-4">
           <div className="card-karaoke aspect-video relative flex-1">
             <div id="youtube-player" className="w-full h-full rounded-lg overflow-hidden" />
+
+            {showCountdown && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="rounded-2xl bg-card/70 backdrop-blur border border-border shadow-lg px-6 py-4">
+                  <div className="text-6xl font-black text-primary tabular-nums text-center">
+                    {remainingSeconds}
+                  </div>
+                  <div className="mt-1 text-[10px] uppercase tracking-[0.3em] text-muted-foreground text-center">
+                    seconds
+                  </div>
+                </div>
+              </div>
+            )}
+
             {!currentSong && (
               <div className="absolute inset-0 flex items-center justify-center bg-card/80 rounded-lg">
                 <p className="text-muted-foreground">Add songs to start!</p>
@@ -227,8 +242,8 @@ const Room = () => {
             currentTime={currentTime}
             duration={duration}
             isMicEnabled={isMicEnabled}
-            canGoPrevious={queue.length > 0}
-            canGoNext={queue.length > 0}
+            canGoPrevious={playbackState.currentSongIndex > 0}
+            canGoNext={playbackState.currentSongIndex < queue.length - 1}
             onPlayPause={handlePlayPause}
             onNext={handleNext}
             onPrevious={handlePrevious}
