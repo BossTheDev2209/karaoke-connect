@@ -69,10 +69,13 @@ export const useYouTubePlayer = (
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [hasEnded, setHasEnded] = useState(false);
+
   const intervalRef = useRef<number>(0);
   const currentVideoIdRef = useRef<string | null>(null);
   const isPlayerReady = useRef(false);
   const isInitializing = useRef(false);
+  const endedHandledRef = useRef(false);
+
   const onEndedRef = useRef(onEnded);
   const onStateChangeRef = useRef(onStateChange);
 
@@ -95,32 +98,49 @@ export const useYouTubePlayer = (
     firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
   }, []);
 
-  // Initialize player - only depends on containerId and videoId
-  useEffect(() => {
-    if (!videoId) return;
-    
-    // If player already exists and is ready, just load new video
-    if (playerRef.current && isPlayerReady.current) {
-      if (currentVideoIdRef.current !== videoId) {
-        currentVideoIdRef.current = videoId;
-        setHasEnded(false);
-        setCurrentTime(0);
-        playerRef.current.loadVideoById(videoId);
-        setIsPlaying(true);
+  const destroyPlayer = useCallback(() => {
+    try {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = 0;
       }
-      return;
-    }
 
-    // Don't create a new player if one is already being initialized
-    if (isInitializing.current || playerRef.current) return;
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+
+      // Ensure no orphaned iframes keep playing
+      const el = document.getElementById(containerId);
+      if (el) el.innerHTML = '';
+
+      isPlayerReady.current = false;
+      isInitializing.current = false;
+      currentVideoIdRef.current = null;
+      endedHandledRef.current = false;
+      setIsReady(false);
+      setIsPlaying(false);
+      setHasEnded(false);
+      setCurrentTime(0);
+      setDuration(0);
+      setIsMuted(false);
+    } catch {
+      // best-effort cleanup
+    }
+  }, [containerId]);
+
+  // Initialize player once per container
+  useEffect(() => {
+    if (!videoId) return; // need an initial videoId for construction
+    if (playerRef.current || isInitializing.current) return;
 
     const initPlayer = () => {
-      // Double-check we haven't already initialized
       if (playerRef.current || isInitializing.current) return;
-      
       isInitializing.current = true;
+
       currentVideoIdRef.current = videoId;
-      
+      endedHandledRef.current = false;
+
       const newPlayer = new window.YT.Player(containerId, {
         videoId,
         playerVars: {
@@ -145,39 +165,61 @@ export const useYouTubePlayer = (
           onStateChange: (event) => {
             const playing = event.data === window.YT.PlayerState.PLAYING;
             const ended = event.data === window.YT.PlayerState.ENDED;
-            
+
             setIsPlaying(playing);
             setHasEnded(ended);
 
             if (!ended) {
               onStateChangeRef.current?.(playing);
             }
-            
+
             if (playing) {
               setDuration(newPlayer.getDuration());
             }
-            
-            if (ended) {
+
+            if (ended && !endedHandledRef.current) {
+              endedHandledRef.current = true;
               onEndedRef.current?.();
             }
           },
         },
       });
+
       playerRef.current = newPlayer;
     };
 
     if (window.YT && window.YT.Player) {
       initPlayer();
     } else {
-      window.onYouTubeIframeAPIReady = initPlayer;
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        prev?.();
+        initPlayer();
+      };
     }
+  }, [containerId, destroyPlayer, videoId]);
 
+  // Cleanup on unmount only (avoid destroying the player on every videoId change)
+  useEffect(() => {
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+      destroyPlayer();
     };
-  }, [containerId, videoId]);
+  }, [destroyPlayer]);
+
+  // Load/crossfade to new video IDs without recreating the player
+  useEffect(() => {
+    if (!videoId) return;
+    if (!playerRef.current || !isPlayerReady.current) return;
+
+    if (currentVideoIdRef.current !== videoId) {
+      currentVideoIdRef.current = videoId;
+      endedHandledRef.current = false;
+      setHasEnded(false);
+      setCurrentTime(0);
+      playerRef.current.loadVideoById(videoId);
+      setIsPlaying(true);
+    }
+  }, [videoId]);
 
   // Update current time periodically
   useEffect(() => {
