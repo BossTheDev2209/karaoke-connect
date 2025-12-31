@@ -148,8 +148,8 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
     <div className="h-full flex flex-col relative overflow-hidden">
       {/* Controls bar */}
       <div className="absolute top-1 right-1 z-10 flex items-center gap-2">
-        {/* Full lyrics button for plain lyrics */}
-        {hasPlainLyrics && lyrics.length > 0 && (
+        {/* Full lyrics button - always show when lyrics exist */}
+        {lyrics.length > 0 && (
           <Dialog>
             <DialogTrigger asChild>
               <Button
@@ -184,20 +184,24 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
               variant="ghost"
               size="icon"
               className="h-5 w-5"
-              onClick={() => adjustOffset(-0.5)}
-              title="Lyrics too slow (speed up)"
+              onClick={() => adjustOffset(-0.01)}
+              title="Fine tune: -0.01s"
             >
               <Minus className="w-3 h-3" />
             </Button>
-            <span className="text-[10px] font-mono min-w-[40px] text-center text-muted-foreground">
-              {offset > 0 ? '+' : ''}{offset.toFixed(1)}s
+            <span 
+              className="text-[10px] font-mono min-w-[50px] text-center text-muted-foreground cursor-pointer hover:text-foreground"
+              onClick={() => onOffsetChange(0)}
+              title="Click to reset"
+            >
+              {offset >= 0 ? '+' : ''}{offset.toFixed(2)}s
             </span>
             <Button
               variant="ghost"
               size="icon"
               className="h-5 w-5"
-              onClick={() => adjustOffset(0.5)}
-              title="Lyrics too fast (slow down)"
+              onClick={() => adjustOffset(0.01)}
+              title="Fine tune: +0.01s"
             >
               <Plus className="w-3 h-3" />
             </Button>
