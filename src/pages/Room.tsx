@@ -210,7 +210,7 @@ const Room = () => {
               </div>
             )}
           </div>
-          <div className="card-karaoke h-[100px] shrink-0">
+          <div className="card-karaoke h-[160px] shrink-0">
             <LyricsDisplay 
               lyrics={lyrics} 
               currentLineIndex={currentLineIndex} 

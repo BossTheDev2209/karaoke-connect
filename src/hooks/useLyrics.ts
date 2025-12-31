@@ -44,8 +44,9 @@ export const useLyrics = (
           const parsed = parseSyncedLyrics(data.syncedLyrics);
           setLyrics(parsed);
         } else if (data.plainLyrics) {
-          // Fallback: show plain lyrics without sync
-          setLyrics([{ time: 0, text: data.plainLyrics }]);
+          // Split plain lyrics into lines for better display
+          const lines = parsePlainLyrics(data.plainLyrics);
+          setLyrics(lines);
         } else {
           setLyrics([]);
           setError('No lyrics found');
@@ -102,4 +103,20 @@ function parseSyncedLyrics(lrc: string): LyricLine[] {
   }
 
   return result;
+}
+
+// Parse plain lyrics into separate lines
+function parsePlainLyrics(plainLyrics: string): LyricLine[] {
+  // Split by newlines and filter empty lines
+  const lines = plainLyrics
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => line.length > 0);
+
+  // For plain lyrics without timestamps, assign sequential "fake" times
+  // so users can at least scroll through manually
+  return lines.map((text, index) => ({
+    time: index * 0.001, // Minimal time differences so they appear in order
+    text,
+  }));
 }
