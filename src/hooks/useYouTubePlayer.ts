@@ -98,7 +98,10 @@ export const useYouTubePlayer = (
       if (currentVideoIdRef.current !== videoId) {
         currentVideoIdRef.current = videoId;
         setHasEnded(false);
+        setCurrentTime(0);
+        // loadVideoById auto-plays the video
         playerRef.current.loadVideoById(videoId);
+        setIsPlaying(true);
       }
       return;
     }
