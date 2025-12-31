@@ -46,8 +46,18 @@ export interface YouTubeSearchResult {
   videoId: string;
   title: string;
   channelTitle: string;
+  channelId?: string;
   thumbnail: string;
   duration: string;
+}
+
+export interface YouTubeChannel {
+  channelId: string;
+  title: string;
+  description: string;
+  thumbnail: string;
+  subscriberCount: string;
+  videoCount: string;
 }
 
 export type RealtimePayload = {
