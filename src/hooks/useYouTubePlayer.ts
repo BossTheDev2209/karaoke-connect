@@ -72,12 +72,18 @@ export const useYouTubePlayer = (
   const intervalRef = useRef<number>(0);
   const currentVideoIdRef = useRef<string | null>(null);
   const isPlayerReady = useRef(false);
+  const isInitializing = useRef(false);
   const onEndedRef = useRef(onEnded);
+  const onStateChangeRef = useRef(onStateChange);
 
-  // Keep onEnded ref updated
+  // Keep refs updated
   useEffect(() => {
     onEndedRef.current = onEnded;
   }, [onEnded]);
+
+  useEffect(() => {
+    onStateChangeRef.current = onStateChange;
+  }, [onStateChange]);
 
   // Load YouTube IFrame API
   useEffect(() => {
@@ -89,7 +95,7 @@ export const useYouTubePlayer = (
     firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
   }, []);
 
-  // Initialize player
+  // Initialize player - only depends on containerId and videoId
   useEffect(() => {
     if (!videoId) return;
     
@@ -99,7 +105,6 @@ export const useYouTubePlayer = (
         currentVideoIdRef.current = videoId;
         setHasEnded(false);
         setCurrentTime(0);
-        // loadVideoById auto-plays the video
         playerRef.current.loadVideoById(videoId);
         setIsPlaying(true);
       }
@@ -107,10 +112,15 @@ export const useYouTubePlayer = (
     }
 
     // Don't create a new player if one is already being initialized
-    if (playerRef.current) return;
+    if (isInitializing.current || playerRef.current) return;
 
     const initPlayer = () => {
+      // Double-check we haven't already initialized
+      if (playerRef.current || isInitializing.current) return;
+      
+      isInitializing.current = true;
       currentVideoIdRef.current = videoId;
+      
       const newPlayer = new window.YT.Player(containerId, {
         videoId,
         playerVars: {
@@ -128,6 +138,7 @@ export const useYouTubePlayer = (
         events: {
           onReady: () => {
             isPlayerReady.current = true;
+            isInitializing.current = false;
             setIsReady(true);
             setDuration(newPlayer.getDuration());
           },
@@ -138,17 +149,14 @@ export const useYouTubePlayer = (
             setIsPlaying(playing);
             setHasEnded(ended);
 
-            // Avoid emitting a conflicting "isPlaying: false" update on ENDED.
-            // Room-level logic decides whether to advance the queue or stop.
             if (!ended) {
-              onStateChange?.(playing);
+              onStateChangeRef.current?.(playing);
             }
             
             if (playing) {
               setDuration(newPlayer.getDuration());
             }
             
-            // Trigger onEnded callback when video ends
             if (ended) {
               onEndedRef.current?.();
             }
@@ -169,7 +177,7 @@ export const useYouTubePlayer = (
         clearInterval(intervalRef.current);
       }
     };
-  }, [containerId, videoId, onStateChange]);
+  }, [containerId, videoId]);
 
   // Update current time periodically
   useEffect(() => {
