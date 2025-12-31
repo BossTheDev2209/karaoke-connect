@@ -136,7 +136,12 @@ export const useYouTubePlayer = (
             
             setIsPlaying(playing);
             setHasEnded(ended);
-            onStateChange?.(playing);
+
+            // Avoid emitting a conflicting "isPlaying: false" update on ENDED.
+            // Room-level logic decides whether to advance the queue or stop.
+            if (!ended) {
+              onStateChange?.(playing);
+            }
             
             if (playing) {
               setDuration(newPlayer.getDuration());
