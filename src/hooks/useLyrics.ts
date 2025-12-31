@@ -7,6 +7,8 @@ interface UseLyricsReturn {
   currentLineIndex: number;
   isLoading: boolean;
   error: string | null;
+  offset: number;
+  setOffset: (offset: number) => void;
 }
 
 export const useLyrics = (
@@ -17,6 +19,8 @@ export const useLyrics = (
   const [lyrics, setLyrics] = useState<LyricLine[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Offset in seconds: positive = lyrics delayed (for lyrics ahead of audio)
+  const [offset, setOffset] = useState(0);
 
   useEffect(() => {
     if (!artist || !title) {
@@ -27,6 +31,7 @@ export const useLyrics = (
     const fetchLyrics = async () => {
       setIsLoading(true);
       setError(null);
+      setOffset(0); // Reset offset when loading new lyrics
 
       try {
         const { data, error: fnError } = await supabase.functions.invoke('fetch-lyrics', {
@@ -60,15 +65,18 @@ export const useLyrics = (
   const currentLineIndex = useMemo(() => {
     if (lyrics.length === 0) return -1;
     
+    // Apply offset: if lyrics are ahead, we need to delay them (subtract offset from currentTime)
+    const adjustedTime = currentTime - offset;
+    
     for (let i = lyrics.length - 1; i >= 0; i--) {
-      if (currentTime >= lyrics[i].time) {
+      if (adjustedTime >= lyrics[i].time) {
         return i;
       }
     }
     return -1;
-  }, [lyrics, currentTime]);
+  }, [lyrics, currentTime, offset]);
 
-  return { lyrics, currentLineIndex, isLoading, error };
+  return { lyrics, currentLineIndex, isLoading, error, offset, setOffset };
 };
 
 // Parse LRC format: [mm:ss.xx] lyrics text
