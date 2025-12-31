@@ -1,8 +1,15 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { LyricLine } from '@/types/karaoke';
 import { cn } from '@/lib/utils';
-import { Music, Minus, Plus, Subtitles } from 'lucide-react';
+import { Music, Minus, Plus, Subtitles, List, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 interface LyricsDisplayProps {
   lyrics: LyricLine[];
@@ -18,6 +25,45 @@ interface LyricsDisplayProps {
   onDisableCaptions?: () => void;
 }
 
+// Simulate loading progress
+const useLoadingProgress = (isLoading: boolean) => {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setProgress(0);
+      return;
+    }
+
+    setProgress(0);
+    const intervals = [
+      { delay: 100, value: 15 },
+      { delay: 300, value: 35 },
+      { delay: 600, value: 55 },
+      { delay: 1000, value: 70 },
+      { delay: 1500, value: 82 },
+      { delay: 2500, value: 90 },
+      { delay: 4000, value: 95 },
+    ];
+
+    const timeouts = intervals.map(({ delay, value }) =>
+      setTimeout(() => setProgress(value), delay)
+    );
+
+    return () => timeouts.forEach(clearTimeout);
+  }, [isLoading]);
+
+  return progress;
+};
+
+// Check if lyrics are plain (no real timestamps)
+const isPlainLyrics = (lyrics: LyricLine[]): boolean => {
+  if (lyrics.length <= 1) return true;
+  // Plain lyrics have minimal time differences (set in useLyrics)
+  const timeDiffs = lyrics.slice(1).map((l, i) => l.time - lyrics[i].time);
+  return timeDiffs.every(diff => diff < 0.1);
+};
+
 export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   lyrics,
   currentLineIndex,
@@ -32,6 +78,8 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const activeLineRef = useRef<HTMLDivElement>(null);
+  const loadingProgress = useLoadingProgress(isLoading);
+  const hasPlainLyrics = isPlainLyrics(lyrics);
 
   useEffect(() => {
     if (activeLineRef.current && containerRef.current) {
@@ -60,11 +108,15 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
       <div className="flex flex-col items-center justify-center h-full gap-3 px-8">
         <div className="w-full max-w-xs">
           <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-primary via-accent to-primary rounded-full animate-shimmer" 
-                 style={{ backgroundSize: '200% 100%', width: '100%' }} />
+            <div 
+              className="h-full bg-gradient-to-r from-primary via-accent to-primary rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${loadingProgress}%` }} 
+            />
           </div>
         </div>
-        <span className="text-xs text-muted-foreground">Loading lyrics...</span>
+        <span className="text-xs text-muted-foreground tabular-nums">
+          Loading lyrics... {loadingProgress}%
+        </span>
       </div>
     );
   }
@@ -94,30 +146,71 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
 
   return (
     <div className="h-full flex flex-col relative overflow-hidden">
-      {/* Offset controls - only show if synced lyrics exist */}
-      {lyrics.length > 1 && onOffsetChange && (
-        <div className="absolute top-1 right-1 z-10 flex items-center gap-1 bg-background/80 backdrop-blur rounded-lg px-1.5 py-0.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-5 w-5"
-            onClick={() => adjustOffset(-0.5)}
-            title="Lyrics too slow (speed up)"
-          >
-            <Minus className="w-3 h-3" />
-          </Button>
-          <span className="text-[10px] font-mono min-w-[40px] text-center text-muted-foreground">
-            {offset > 0 ? '+' : ''}{offset.toFixed(1)}s
+      {/* Controls bar */}
+      <div className="absolute top-1 right-1 z-10 flex items-center gap-2">
+        {/* Full lyrics button for plain lyrics */}
+        {hasPlainLyrics && lyrics.length > 0 && (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs bg-background/80 backdrop-blur rounded-lg"
+                title="View full lyrics"
+              >
+                <List className="w-3 h-3 mr-1" />
+                Full Lyrics
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Full Lyrics</DialogTitle>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto pr-2 space-y-2">
+                {lyrics.map((line, index) => (
+                  <p key={index} className="text-sm leading-relaxed">
+                    {line.text}
+                  </p>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Offset controls - only show if synced lyrics exist */}
+        {!hasPlainLyrics && lyrics.length > 1 && onOffsetChange && (
+          <div className="flex items-center gap-1 bg-background/80 backdrop-blur rounded-lg px-1.5 py-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5"
+              onClick={() => adjustOffset(-0.5)}
+              title="Lyrics too slow (speed up)"
+            >
+              <Minus className="w-3 h-3" />
+            </Button>
+            <span className="text-[10px] font-mono min-w-[40px] text-center text-muted-foreground">
+              {offset > 0 ? '+' : ''}{offset.toFixed(1)}s
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5"
+              onClick={() => adjustOffset(0.5)}
+              title="Lyrics too fast (slow down)"
+            >
+              <Plus className="w-3 h-3" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Plain lyrics indicator */}
+      {hasPlainLyrics && (
+        <div className="absolute top-1 left-1 z-10">
+          <span className="text-[10px] text-muted-foreground bg-background/80 backdrop-blur rounded px-1.5 py-0.5">
+            No sync available
           </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-5 w-5"
-            onClick={() => adjustOffset(0.5)}
-            title="Lyrics too fast (slow down)"
-          >
-            <Plus className="w-3 h-3" />
-          </Button>
         </div>
       )}
       
@@ -132,8 +225,8 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
               ref={index === currentLineIndex ? activeLineRef : null}
               className={cn(
                 'lyric-line transition-all duration-300',
-                index === currentLineIndex && 'active',
-                index < currentLineIndex && 'past'
+                !hasPlainLyrics && index === currentLineIndex && 'active',
+                !hasPlainLyrics && index < currentLineIndex && 'past'
               )}
             >
               {line.text}
