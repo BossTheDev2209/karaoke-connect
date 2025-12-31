@@ -42,11 +42,32 @@ const KaraokeLine: React.FC<{
 }> = ({ text, lineProgress, isActive }) => {
   const words = text.split(/\s+/).filter(Boolean);
   const totalWords = words.length;
-  
+
+  // LRC only gives line-level timestamps, so we approximate word timing.
+  // Weight by word length so longer words take slightly longer than short ones.
+  const weights = useMemo(() => {
+    return words.map((w) => {
+      const cleaned = w.replace(/[^\p{L}\p{N}]+/gu, '');
+      return Math.max(1, cleaned.length);
+    });
+  }, [words]);
+
+  const totalWeight = useMemo(() => weights.reduce((sum, w) => sum + w, 0), [weights]);
+
   // Calculate which word index should be highlighted
-  const currentWordIndex = isActive 
-    ? Math.floor(lineProgress * totalWords)
-    : -1;
+  const currentWordIndex = useMemo(() => {
+    if (!isActive || totalWords === 0 || totalWeight === 0) return -1;
+    // Clamp progress to keep the highlight on the last word at the end.
+    const clamped = Math.max(0, Math.min(0.999999, lineProgress));
+    const target = clamped * totalWeight;
+
+    let acc = 0;
+    for (let i = 0; i < weights.length; i++) {
+      acc += weights[i];
+      if (target < acc) return i;
+    }
+    return totalWords - 1;
+  }, [isActive, lineProgress, totalWords, totalWeight, weights]);
 
   return (
     <span className="inline">
