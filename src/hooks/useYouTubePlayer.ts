@@ -57,13 +57,15 @@ export const useYouTubePlayer = (
   videoId: string | null,
   onStateChange?: (isPlaying: boolean) => void
 ): UseYouTubePlayerReturn => {
-  const [player, setPlayer] = useState<YouTubePlayer | null>(null);
+  const playerRef = useRef<YouTubePlayer | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const intervalRef = useRef<number>(0);
+  const currentVideoIdRef = useRef<string | null>(null);
+  const isPlayerReady = useRef(false);
 
   // Load YouTube IFrame API
   useEffect(() => {
@@ -78,8 +80,21 @@ export const useYouTubePlayer = (
   // Initialize player
   useEffect(() => {
     if (!videoId) return;
+    
+    // If player already exists and is ready, just load new video
+    if (playerRef.current && isPlayerReady.current) {
+      if (currentVideoIdRef.current !== videoId) {
+        currentVideoIdRef.current = videoId;
+        playerRef.current.loadVideoById(videoId);
+      }
+      return;
+    }
+
+    // Don't create a new player if one is already being initialized
+    if (playerRef.current) return;
 
     const initPlayer = () => {
+      currentVideoIdRef.current = videoId;
       const newPlayer = new window.YT.Player(containerId, {
         videoId,
         playerVars: {
@@ -95,6 +110,7 @@ export const useYouTubePlayer = (
         },
         events: {
           onReady: () => {
+            isPlayerReady.current = true;
             setIsReady(true);
             setDuration(newPlayer.getDuration());
           },
@@ -109,7 +125,7 @@ export const useYouTubePlayer = (
           },
         },
       });
-      setPlayer(newPlayer);
+      playerRef.current = newPlayer;
     };
 
     if (window.YT && window.YT.Player) {
@@ -127,9 +143,11 @@ export const useYouTubePlayer = (
 
   // Update current time periodically
   useEffect(() => {
-    if (isPlaying && player) {
+    if (isPlaying && playerRef.current) {
       intervalRef.current = window.setInterval(() => {
-        setCurrentTime(player.getCurrentTime());
+        if (playerRef.current && isPlayerReady.current) {
+          setCurrentTime(playerRef.current.getCurrentTime());
+        }
       }, 100);
     } else {
       if (intervalRef.current) {
@@ -142,44 +160,49 @@ export const useYouTubePlayer = (
         clearInterval(intervalRef.current);
       }
     };
-  }, [isPlaying, player]);
-
-  // Load new video when videoId changes
-  useEffect(() => {
-    if (player && videoId && isReady) {
-      player.loadVideoById(videoId);
-    }
-  }, [videoId, player, isReady]);
+  }, [isPlaying]);
 
   const play = useCallback(() => {
-    player?.playVideo();
-  }, [player]);
+    if (playerRef.current && isPlayerReady.current) {
+      playerRef.current.playVideo();
+    }
+  }, []);
 
   const pause = useCallback(() => {
-    player?.pauseVideo();
-  }, [player]);
+    if (playerRef.current && isPlayerReady.current) {
+      playerRef.current.pauseVideo();
+    }
+  }, []);
 
   const seekTo = useCallback((seconds: number) => {
-    player?.seekTo(seconds, true);
-    setCurrentTime(seconds);
-  }, [player]);
+    if (playerRef.current && isPlayerReady.current) {
+      playerRef.current.seekTo(seconds, true);
+      setCurrentTime(seconds);
+    }
+  }, []);
 
   const setVolume = useCallback((volume: number) => {
-    player?.setVolume(volume);
-  }, [player]);
+    if (playerRef.current && isPlayerReady.current) {
+      playerRef.current.setVolume(volume);
+    }
+  }, []);
 
   const mute = useCallback(() => {
-    player?.mute();
-    setIsMuted(true);
-  }, [player]);
+    if (playerRef.current && isPlayerReady.current) {
+      playerRef.current.mute();
+      setIsMuted(true);
+    }
+  }, []);
 
   const unmute = useCallback(() => {
-    player?.unMute();
-    setIsMuted(false);
-  }, [player]);
+    if (playerRef.current && isPlayerReady.current) {
+      playerRef.current.unMute();
+      setIsMuted(false);
+    }
+  }, []);
 
   return {
-    player,
+    player: playerRef.current,
     isReady,
     currentTime,
     duration,
