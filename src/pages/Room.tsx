@@ -46,32 +46,31 @@ const Room = () => {
   useEffect(() => {
     const root = document.documentElement;
     
+    // All theme-related CSS variables that should be updated
+    const themeVars = [
+      '--neon-pink', '--neon-purple', '--neon-blue',
+      '--primary', '--secondary', '--accent', '--ring'
+    ];
+    
     if (theme === 'auto' && autoColors) {
       root.style.setProperty('--neon-pink', autoColors.primary);
       root.style.setProperty('--neon-purple', autoColors.secondary);
       root.style.setProperty('--neon-blue', autoColors.accent);
       root.style.setProperty('--primary', autoColors.secondary);
+      root.style.setProperty('--secondary', autoColors.accent);
       root.style.setProperty('--accent', autoColors.primary);
       root.style.setProperty('--ring', autoColors.secondary);
     } else if (theme !== 'auto') {
       const styles = themeStyles[theme];
+      // Apply all theme variables from the themeStyles object
       Object.entries(styles).forEach(([key, value]) => {
         root.style.setProperty(key, value);
       });
-      // Also update primary/accent to match theme
-      root.style.setProperty('--primary', styles['--neon-purple']);
-      root.style.setProperty('--accent', styles['--neon-pink']);
-      root.style.setProperty('--ring', styles['--neon-purple']);
     }
 
     return () => {
-      // Reset to defaults on unmount
-      root.style.removeProperty('--neon-pink');
-      root.style.removeProperty('--neon-purple');
-      root.style.removeProperty('--neon-blue');
-      root.style.removeProperty('--primary');
-      root.style.removeProperty('--accent');
-      root.style.removeProperty('--ring');
+      // Reset all theme variables on unmount
+      themeVars.forEach(v => root.style.removeProperty(v));
     };
   }, [theme, autoColors]);
 
