@@ -9,8 +9,11 @@ interface UseMicrophoneReturn {
   error: string | null;
 }
 
-const VOLUME_THRESHOLD = 0.02;
-const SMOOTHING = 0.8;
+// Lower threshold for better proximity detection
+const VOLUME_THRESHOLD = 0.008;
+const SMOOTHING = 0.7;
+// Boost factor for better sensitivity
+const SENSITIVITY_BOOST = 1.5;
 
 export const useMicrophone = (onSpeakingChange?: (isSpeaking: boolean, level: number) => void): UseMicrophoneReturn => {
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -32,8 +35,22 @@ export const useMicrophone = (onSpeakingChange?: (isSpeaking: boolean, level: nu
     const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
     analyserRef.current.getByteFrequencyData(dataArray);
 
-    const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-    const normalizedVolume = Math.min(1, average / 128); // Boost sensitivity a bit
+    // Focus on voice frequency range (300Hz - 3400Hz) for better speech detection
+    const voiceStartBin = Math.floor(300 / (44100 / analyserRef.current.fftSize));
+    const voiceEndBin = Math.floor(3400 / (44100 / analyserRef.current.fftSize));
+    
+    let voiceSum = 0;
+    for (let i = voiceStartBin; i < voiceEndBin && i < dataArray.length; i++) {
+      voiceSum += dataArray[i];
+    }
+    const voiceAverage = voiceSum / (voiceEndBin - voiceStartBin);
+    
+    // Also get overall average for comparison
+    const overallAverage = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+    
+    // Weight voice frequencies more heavily
+    const weightedAverage = (voiceAverage * 0.7 + overallAverage * 0.3);
+    const normalizedVolume = Math.min(1, (weightedAverage / 100) * SENSITIVITY_BOOST);
     
     setVolume(prev => prev * SMOOTHING + normalizedVolume * (1 - SMOOTHING));
     

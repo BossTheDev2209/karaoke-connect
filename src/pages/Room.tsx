@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { User, RoomMode, BattleFormat, Song } from '@/types/karaoke';
 import { useRoom } from '@/hooks/useRoom';
@@ -17,6 +17,7 @@ import { RoomSettings } from '@/components/RoomSettings';
 import { CelebrationOverlay, getCurrentCelebration } from '@/components/effects/CelebrationOverlay';
 import { ReactionBar, FloatingReactions, useReactions, useWaving } from '@/components/Reactions';
 import { SingReactOverlay } from '@/components/effects/SingReactOverlay';
+import { DustFallEffect } from '@/components/effects/SingerEffects';
 import { useAudioReactive } from '@/hooks/useAudioReactive';
 import { useVoteKick } from '@/components/VoteKick';
 import { VotingPanel } from '@/components/VotingPanel';
@@ -121,9 +122,16 @@ const Room = () => {
   // Audio reactive for light sticks (after isPlaying is defined)
   const { intensity: audioIntensity, beatPhase, isBeat, bpm } = useAudioReactive({ enabled: isPlaying, sensitivity: 6, targetBpm: 120 });
 
+  // Calculate max audio level from all users for screen effects
+  const maxUserAudioLevel = useMemo(() => {
+    return Math.max(0, ...users.map(u => u.audioLevel || 0));
+  }, [users]);
+  
+  // Check if anyone is singing loudly (for dust/shake effects)
+  const isLoudSinging = maxUserAudioLevel > 0.5;
+
   const remainingSeconds = duration > 0 ? Math.ceil(duration - currentTime) : null;
   const showCountdown = isPlaying && remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 5;
-
   // Preload lyrics for queued songs
   const { getStatusForSong, getLyricsForSong } = useLyricsPreload(queue, playbackState.currentSongIndex);
 
@@ -207,10 +215,9 @@ const Room = () => {
       {celebrationEnabled && <CelebrationOverlay theme={celebration} />}
       
       {/* Floating reactions */}
-      <FloatingReactions reactions={reactions} />
       
-
-
+      {/* Dust fall effect when singing loudly */}
+      <DustFallEffect isActive={isLoudSinging && isPlaying} intensity={maxUserAudioLevel} />
       {/* Header */}
       <header className="flex items-center justify-between">
         <RoomCodeDisplay code={code} />

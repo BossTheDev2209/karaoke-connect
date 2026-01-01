@@ -3,6 +3,7 @@ import { User, RoomMode, BattleFormat } from '@/types/karaoke';
 import { UserAvatar } from './UserAvatar';
 import { LightStick, LIGHTSTICK_COLORS } from './effects/LightStick';
 import { VoteKickButton } from './VoteKick';
+import { SingerSpotlight, MusicNotesEffect, DustFallEffect } from './effects/SingerEffects';
 import { cn } from '@/lib/utils';
 import {
   Popover,
@@ -78,16 +79,31 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
     const isWaving = wavingUsers.has(user.id);
     const color = getUserColor(user.id);
     const isMainSinger = user.id === activeMainSingerId;
+    const userAudioLevel = user.audioLevel || 0;
     
     // Cheerleader effect: jump if member of other team is singing
     const isCheerleader = roomMode === 'team-battle' && activeTeam && user.team !== activeTeam && activeMainSingerId;
 
+    // Dynamic scale based on audio level for main singer
+    const dynamicScale = isMainSinger ? 1.15 + (userAudioLevel * 0.15) : 1;
+    const translateY = isMainSinger ? -8 - (userAudioLevel * 8) : 0;
+
     return (
       <div key={user.id} className={cn(
-        "flex items-end gap-1 group relative transition-all duration-500",
-        isMainSinger ? "z-20 scale-110 -translate-y-2" : "z-10",
+        "flex items-end gap-1 group relative transition-all duration-300",
+        isMainSinger ? "z-20" : "z-10",
         isCheerleader && "animate-bounce"
-      )}>
+      )}
+      style={{
+        transform: `scale(${dynamicScale}) translateY(${translateY}px)`,
+      }}
+      >
+        {/* Spotlight effect for main singer */}
+        <SingerSpotlight isMainSinger={isMainSinger} audioLevel={userAudioLevel} />
+        
+        {/* Music notes floating effect */}
+        <MusicNotesEffect isActive={isMainSinger && user.isSpeaking} audioLevel={userAudioLevel} />
+
         {/* Vote kick button */}
         {onStartVoteKick && users.length >= 2 && (
           <div className="absolute -top-1 -right-1 z-10">
@@ -128,6 +144,7 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
                   size="lg"
                   showName
                   isMainSinger={isMainSinger}
+                  audioLevel={userAudioLevel}
                 />
               </button>
             </PopoverTrigger>
