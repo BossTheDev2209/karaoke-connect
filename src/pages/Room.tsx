@@ -18,7 +18,8 @@ import { CelebrationOverlay, getCurrentCelebration } from '@/components/effects/
 import { ReactionBar, FloatingReactions, useReactions, useWaving } from '@/components/Reactions';
 import { SingReactOverlay } from '@/components/effects/SingReactOverlay';
 import { useAudioReactive } from '@/hooks/useAudioReactive';
-import { useVoteKick, VoteKickBanner } from '@/components/VoteKick';
+import { useVoteKick } from '@/components/VoteKick';
+import { VotingPanel } from '@/components/VotingPanel';
 import { LogOut, Swords, Mic2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -228,14 +229,24 @@ const Room = () => {
             {roomMode === 'team-battle' ? 'Team Battle' : 'Free Sing'}
           </div>
 
+          {/* Unified Voting Panel */}
+          <VotingPanel
+            channel={channel}
+            currentUserId={user.id}
+            users={users}
+            currentMode={roomMode}
+            onModeChange={updateMode}
+            activeVoteKick={activeVoteKick}
+            hasVoted={hasVoted}
+            onStartVoteKick={startVoteKick}
+            onVoteYes={voteYes}
+            onVoteNo={voteNo}
+            voteKickDisabled={!!activeVoteKick}
+          />
+
           <RoomSettings 
             celebrationEnabled={celebrationEnabled} 
             onCelebrationToggle={setCelebrationEnabled}
-            channel={channel}
-            currentUserId={user.id}
-            usersCount={users.length}
-            currentMode={roomMode}
-            onModeChange={updateMode}
             eqSettings={eqSettings}
             onEqChange={handleEqChange}
           />
@@ -341,16 +352,6 @@ const Room = () => {
             onSync={requestSync}
           />
 
-          {/* Vote kick banner - moved under controls */}
-          {activeVoteKick && (
-            <VoteKickBanner
-              voteKick={activeVoteKick}
-              currentUserId={user.id}
-              hasVoted={hasVoted}
-              onVoteYes={voteYes}
-              onVoteNo={voteNo}
-            />
-          )}
           
           {/* Reactions */}
           <div className="mt-auto pt-4">

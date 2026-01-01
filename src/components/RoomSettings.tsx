@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Palette, Sparkles, PartyPopper, Waves, Zap, Shapes, Music, Swords, Users2, Mic2 } from 'lucide-react';
+import { Settings, Palette, Sparkles, PartyPopper, Waves, Zap, Shapes, Music, Mic2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -21,19 +21,11 @@ import {
 } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
 import { useTheme, THEME_PRESETS } from '@/contexts/ThemeContext';
-import { ModeVoting } from './ModeVoting';
-import { RealtimeChannel } from '@supabase/supabase-js';
-import { RoomMode, BattleFormat } from '@/types/karaoke';
 import { EQSettings } from './EQSettings';
 
 interface RoomSettingsProps {
   celebrationEnabled: boolean;
   onCelebrationToggle: (enabled: boolean) => void;
-  channel: RealtimeChannel | null;
-  currentUserId: string;
-  usersCount: number;
-  currentMode: RoomMode;
-  onModeChange: (mode: RoomMode, format?: BattleFormat) => void;
   eqSettings?: number[];
   onEqChange?: (settings: number[]) => void;
 }
@@ -41,11 +33,6 @@ interface RoomSettingsProps {
 export const RoomSettings: React.FC<RoomSettingsProps> = ({
   celebrationEnabled,
   onCelebrationToggle,
-  channel,
-  currentUserId,
-  usersCount,
-  currentMode,
-  onModeChange,
   eqSettings,
   onEqChange,
 }) => {
@@ -85,10 +72,6 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({
             <TabsTrigger value="effects" className="flex items-center gap-2">
               <PartyPopper className="w-4 h-4" />
               Effects
-            </TabsTrigger>
-            <TabsTrigger value="mode" className="flex items-center gap-2">
-              <Swords className="w-4 h-4" />
-              Mode
             </TabsTrigger>
             <TabsTrigger value="audio" className="flex items-center gap-2">
               <Mic2 className="w-4 h-4" />
@@ -242,49 +225,6 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({
             </p>
           </TabsContent>
 
-          <TabsContent value="mode" className="mt-4 space-y-6">
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
-                <div className="flex items-center gap-3 mb-2">
-                  <Swords className="w-5 h-5 text-primary" />
-                  <h4 className="font-semibold text-sm">Room Mode</h4>
-                </div>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Vote with friends to change how the room works!
-                </p>
-                <ModeVoting
-                  channel={channel}
-                  currentUserId={currentUserId}
-                  usersCount={usersCount}
-                  currentMode={currentMode}
-                  onModeChange={onModeChange}
-                />
-              </div>
-
-              {currentMode === 'team-battle' && (
-                <div className="p-4 rounded-xl bg-accent/5 border border-accent/20 animate-in zoom-in-95 duration-300">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Users2 className="w-5 h-5 text-accent" />
-                    <h4 className="font-semibold text-sm">Team Battle Settings</h4>
-                  </div>
-                  <div className="space-y-3">
-                    <Label className="text-xs">Battle Format</Label>
-                    <Select defaultValue="1v1">
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1v1">1v1 Showdown</SelectItem>
-                        <SelectItem value="2v2">2v2 Tag Team</SelectItem>
-                        <SelectItem value="3v3">3v3 Group War</SelectItem>
-                        <SelectItem value="4v4">4v4 Mega Battle</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              )}
-            </div>
-          </TabsContent>
 
           <TabsContent value="audio" className="mt-4 space-y-6 overflow-y-auto max-h-[70vh] pb-6 px-1">
             <EQSettings 
