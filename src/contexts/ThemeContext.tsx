@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 
 // Theme presets
 export type ThemePreset = 'auto' | 'neon' | 'ocean' | 'sunset' | 'forest' | 'galaxy' | 'retro' | 'midnight' | 'candy' | 'ember';
+export type BackgroundEffect = 'none' | 'beat-sync' | 'particles' | 'neon-grid' | 'wave-form';
 
 interface ThemeColors {
   primary: string;   // HSL format: "280 100% 65%"
@@ -12,6 +13,10 @@ interface ThemeColors {
 interface ThemeContextValue {
   preset: ThemePreset;
   setPreset: (preset: ThemePreset) => void;
+  backgroundEffect: BackgroundEffect;
+  setBackgroundEffect: (effect: BackgroundEffect) => void;
+  karaokeFilterEnabled: boolean;
+  setKaraokeFilterEnabled: (enabled: boolean) => void;
   setVideoId: (videoId: string | null) => void;
   colors: ThemeColors;
 }
@@ -175,6 +180,8 @@ interface ThemeProviderProps {
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [preset, setPresetState] = useState<ThemePreset>('neon');
+  const [backgroundEffect, setBackgroundEffectState] = useState<BackgroundEffect>('beat-sync');
+  const [karaokeFilterEnabled, setKaraokeFilterEnabledState] = useState<boolean>(true);
   const [videoId, setVideoId] = useState<string | null>(null);
   const [autoColors, setAutoColors] = useState<ThemeColors | null>(null);
   const extractionRef = useRef<string | null>(null);
@@ -192,12 +199,36 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     } catch {}
   }, []);
 
+  const setBackgroundEffect = useCallback((effect: BackgroundEffect) => {
+    setBackgroundEffectState(effect);
+    try {
+      localStorage.setItem('karaoke_background_effect', effect);
+    } catch {}
+  }, []);
+
+  const setKaraokeFilterEnabled = useCallback((enabled: boolean) => {
+    setKaraokeFilterEnabledState(enabled);
+    try {
+      localStorage.setItem('karaoke_search_filter', enabled ? 'true' : 'false');
+    } catch {}
+  }, []);
+
   // Load saved preset on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('karaoke_theme_preset') as ThemePreset | null;
-      if (saved && (saved === 'auto' || PRESET_COLORS[saved])) {
-        setPresetState(saved);
+      const savedPreset = localStorage.getItem('karaoke_theme_preset') as ThemePreset | null;
+      if (savedPreset && (savedPreset === 'auto' || PRESET_COLORS[savedPreset])) {
+        setPresetState(savedPreset);
+      }
+      
+      const savedEffect = localStorage.getItem('karaoke_background_effect') as BackgroundEffect | null;
+      if (savedEffect && ['none', 'beat-sync', 'particles', 'neon-grid', 'wave-form'].includes(savedEffect)) {
+        setBackgroundEffectState(savedEffect);
+      }
+
+      const savedFilter = localStorage.getItem('karaoke_search_filter');
+      if (savedFilter !== null) {
+        setKaraokeFilterEnabledState(savedFilter === 'true');
       }
     } catch {}
   }, []);
@@ -227,7 +258,16 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   }, [colors]);
 
   return (
-    <ThemeContext.Provider value={{ preset, setPreset, setVideoId, colors }}>
+    <ThemeContext.Provider value={{ 
+      preset, 
+      setPreset, 
+      backgroundEffect, 
+      setBackgroundEffect, 
+      karaokeFilterEnabled,
+      setKaraokeFilterEnabled,
+      setVideoId, 
+      colors 
+    }}>
       {children}
     </ThemeContext.Provider>
   );

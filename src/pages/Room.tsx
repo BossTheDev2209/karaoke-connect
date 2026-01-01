@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { User, Song } from '@/types/karaoke';
+import { User, RoomMode, BattleFormat, Song } from '@/types/karaoke';
 import { useRoom } from '@/hooks/useRoom';
 import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
 import { useLyrics } from '@/hooks/useLyrics';
@@ -19,8 +19,9 @@ import { ReactionBar, FloatingReactions, useReactions, useWaving } from '@/compo
 import { SingReactOverlay } from '@/components/effects/SingReactOverlay';
 import { useAudioReactive } from '@/hooks/useAudioReactive';
 import { useVoteKick, VoteKickBanner } from '@/components/VoteKick';
-import { LogOut } from 'lucide-react';
+import { LogOut, Swords, Mic2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const Room = () => {
   const { code } = useParams<{ code: string }>();
@@ -29,6 +30,23 @@ const Room = () => {
   const [volume, setVolume] = useState(80);
   const [celebration] = useState(getCurrentCelebration());
   const [celebrationEnabled, setCelebrationEnabled] = useState(true);
+  const [userVolumes, setUserVolumes] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem('karaoke_user_volumes');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('karaoke_user_volumes', JSON.stringify(userVolumes));
+  }, [userVolumes]);
+
+  const handleUserVolumeChange = (userId: string, volume: number) => {
+    setUserVolumes(prev => ({ ...prev, [userId]: volume }));
+  };
+
+  const [eqSettings, setEqSettings] = useState<number[]>(() => {
+    const saved = localStorage.getItem('karaoke_eq_custom');
+    return saved ? JSON.parse(saved) : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  });
   
   // Theme context
   const { setVideoId } = useTheme();
@@ -42,7 +60,21 @@ const Room = () => {
     }
   }, [navigate]);
 
-  const { users, queue, playbackState, isConnected, channel, updatePlayback, updateQueue, updateSpeaking, requestSync } = useRoom(code || '', user);
+  const { 
+    users, 
+    queue, 
+    playbackState, 
+    roomMode,
+    battleFormat,
+    isConnected, 
+    channel, 
+    updatePlayback, 
+    updateQueue, 
+    updateSpeaking, 
+    updateMode,
+    updateTeams,
+    requestSync 
+  } = useRoom(code || '', user);
   
   const currentSong = queue[playbackState.currentSongIndex];
   
@@ -104,11 +136,16 @@ const Room = () => {
     preloadedLyrics
   );
 
-  const handleSpeakingChange = useCallback((isSpeaking: boolean) => {
-    updateSpeaking(isSpeaking);
+  const handleSpeakingChange = useCallback((isSpeaking: boolean, level: number) => {
+    updateSpeaking(isSpeaking, level);
   }, [updateSpeaking]);
 
-  const { isEnabled: isMicEnabled, toggleMic } = useMicrophone(handleSpeakingChange);
+  const { isEnabled: isMicEnabled, toggleMic, applyEQ } = useMicrophone(handleSpeakingChange);
+
+  const handleEqChange = (newSettings: number[]) => {
+    setEqSettings(newSettings);
+    applyEQ(newSettings);
+  };
 
   const handlePlayPause = () => {
     if (isPlaying) {
@@ -171,16 +208,7 @@ const Room = () => {
       {/* Floating reactions */}
       <FloatingReactions reactions={reactions} />
       
-      {/* Vote kick banner */}
-      {activeVoteKick && (
-        <VoteKickBanner
-          voteKick={activeVoteKick}
-          currentUserId={user.id}
-          hasVoted={hasVoted}
-          onVoteYes={voteYes}
-          onVoteNo={voteNo}
-        />
-      )}
+
 
       {/* Header */}
       <header className="flex items-center justify-between">
@@ -188,9 +216,28 @@ const Room = () => {
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-neon-green' : 'bg-destructive'}`} />
           <span className="text-sm text-muted-foreground">{users.length} online</span>
+          
+          {/* Mode Badge */}
+          <div className={cn(
+            "flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all",
+            roomMode === 'team-battle' 
+              ? "bg-primary/20 border-primary text-primary animate-pulse" 
+              : "bg-muted/50 border-border text-muted-foreground"
+          )}>
+            {roomMode === 'team-battle' ? <Swords className="w-3 h-3" /> : <Mic2 className="w-3 h-3" />}
+            {roomMode === 'team-battle' ? 'Team Battle' : 'Free Sing'}
+          </div>
+
           <RoomSettings 
             celebrationEnabled={celebrationEnabled} 
-            onCelebrationToggle={setCelebrationEnabled} 
+            onCelebrationToggle={setCelebrationEnabled}
+            channel={channel}
+            currentUserId={user.id}
+            usersCount={users.length}
+            currentMode={roomMode}
+            onModeChange={updateMode}
+            eqSettings={eqSettings}
+            onEqChange={handleEqChange}
           />
           <Button variant="ghost" size="icon" onClick={handleLeave}>
             <LogOut className="w-4 h-4" />
@@ -290,9 +337,20 @@ const Room = () => {
             onSeek={handleSeek}
             onVolumeChange={handleVolumeChange}
             onMuteToggle={isMuted ? unmute : mute}
-            onMicToggle={toggleMic}
+            onMicToggle={() => toggleMic(eqSettings)}
             onSync={requestSync}
           />
+
+          {/* Vote kick banner - moved under controls */}
+          {activeVoteKick && (
+            <VoteKickBanner
+              voteKick={activeVoteKick}
+              currentUserId={user.id}
+              hasVoted={hasVoted}
+              onVoteYes={voteYes}
+              onVoteNo={voteNo}
+            />
+          )}
           
           {/* Reactions */}
           <div className="mt-auto pt-4">
@@ -312,6 +370,10 @@ const Room = () => {
         bpm={bpm}
         onStartVoteKick={startVoteKick}
         voteKickDisabled={!!activeVoteKick}
+        roomMode={roomMode}
+        battleFormat={battleFormat}
+        userVolumes={userVolumes}
+        onVolumeChange={handleUserVolumeChange}
       />
     </div>
   );

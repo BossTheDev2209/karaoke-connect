@@ -1,17 +1,58 @@
-import { toRomaji, isJapanese, isKana, isKanji } from 'wanakana';
+import Kuroshiro from 'kuroshiro';
+import KuromojiAnalyzer from 'kuroshiro-analyzer-kuromoji';
 import { pinyin } from 'pinyin-pro';
+import { isJapanese, toRomaji } from 'wanakana';
+
+// Singleton instance for Kuroshiro
+let kuroshiro: any = null;
+let isInitializing = false;
+let initPromise: Promise<void> | null = null;
+let initializationFailed = false;
+
+// Initialize Kuroshiro engine
+export const initRomanization = async (): Promise<void> => {
+  if (kuroshiro) return;
+  if (isInitializing) return initPromise!;
+
+  isInitializing = true;
+  initPromise = (async () => {
+    try {
+      console.log('Initializing Kuroshiro with Kuromoji analyzer...');
+      
+      // In Vite/ESM, we need to handle the .default export carefully
+      const KClass = (Kuroshiro as any).default || Kuroshiro;
+      const AClass = (KuromojiAnalyzer as any).default || KuromojiAnalyzer;
+      
+      const instance = new KClass();
+      await instance.init(new AClass({
+        dictPath: '/dict/' // Ensure trailing slash for kuromoji
+      }));
+      
+      kuroshiro = instance;
+      console.log('Kuroshiro engine ready.');
+    } catch (error) {
+      console.error('Kuroshiro initialization failed:', error);
+      initializationFailed = true;
+      kuroshiro = null;
+    } finally {
+      isInitializing = false;
+    }
+  })();
+
+  return initPromise;
+};
 
 // Check if text contains Chinese characters
 export const containsChinese = (text: string): boolean => {
   return /[\u4e00-\u9fff]/.test(text) && !isJapanese(text);
 };
 
-// Check if text contains Japanese (Hiragana, Katakana, or Kanji with Japanese context)
+// Check if text contains Japanese
 export const containsJapanese = (text: string): boolean => {
   return isJapanese(text) || /[\u3040-\u309f\u30a0-\u30ff]/.test(text);
 };
 
-// Check if text contains Korean (Hangul)
+// Check if text contains Korean
 export const containsKorean = (text: string): boolean => {
   return /[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/.test(text);
 };
@@ -22,11 +63,28 @@ export const containsCJK = (text: string): boolean => {
 };
 
 // Romanize Japanese text
-export const romanizeJapanese = (text: string): string => {
+export const romanizeJapanese = async (text: string): Promise<string> => {
   try {
+    // If not initialized, start it but don't block yet (we'll use fallback)
+    if (!kuroshiro && !isInitializing && !initializationFailed) {
+      initRomanization();
+    }
+
+    // If Kuroshiro is ready, use it for Kanji support
+    if (kuroshiro) {
+      const result = await kuroshiro.convert(text, { 
+        to: 'romaji', 
+        mode: 'spaced', 
+        romajiSystem: 'passport' 
+      });
+      if (result && result !== text) return result;
+    }
+    
+    // Fallback: Use Wanakana (handles Hiragana/Katakana but not Kanji)
     return toRomaji(text);
-  } catch {
-    return text;
+  } catch (error) {
+    console.warn('Advanced romanization failed, falling back to basic:', error);
+    return toRomaji(text);
   }
 };
 
@@ -70,27 +128,20 @@ const finalCodes = ['', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 
 export const romanizeKorean = (text: string): string => {
   try {
     let result = '';
-    
     for (const char of text) {
       const code = char.charCodeAt(0);
-      
-      // Check if it's a Hangul syllable (가-힣)
       if (code >= 0xAC00 && code <= 0xD7A3) {
         const syllableIndex = code - 0xAC00;
         const initialIndex = Math.floor(syllableIndex / (21 * 28));
         const vowelIndex = Math.floor((syllableIndex % (21 * 28)) / 28);
         const finalIndex = syllableIndex % 28;
-        
-        const initial = initialCodes[initialIndex];
-        const vowel = vowelCodes[vowelIndex];
-        const final = finalCodes[finalIndex];
-        
-        result += (koreanInitials[initial] || '') + (koreanVowels[vowel] || '') + (koreanFinals[final] || '');
+        result += (koreanInitials[initialCodes[initialIndex]] || '') + 
+                  (koreanVowels[vowelCodes[vowelIndex]] || '') + 
+                  (koreanFinals[finalCodes[finalIndex]] || '');
       } else {
         result += char;
       }
     }
-    
     return result;
   } catch {
     return text;
@@ -98,23 +149,11 @@ export const romanizeKorean = (text: string): string => {
 };
 
 // Get romanization for any CJK text
-export const romanize = (text: string): string | null => {
-  if (!containsCJK(text)) {
-    return null;
-  }
-  
-  if (containsJapanese(text)) {
-    return romanizeJapanese(text);
-  }
-  
-  if (containsKorean(text)) {
-    return romanizeKorean(text);
-  }
-  
-  if (containsChinese(text)) {
-    return romanizeChinese(text);
-  }
-  
+export const romanize = async (text: string): Promise<string | null> => {
+  if (!containsCJK(text)) return null;
+  if (containsJapanese(text)) return await romanizeJapanese(text);
+  if (containsKorean(text)) return romanizeKorean(text);
+  if (containsChinese(text)) return romanizeChinese(text);
   return null;
 };
 

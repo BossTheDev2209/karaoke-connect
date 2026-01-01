@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Palette, Sparkles, PartyPopper } from 'lucide-react';
+import { Settings, Palette, Sparkles, PartyPopper, Waves, Zap, Shapes, Music, Swords, Users2, Mic2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -12,19 +12,51 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from '@/lib/utils';
 import { useTheme, THEME_PRESETS } from '@/contexts/ThemeContext';
+import { ModeVoting } from './ModeVoting';
+import { RealtimeChannel } from '@supabase/supabase-js';
+import { RoomMode, BattleFormat } from '@/types/karaoke';
+import { EQSettings } from './EQSettings';
 
 interface RoomSettingsProps {
   celebrationEnabled: boolean;
   onCelebrationToggle: (enabled: boolean) => void;
+  channel: RealtimeChannel | null;
+  currentUserId: string;
+  usersCount: number;
+  currentMode: RoomMode;
+  onModeChange: (mode: RoomMode, format?: BattleFormat) => void;
+  eqSettings?: number[];
+  onEqChange?: (settings: number[]) => void;
 }
 
 export const RoomSettings: React.FC<RoomSettingsProps> = ({
   celebrationEnabled,
   onCelebrationToggle,
+  channel,
+  currentUserId,
+  usersCount,
+  currentMode,
+  onModeChange,
+  eqSettings,
+  onEqChange,
 }) => {
-  const { preset, setPreset } = useTheme();
+  const { 
+    preset, 
+    setPreset, 
+    backgroundEffect, 
+    setBackgroundEffect,
+    karaokeFilterEnabled,
+    setKaraokeFilterEnabled
+  } = useTheme();
 
   return (
     <Sheet>
@@ -45,7 +77,7 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({
         </SheetHeader>
 
         <Tabs defaultValue="theme" className="mt-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="theme" className="flex items-center gap-2">
               <Palette className="w-4 h-4" />
               Theme
@@ -53,6 +85,14 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({
             <TabsTrigger value="effects" className="flex items-center gap-2">
               <PartyPopper className="w-4 h-4" />
               Effects
+            </TabsTrigger>
+            <TabsTrigger value="mode" className="flex items-center gap-2">
+              <Swords className="w-4 h-4" />
+              Mode
+            </TabsTrigger>
+            <TabsTrigger value="audio" className="flex items-center gap-2">
+              <Mic2 className="w-4 h-4" />
+              Audio
             </TabsTrigger>
           </TabsList>
 
@@ -102,6 +142,77 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({
           </TabsContent>
 
           <TabsContent value="effects" className="mt-4 space-y-6">
+            <div className="space-y-3">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Waves className="w-4 h-4 text-primary" />
+                Background Visuals
+              </Label>
+              <Select 
+                value={backgroundEffect} 
+                onValueChange={(value: any) => setBackgroundEffect(value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select effect" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    <div className="flex items-center gap-2">
+                      <Shapes className="w-4 h-4" />
+                      <span>None</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="beat-sync">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4" />
+                      <span>Beat Sync (Classic)</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="particles">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" />
+                      <span>Floating Particles</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="neon-grid">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border border-primary/50 bg-primary/20" />
+                      <span>Retro Neon Grid</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="wave-form">
+                    <div className="flex items-center gap-2">
+                      <Waves className="w-4 h-4" />
+                      <span>Audio Waveform</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground px-1">
+                Choose a visual effect that reacts to the music playback.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between p-4 rounded-lg bg-card border border-border">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-primary/20 relative">
+                  <Music className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <Label htmlFor="search-filter-toggle" className="text-sm font-medium">
+                    Search Filter
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Only show Instrumental/Karaoke versions
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="search-filter-toggle"
+                checked={karaokeFilterEnabled}
+                onCheckedChange={setKaraokeFilterEnabled}
+              />
+            </div>
+
             <div className="flex items-center justify-between p-4 rounded-lg bg-card border border-border">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-full bg-primary/20 relative">
@@ -129,6 +240,57 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({
             <p className="text-xs text-muted-foreground text-center">
               Celebrations auto-activate during special events like New Year, Christmas, and Halloween.
             </p>
+          </TabsContent>
+
+          <TabsContent value="mode" className="mt-4 space-y-6">
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+                <div className="flex items-center gap-3 mb-2">
+                  <Swords className="w-5 h-5 text-primary" />
+                  <h4 className="font-semibold text-sm">Room Mode</h4>
+                </div>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Vote with friends to change how the room works!
+                </p>
+                <ModeVoting
+                  channel={channel}
+                  currentUserId={currentUserId}
+                  usersCount={usersCount}
+                  currentMode={currentMode}
+                  onModeChange={onModeChange}
+                />
+              </div>
+
+              {currentMode === 'team-battle' && (
+                <div className="p-4 rounded-xl bg-accent/5 border border-accent/20 animate-in zoom-in-95 duration-300">
+                  <div className="flex items-center gap-3 mb-3">
+                    <Users2 className="w-5 h-5 text-accent" />
+                    <h4 className="font-semibold text-sm">Team Battle Settings</h4>
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-xs">Battle Format</Label>
+                    <Select defaultValue="1v1">
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1v1">1v1 Showdown</SelectItem>
+                        <SelectItem value="2v2">2v2 Tag Team</SelectItem>
+                        <SelectItem value="3v3">3v3 Group War</SelectItem>
+                        <SelectItem value="4v4">4v4 Mega Battle</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="audio" className="mt-4 space-y-6 overflow-y-auto max-h-[70vh] pb-6 px-1">
+            <EQSettings 
+              initialSettings={eqSettings} 
+              onChange={onEqChange} 
+            />
           </TabsContent>
         </Tabs>
       </SheetContent>

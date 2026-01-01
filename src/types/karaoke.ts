@@ -1,13 +1,22 @@
+export type RoomMode = 'free-sing' | 'team-battle';
+export type BattleFormat = '1v1' | '2v2' | '3v3' | '4v4' | '5v5';
+
 export interface User {
   id: string;
   nickname: string;
-  avatarId: string; // Changed to string for human avatar customization
-  customAvatarNormal?: string; // Custom image URL when not speaking
-  customAvatarSpeaking?: string; // Custom image URL when speaking
+  avatarId: string;
+  customAvatarNormal?: string;
+  customAvatarSpeaking?: string;
   isSpeaking: boolean;
+  audioLevel?: number;
+  team?: 'left' | 'right';
+  score?: number;
+  discordId?: string;
+  discordUsername?: string;
+  discordAvatar?: string;
+  eqSettings?: number[]; // dB values for 10 bands
 }
 
-// Human avatar customization
 export interface AvatarConfig {
   bodyColor: string;
   hairStyle: 'short' | 'long' | 'spiky' | 'curly' | 'bald' | 'ponytail';
@@ -28,7 +37,7 @@ export interface Song {
 export interface LyricLine {
   time: number;
   text: string;
-  romanization?: string; // Optional romanization for CJK lyrics
+  romanization?: string;
 }
 
 export interface PlaybackState {
@@ -43,6 +52,8 @@ export interface Room {
   users: User[];
   queue: Song[];
   playbackState: PlaybackState;
+  mode: RoomMode;
+  battleFormat?: BattleFormat;
 }
 
 export interface YouTubeSearchResult {
@@ -66,11 +77,22 @@ export interface YouTubeChannel {
 export interface VoteKick {
   targetUserId: string;
   initiatorId: string;
-  votes: Set<string>; // User IDs who voted
+  votes: Set<string>;
   createdAt: number;
 }
 
 export type RealtimePayload = {
-  type: 'playback_update' | 'queue_update' | 'speaking_update' | 'sync_request' | 'vote_kick_start' | 'vote_kick_vote' | 'kick_user';
+  type: 
+    | 'playback_update' 
+    | 'queue_update' 
+    | 'speaking_update' 
+    | 'sync_request' 
+    | 'vote_kick_start' 
+    | 'vote_kick_vote' 
+    | 'kick_user'
+    | 'mode_vote_start'
+    | 'mode_vote_cast'
+    | 'mode_update'
+    | 'team_update';
   payload: unknown;
 };

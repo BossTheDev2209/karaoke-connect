@@ -137,8 +137,8 @@ export const useVoteKick = (
   const startVoteKick = useCallback((target: User) => {
     if (!channel || users.length < 2) return;
     
-    // Need majority to kick (at least 2 votes for small rooms)
-    const requiredVotes = Math.max(2, Math.ceil((users.length - 1) / 2));
+    // Need absolute majority to kick (> 50% of people in room)
+    const requiredVotes = Math.floor(users.length / 2) + 1;
     
     const voteData: VoteKickState = {
       targetUserId: target.id,
@@ -233,12 +233,12 @@ export const VoteKickButton: React.FC<VoteKickButtonProps> = ({
       <Button
         variant="ghost"
         size="icon"
-        className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+        className="w-7 h-7 opacity-40 group-hover:opacity-100 transition-all duration-300 text-destructive hover:text-destructive hover:bg-destructive/10 bg-background/50 backdrop-blur-sm rounded-full border border-destructive/20"
         onClick={() => setConfirmOpen(true)}
         disabled={disabled}
-        title="Vote to kick"
+        title={`Vote to kick ${user.nickname}`}
       >
-        <UserX className="w-3.5 h-3.5" />
+        <UserX className="w-4 h-4" />
       </Button>
       
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -285,13 +285,15 @@ export const VoteKickBanner: React.FC<VoteKickBannerProps> = ({
   const isTarget = voteKick.targetUserId === currentUserId;
 
   return (
-    <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
-      <div className="bg-card border border-destructive/50 rounded-xl px-4 py-3 shadow-lg flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <UserX className="w-5 h-5 text-destructive" />
-          <div>
-            <p className="text-sm font-medium">
-              {isTarget ? 'Vote to kick you' : `Vote to kick ${voteKick.targetNickname}`}
+    <div className="relative w-full mt-4 z-10 animate-fade-in">
+      <div className="glass-morphism border-2 border-destructive/30 rounded-2xl px-4 py-3 shadow-xl flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-1.5 bg-destructive/10 rounded-full shrink-0">
+            <UserX className="w-5 h-5 text-destructive animate-pulse" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold truncate">
+              {isTarget ? 'Vote to kick you' : `Kick ${voteKick.targetNickname}?`}
             </p>
             <p className="text-xs text-muted-foreground">
               {voteKick.votes.length}/{voteKick.requiredVotes} votes needed
@@ -305,25 +307,29 @@ export const VoteKickBanner: React.FC<VoteKickBannerProps> = ({
               size="sm"
               variant="destructive"
               onClick={onVoteYes}
-              className="h-8"
+              className="flex-1 h-8 text-xs"
             >
-              <Check className="w-4 h-4 mr-1" />
+              <Check className="w-3.5 h-3.5 mr-1" />
               Yes
             </Button>
             <Button
               size="sm"
               variant="outline"
               onClick={onVoteNo}
-              className="h-8"
+              className="flex-1 h-8 text-xs bg-background/50"
             >
-              <X className="w-4 h-4 mr-1" />
+              <X className="w-3.5 h-3.5 mr-1" />
               No
             </Button>
           </div>
         )}
         
-        {hasVoted && (
-          <span className="text-xs text-muted-foreground">Voted</span>
+        {(hasVoted || isTarget) && (
+          <div className="text-center py-1">
+            <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60">
+              {isTarget ? 'Waiting for results...' : 'Vote Registered'}
+            </span>
+          </div>
         )}
       </div>
     </div>

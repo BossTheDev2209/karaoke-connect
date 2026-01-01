@@ -7,12 +7,14 @@ interface UserAvatarProps {
   user: User;
   size?: 'sm' | 'md' | 'lg';
   showName?: boolean;
+  isMainSinger?: boolean;
 }
 
 export const UserAvatar: React.FC<UserAvatarProps> = ({ 
   user, 
   size = 'md',
-  showName = true 
+  showName = true,
+  isMainSinger = false
 }) => {
   const sizeClasses = {
     sm: 'w-12 h-12',
@@ -27,13 +29,22 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
     : user.customAvatarNormal;
 
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-1 relative">
+      {/* Spotlight down effect */}
+      {isMainSinger && (
+        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-48 h-48 pointer-events-none z-0">
+          <div className="w-full h-full bg-[conic-gradient(from_150deg_at_50%_0%,transparent_0deg,rgba(255,255,255,0.15)_30deg,transparent_60deg)] animate-pulse" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-32 bg-gradient-to-b from-white/20 to-transparent" />
+        </div>
+      )}
+
       {hasCustomAvatar ? (
         <div 
           className={cn(
-            'relative rounded-full overflow-hidden',
+            'relative rounded-full overflow-hidden border-2 transition-all duration-300',
             sizeClasses[size],
-            user.isSpeaking && 'avatar-speaking'
+            user.isSpeaking && 'avatar-speaking',
+            isMainSinger ? 'border-primary shadow-[0_0_20px_hsl(var(--primary)/0.5)]' : 'border-transparent'
           )}
         >
           <img 
@@ -47,16 +58,22 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
           )}
         </div>
       ) : (
-        <HumanAvatar 
-          avatarId={user.avatarId} 
-          size={size} 
-          isSpeaking={user.isSpeaking}
-        />
+        <div className={cn(
+          "relative transition-all duration-300",
+          isMainSinger && "drop-shadow-[0_0_15px_hsl(var(--primary)/0.8)]"
+        )}>
+          <HumanAvatar 
+            avatarId={user.avatarId} 
+            size={size} 
+            isSpeaking={user.isSpeaking}
+          />
+        </div>
       )}
       {showName && (
         <span className={cn(
-          'text-sm font-medium truncate max-w-24',
-          user.isSpeaking ? 'text-neon-green' : 'text-foreground/80'
+          'text-sm font-medium truncate max-w-24 px-2 py-0.5 rounded transition-all duration-300',
+          user.isSpeaking ? 'text-neon-green' : 'text-foreground/80',
+          isMainSinger && 'bg-primary/20 text-primary font-bold scale-110'
         )}>
           {user.nickname}
         </span>

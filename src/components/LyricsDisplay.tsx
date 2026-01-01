@@ -70,10 +70,7 @@ const hasCJKLyrics = (lyrics: LyricLine[]): boolean => {
   return lyrics.some(line => containsCJK(line.text));
 };
 
-// Get romanization for a line
-const getRomanization = (text: string): string | null => {
-  return romanize(text);
-};
+
 
 // Get language label
 const getLanguageLabel = (lyrics: LyricLine[]): string | null => {
@@ -107,9 +104,48 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   const loadingProgress = useLoadingProgress(isLoading);
   const hasPlainLyrics = isPlainLyrics(lyrics);
   const [showRomanization, setShowRomanization] = useState(true);
+  const [calculatedRomanizations, setCalculatedRomanizations] = useState<Record<string, string>>({});
   
   const hasCJK = hasCJKLyrics(lyrics);
   const languageLabel = getLanguageLabel(lyrics);
+
+  // Pre-generate romanizations for all lines when lyrics change or romanization is enabled
+  useEffect(() => {
+    if (!hasCJK || !showRomanization || lyrics.length === 0) return;
+
+    let isMounted = true;
+
+    const generateAll = async () => {
+      const newRomanizations: Record<string, string> = { ...calculatedRomanizations };
+      let changed = false;
+
+      for (const line of lyrics) {
+        if (!isMounted) break;
+        if (newRomanizations[line.text] === undefined && containsCJK(line.text)) {
+          const result = await romanize(line.text);
+          if (result) {
+            newRomanizations[line.text] = result;
+            changed = true;
+          }
+        }
+      }
+
+      if (isMounted && changed) {
+        setCalculatedRomanizations(newRomanizations);
+      }
+    };
+
+    generateAll();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [lyrics, showRomanization, hasCJK]);
+
+  // Sync getRomanization helper
+  const getRomanizedText = (text: string): string | null => {
+    return calculatedRomanizations[text] || null;
+  };
 
   useEffect(() => {
     if (activeLineRef.current && containerRef.current) {
@@ -231,7 +267,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
               </DialogHeader>
               <div className="flex-1 overflow-y-auto pr-2 space-y-3">
                 {lyrics.map((line, index) => {
-                  const romanization = showRomanization ? getRomanization(line.text) : null;
+                  const romanization = showRomanization ? getRomanizedText(line.text) : null;
                   return (
                     <div key={index} className="leading-relaxed">
                       <p className="text-sm">{line.text}</p>
@@ -293,7 +329,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
       >
         <div className="space-y-1 text-center">
           {lyrics.map((line, index) => {
-            const romanization = showRomanization ? getRomanization(line.text) : null;
+            const romanization = showRomanization ? getRomanizedText(line.text) : null;
             const isActive = !hasPlainLyrics && index === currentLineIndex;
             const isPast = !hasPlainLyrics && index < currentLineIndex;
             

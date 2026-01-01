@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { YouTubeSearchResult, YouTubeChannel, Song } from '@/types/karaoke';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface SongSearchProps {
   onAddSong: (song: Song) => void;
@@ -14,6 +15,7 @@ interface SongSearchProps {
 type SearchTab = 'songs' | 'artists';
 
 export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => {
+  const { karaokeFilterEnabled } = useTheme();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<YouTubeSearchResult[]>([]);
   const [channels, setChannels] = useState<YouTubeChannel[]>([]);
@@ -31,9 +33,13 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
     setChannelVideos([]);
     
     try {
+      const searchQuery = activeTab === 'songs' && karaokeFilterEnabled 
+        ? `${query} karaoke instrumental` 
+        : query;
+
       if (activeTab === 'songs') {
         const { data, error } = await supabase.functions.invoke('youtube-search', {
-          body: { query, type: 'video' },
+          body: { query: searchQuery, type: 'video' },
         });
         if (error) throw error;
         setResults(data.results || []);
