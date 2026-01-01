@@ -8,13 +8,15 @@ interface UserAvatarProps {
   size?: 'sm' | 'md' | 'lg';
   showName?: boolean;
   isMainSinger?: boolean;
+  audioLevel?: number;
 }
 
 export const UserAvatar: React.FC<UserAvatarProps> = ({ 
   user, 
   size = 'md',
   showName = true,
-  isMainSinger = false
+  isMainSinger = false,
+  audioLevel = 0
 }) => {
   const sizeClasses = {
     sm: 'w-12 h-12',
@@ -28,14 +30,49 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
     ? user.customAvatarSpeaking 
     : user.customAvatarNormal;
 
+  // Dynamic glow intensity based on audio level
+  const glowIntensity = isMainSinger ? 0.5 + audioLevel * 0.5 : 0;
+
   return (
     <div className="flex flex-col items-center gap-1 relative">
-      {/* Spotlight down effect */}
+      {/* Enhanced spotlight down effect */}
       {isMainSinger && (
-        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-48 h-48 pointer-events-none z-0">
-          <div className="w-full h-full bg-[conic-gradient(from_150deg_at_50%_0%,transparent_0deg,rgba(255,255,255,0.15)_30deg,transparent_60deg)] animate-pulse" />
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-32 bg-gradient-to-b from-white/20 to-transparent" />
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-56 h-56 pointer-events-none z-0">
+          {/* Main spotlight cone */}
+          <div 
+            className="w-full h-full transition-opacity duration-300"
+            style={{
+              background: `conic-gradient(from 155deg at 50% 0%, transparent 0deg, rgba(255,255,255,${0.15 + audioLevel * 0.2}) 20deg, rgba(255,255,255,${0.08 + audioLevel * 0.1}) 35deg, transparent 50deg)`,
+              filter: 'blur(3px)',
+            }}
+          />
+          {/* Center beam */}
+          <div 
+            className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-40 transition-opacity duration-300"
+            style={{
+              background: `linear-gradient(to bottom, rgba(255,255,255,${0.3 + audioLevel * 0.2}), transparent)`,
+              filter: 'blur(2px)',
+            }}
+          />
+          {/* Animated rays */}
+          <div 
+            className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32"
+            style={{
+              background: `radial-gradient(ellipse at top, hsla(var(--primary) / ${0.3 + audioLevel * 0.3}), transparent 70%)`,
+            }}
+          />
         </div>
+      )}
+
+      {/* Ground glow for main singer */}
+      {isMainSinger && (
+        <div 
+          className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-40 h-10 rounded-full pointer-events-none z-0 transition-opacity duration-300"
+          style={{
+            background: `radial-gradient(ellipse, hsla(var(--primary) / ${0.4 + audioLevel * 0.4}), transparent 70%)`,
+            filter: 'blur(10px)',
+          }}
+        />
       )}
 
       {hasCustomAvatar ? (
@@ -60,8 +97,12 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
       ) : (
         <div className={cn(
           "relative transition-all duration-300",
-          isMainSinger && "drop-shadow-[0_0_15px_hsl(var(--primary)/0.8)]"
-        )}>
+          isMainSinger && "main-singer-spotlight"
+        )}
+        style={{
+          filter: isMainSinger ? `drop-shadow(0 0 ${15 + audioLevel * 20}px hsl(var(--primary) / ${glowIntensity}))` : 'none',
+        }}
+        >
           <HumanAvatar 
             avatarId={user.avatarId} 
             size={size} 
