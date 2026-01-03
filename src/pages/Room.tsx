@@ -127,8 +127,8 @@ const Room = () => {
     return Math.max(0, ...users.map(u => u.audioLevel || 0));
   }, [users]);
   
-  // Check if anyone is singing loudly (for dust/shake effects)
-  const isLoudSinging = maxUserAudioLevel > 0.5;
+  // Check if anyone is singing EXTRA loud (Level 2 - for dust/shake effects)
+  const isExtraLoudSinging = maxUserAudioLevel > 0.65;
 
   const remainingSeconds = duration > 0 ? Math.ceil(duration - currentTime) : null;
   const showCountdown = isPlaying && remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 5;
@@ -210,14 +210,14 @@ const Room = () => {
   if (!user || !code) return null;
 
   return (
-    <div className="min-h-screen flex flex-col p-4 gap-4">
+    <div className="h-screen flex flex-col p-4 gap-4 overflow-hidden">
       {/* Celebration effects */}
       {celebrationEnabled && <CelebrationOverlay theme={celebration} />}
       
       {/* Floating reactions */}
       
-      {/* Dust fall effect when singing loudly */}
-      <DustFallEffect isActive={isLoudSinging && isPlaying} intensity={maxUserAudioLevel} />
+      {/* Dust fall effect when singing EXTRA loudly (Level 2) */}
+      <DustFallEffect isActive={isExtraLoudSinging && isPlaying} intensity={maxUserAudioLevel} />
       {/* Header */}
       <header className="flex items-center justify-between">
         <RoomCodeDisplay code={code} />
