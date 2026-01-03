@@ -11,6 +11,7 @@ export interface User {
   audioLevel?: number;
   team?: 'left' | 'right';
   score?: number;
+  joinedAt?: number;
   discordId?: string;
   discordUsername?: string;
   discordAvatar?: string;
@@ -87,6 +88,7 @@ export type RealtimePayload = {
     | 'queue_update' 
     | 'speaking_update' 
     | 'sync_request' 
+    | 'full_sync_response'
     | 'vote_kick_start' 
     | 'vote_kick_vote' 
     | 'kick_user'

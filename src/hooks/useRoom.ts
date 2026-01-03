@@ -35,6 +35,31 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
   const [roomMode, setRoomMode] = useState<RoomMode>('free-sing');
   const [battleFormat, setBattleFormat] = useState<BattleFormat | undefined>();
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const isHostRef = useRef(false);
+  const hasSyncedRef = useRef(false);
+
+  // Store latest state in refs for sync responses
+  const queueRef = useRef<Song[]>([]);
+  const playbackRef = useRef<PlaybackState>(DEFAULT_PLAYBACK);
+  const roomModeRef = useRef<RoomMode>('free-sing');
+  const battleFormatRef = useRef<BattleFormat | undefined>();
+
+  // Keep refs updated
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
+
+  useEffect(() => {
+    playbackRef.current = playbackState;
+  }, [playbackState]);
+
+  useEffect(() => {
+    roomModeRef.current = roomMode;
+  }, [roomMode]);
+
+  useEffect(() => {
+    battleFormatRef.current = battleFormat;
+  }, [battleFormat]);
 
   useEffect(() => {
     if (!roomCode || !user) return;
@@ -51,9 +76,36 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
         const state = channel.presenceState<User>();
         const presentUsers = Object.values(state).flat() as User[];
         setUsers(presentUsers);
+        
+        // First user becomes the host
+        if (presentUsers.length > 0 && !isHostRef.current) {
+          const sortedByJoinTime = [...presentUsers].sort((a, b) => 
+            (a.joinedAt || 0) - (b.joinedAt || 0)
+          );
+          isHostRef.current = sortedByJoinTime[0]?.id === user.id;
+        }
       })
       .on('presence', { event: 'join' }, ({ newPresences }) => {
         console.log('User joined:', newPresences);
+        
+        // If we're a host and someone joins, send them our current state
+        if (isHostRef.current && queueRef.current.length > 0) {
+          setTimeout(() => {
+            channel.send({
+              type: 'broadcast',
+              event: 'room_event',
+              payload: { 
+                type: 'full_sync_response', 
+                payload: {
+                  queue: queueRef.current,
+                  playbackState: { ...playbackRef.current, lastUpdate: Date.now() },
+                  roomMode: roomModeRef.current,
+                  battleFormat: battleFormatRef.current,
+                }
+              },
+            });
+          }, 500); // Small delay to ensure new user is ready
+        }
       })
       .on('presence', { event: 'leave' }, ({ leftPresences }) => {
         console.log('User left:', leftPresences);
@@ -89,12 +141,60 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
             })));
             break;
           }
+          case 'sync_request': {
+            // If we're host and have data, respond with full state
+            if (isHostRef.current && queueRef.current.length > 0) {
+              channel.send({
+                type: 'broadcast',
+                event: 'room_event',
+                payload: { 
+                  type: 'full_sync_response', 
+                  payload: {
+                    queue: queueRef.current,
+                    playbackState: { ...playbackRef.current, lastUpdate: Date.now() },
+                    roomMode: roomModeRef.current,
+                    battleFormat: battleFormatRef.current,
+                  }
+                },
+              });
+            }
+            break;
+          }
+          case 'full_sync_response': {
+            // Only accept sync if we haven't synced yet or have no data
+            if (!hasSyncedRef.current || queueRef.current.length === 0) {
+              const syncData = data.payload as {
+                queue: Song[];
+                playbackState: PlaybackState;
+                roomMode: RoomMode;
+                battleFormat?: BattleFormat;
+              };
+              console.log('Received full sync:', syncData);
+              setQueue(syncData.queue);
+              setPlaybackState(syncData.playbackState);
+              setRoomMode(syncData.roomMode);
+              setBattleFormat(syncData.battleFormat);
+              hasSyncedRef.current = true;
+            }
+            break;
+          }
         }
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          await channel.track(user);
+          await channel.track({ ...user, joinedAt: Date.now() });
           setIsConnected(true);
+          
+          // Request sync after joining with a small delay
+          setTimeout(() => {
+            if (!hasSyncedRef.current) {
+              channel.send({
+                type: 'broadcast',
+                event: 'room_event',
+                payload: { type: 'sync_request', payload: null },
+              });
+            }
+          }, 300);
         }
       });
 
@@ -103,6 +203,8 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
     return () => {
       channel.unsubscribe();
       channelRef.current = null;
+      isHostRef.current = false;
+      hasSyncedRef.current = false;
     };
   }, [roomCode, user]);
 
@@ -135,6 +237,7 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
   }, [user]);
 
   const requestSync = useCallback(() => {
+    hasSyncedRef.current = false; // Allow re-sync
     channelRef.current?.send({
       type: 'broadcast',
       event: 'room_event',
