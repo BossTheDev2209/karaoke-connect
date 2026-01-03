@@ -84,25 +84,49 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
     // Cheerleader effect: jump if member of other team is singing
     const isCheerleader = roomMode === 'team-battle' && activeTeam && user.team !== activeTeam && activeMainSingerId;
 
-    // Dynamic scale based on audio level for main singer
-    const dynamicScale = isMainSinger ? 1.15 + (userAudioLevel * 0.15) : 1;
-    const translateY = isMainSinger ? -8 - (userAudioLevel * 8) : 0;
+    // Two-level sing react:
+    // Level 1: Normal loud (audioLevel > 0.3) - moderate scale up
+    // Level 2: Extra loud (audioLevel > 0.65) - spotlight + bigger scale
+    const isNormalLoud = userAudioLevel > 0.3;
+    const isExtraLoud = userAudioLevel > 0.65;
+    
+    // Dynamic scale: base 1.0, +0.15 if loud, +0.20 more if extra loud, +audio level bonus
+    let dynamicScale = 1;
+    let translateY = 0;
+    
+    if (isMainSinger) {
+      if (isExtraLoud) {
+        // Level 2: Extra loud - massive scale with spotlight
+        dynamicScale = 1.35 + (userAudioLevel * 0.15);
+        translateY = -20 - (userAudioLevel * 10);
+      } else if (isNormalLoud) {
+        // Level 1: Normal loud - moderate scale up
+        dynamicScale = 1.15 + ((userAudioLevel - 0.3) * 0.3);
+        translateY = -8 - (userAudioLevel * 5);
+      } else {
+        // Speaking but not loud
+        dynamicScale = 1.05 + (userAudioLevel * 0.2);
+        translateY = -4;
+      }
+    }
 
     return (
       <div key={user.id} className={cn(
-        "flex items-end gap-1 group relative transition-all duration-300",
-        isMainSinger ? "z-20" : "z-10",
+        "flex items-end gap-1 group relative transition-all duration-200",
+        isMainSinger && isExtraLoud && "z-30",
+        isMainSinger && !isExtraLoud && "z-20",
+        !isMainSinger && "z-10",
         isCheerleader && "animate-bounce"
       )}
       style={{
         transform: `scale(${dynamicScale}) translateY(${translateY}px)`,
       }}
       >
-        {/* Spotlight effect for main singer */}
-        <SingerSpotlight isMainSinger={isMainSinger} audioLevel={userAudioLevel} />
+        {/* Spotlight effect only for EXTRA LOUD singing (Level 2) */}
+        <SingerSpotlight isMainSinger={isMainSinger && isExtraLoud} audioLevel={userAudioLevel} />
         
-        {/* Music notes floating effect */}
-        <MusicNotesEffect isActive={isMainSinger && user.isSpeaking} audioLevel={userAudioLevel} />
+        {/* Music notes floating effect for normal loud singing (Level 1+) */}
+        <MusicNotesEffect isActive={isMainSinger && user.isSpeaking && isNormalLoud} audioLevel={userAudioLevel} />
 
         {/* Vote kick button */}
         {onStartVoteKick && users.length >= 2 && (
@@ -145,6 +169,7 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
                   showName
                   isMainSinger={isMainSinger}
                   audioLevel={userAudioLevel}
+                  isExtraLoud={isExtraLoud}
                 />
               </button>
             </PopoverTrigger>
