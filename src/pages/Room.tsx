@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { User, RoomMode, BattleFormat, Song } from '@/types/karaoke';
 import { useRoom } from '@/hooks/useRoom';
@@ -102,7 +102,23 @@ const Room = () => {
     handleUserKicked
   );
 
+  // Prevent feedback loops when we apply remote playback updates to the local player
+  const applyingRemoteRef = useRef(false);
+  const markApplyingRemote = useCallback(() => {
+    applyingRemoteRef.current = true;
+    window.setTimeout(() => {
+      applyingRemoteRef.current = false;
+    }, 300);
+  }, []);
+
+  // When the current video changes (often driven by remote sync), suppress transient player events
+  useEffect(() => {
+    if (!currentSong?.videoId) return;
+    markApplyingRemote();
+  }, [currentSong?.videoId, markApplyingRemote]);
+
   const handleStateChange = useCallback((isPlaying: boolean) => {
+    if (applyingRemoteRef.current) return;
     updatePlayback({ isPlaying });
   }, [updatePlayback]);
 
@@ -118,6 +134,45 @@ const Room = () => {
   }, [queue.length, playbackState.currentSongIndex, updatePlayback]);
 
   const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded);
+
+  // Apply remote room playback state to our local player (seek + play/pause) so everyone stays in sync.
+  useEffect(() => {
+    if (!isReady) return;
+    if (!currentSong) return;
+
+    const now = Date.now();
+    const baseTime = playbackState.currentTime || 0;
+    const elapsed = Math.max(0, (now - (playbackState.lastUpdate || now)) / 1000);
+    const targetTime = playbackState.isPlaying ? baseTime + elapsed : baseTime;
+
+    // 1) Correct drift (but avoid constant micro-seeking)
+    const drift = Math.abs(targetTime - currentTime);
+    if (Number.isFinite(targetTime) && drift > 1.2) {
+      markApplyingRemote();
+      seekTo(targetTime);
+    }
+
+    // 2) Match play/pause
+    if (playbackState.isPlaying && !isPlaying) {
+      markApplyingRemote();
+      play();
+    } else if (!playbackState.isPlaying && isPlaying) {
+      markApplyingRemote();
+      pause();
+    }
+  }, [
+    isReady,
+    currentSong?.videoId,
+    playbackState.isPlaying,
+    playbackState.currentTime,
+    playbackState.lastUpdate,
+    currentTime,
+    isPlaying,
+    play,
+    pause,
+    seekTo,
+    markApplyingRemote,
+  ]);
 
   // Audio reactive for light sticks (after isPlaying is defined)
   const { intensity: audioIntensity, beatPhase, isBeat, bpm } = useAudioReactive({ enabled: isPlaying, sensitivity: 6, targetBpm: 120 });

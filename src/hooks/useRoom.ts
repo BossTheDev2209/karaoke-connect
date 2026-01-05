@@ -44,6 +44,19 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
   const roomModeRef = useRef<RoomMode>('free-sing');
   const battleFormatRef = useRef<BattleFormat | undefined>();
 
+  // When sending a full sync, compute an "effective" currentTime for joiners
+  // based on the last known time + elapsed since lastUpdate.
+  const getEffectivePlaybackForSync = useCallback((): PlaybackState => {
+    const base = playbackRef.current;
+    const now = Date.now();
+    const elapsed = base.isPlaying ? Math.max(0, (now - (base.lastUpdate || now)) / 1000) : 0;
+    return {
+      ...base,
+      currentTime: (base.currentTime || 0) + elapsed,
+      lastUpdate: now,
+    };
+  }, []);
+
   // Keep refs updated
   useEffect(() => {
     queueRef.current = queue;
@@ -76,32 +89,35 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
         const state = channel.presenceState<User>();
         const presentUsers = Object.values(state).flat() as User[];
         setUsers(presentUsers);
-        
-        // First user becomes the host
-        if (presentUsers.length > 0 && !isHostRef.current) {
-          const sortedByJoinTime = [...presentUsers].sort((a, b) => 
-            (a.joinedAt || 0) - (b.joinedAt || 0)
+
+        // Host = earliest joiner (re-evaluated on every sync to handle host leaving)
+        if (presentUsers.length > 0) {
+          const sortedByJoinTime = [...presentUsers].sort(
+            (a, b) => (a.joinedAt || 0) - (b.joinedAt || 0)
           );
           isHostRef.current = sortedByJoinTime[0]?.id === user.id;
+        } else {
+          isHostRef.current = false;
         }
       })
       .on('presence', { event: 'join' }, ({ newPresences }) => {
         console.log('User joined:', newPresences);
-        
-        // If we're a host and someone joins, send them our current state
-        if (isHostRef.current && queueRef.current.length > 0) {
+
+        // If we're the host and someone joins, proactively push our current state.
+        // (Don't gate on queue length; new users still need mode/battleFormat/empty queue.)
+        if (isHostRef.current) {
           setTimeout(() => {
             channel.send({
               type: 'broadcast',
               event: 'room_event',
-              payload: { 
-                type: 'full_sync_response', 
+              payload: {
+                type: 'full_sync_response',
                 payload: {
                   queue: queueRef.current,
-                  playbackState: { ...playbackRef.current, lastUpdate: Date.now() },
+                  playbackState: getEffectivePlaybackForSync(),
                   roomMode: roomModeRef.current,
                   battleFormat: battleFormatRef.current,
-                }
+                },
               },
             });
           }, 500); // Small delay to ensure new user is ready
@@ -142,19 +158,19 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
             break;
           }
           case 'sync_request': {
-            // If we're host and have data, respond with full state
-            if (isHostRef.current && queueRef.current.length > 0) {
+            // If we're host, respond with full state
+            if (isHostRef.current) {
               channel.send({
                 type: 'broadcast',
                 event: 'room_event',
-                payload: { 
-                  type: 'full_sync_response', 
+                payload: {
+                  type: 'full_sync_response',
                   payload: {
                     queue: queueRef.current,
-                    playbackState: { ...playbackRef.current, lastUpdate: Date.now() },
+                    playbackState: getEffectivePlaybackForSync(),
                     roomMode: roomModeRef.current,
                     battleFormat: battleFormatRef.current,
-                  }
+                  },
                 },
               });
             }
@@ -206,7 +222,7 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
       isHostRef.current = false;
       hasSyncedRef.current = false;
     };
-  }, [roomCode, user]);
+  }, [roomCode, user, getEffectivePlaybackForSync]);
 
   const updatePlayback = useCallback((state: Partial<PlaybackState>) => {
     const newState = { ...playbackState, ...state, lastUpdate: Date.now() };
