@@ -9,9 +9,9 @@ interface UseMicrophoneReturn {
   error: string | null;
 }
 
-// Higher threshold to avoid false positives
-const VOLUME_THRESHOLD = 0.03;
-const SMOOTHING = 0.85;
+// Higher threshold to avoid false positives - requires real voice input
+const VOLUME_THRESHOLD = 0.08;
+const SMOOTHING = 0.88;
 // Minimum speech duration to avoid flicker (ms)
 const MIN_SPEECH_DURATION = 150;
 // Cooldown after speech ends to prevent rapid toggling

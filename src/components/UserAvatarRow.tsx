@@ -85,10 +85,10 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
     const isCheerleader = roomMode === 'team-battle' && activeTeam && user.team !== activeTeam && activeMainSingerId;
 
     // Two-level sing react:
-    // Level 1: Normal loud (audioLevel > 0.3) - moderate scale up
-    // Level 2: Extra loud (audioLevel > 0.65) - spotlight + bigger scale
-    const isNormalLoud = userAudioLevel > 0.3;
-    const isExtraLoud = userAudioLevel > 0.65;
+    // Level 1: Normal loud (audioLevel > 0.45) - moderate scale up
+    // Level 2: Extra loud (audioLevel > 0.75) - bigger scale
+    const isNormalLoud = userAudioLevel > 0.45;
+    const isExtraLoud = userAudioLevel > 0.75;
     
     // Dynamic scale: base 1.0, +0.15 if loud, +0.20 more if extra loud, +audio level bonus
     let dynamicScale = 1;
