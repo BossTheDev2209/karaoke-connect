@@ -32,50 +32,8 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
     ? user.customAvatarSpeaking 
     : user.customAvatarNormal;
 
-  // Dynamic glow intensity based on audio level
-  const glowIntensity = isMainSinger ? 0.5 + audioLevel * 0.5 : 0;
-
   return (
     <div className="flex flex-col items-center gap-1 relative">
-      {/* Enhanced spotlight down effect - ONLY for extra loud (Level 2) */}
-      {isMainSinger && isExtraLoud && (
-        <div className="absolute -top-48 left-1/2 -translate-x-1/2 w-72 h-72 pointer-events-none z-0">
-          {/* Main spotlight cone - bigger and brighter for extra loud */}
-          <div 
-            className="w-full h-full transition-opacity duration-200"
-            style={{
-              background: `conic-gradient(from 150deg at 50% 0%, transparent 0deg, rgba(255,255,255,${0.25 + audioLevel * 0.25}) 25deg, rgba(255,255,255,${0.15 + audioLevel * 0.15}) 40deg, transparent 55deg)`,
-              filter: 'blur(4px)',
-            }}
-          />
-          {/* Center beam - intense */}
-          <div 
-            className="absolute top-0 left-1/2 -translate-x-1/2 w-3 h-56 transition-opacity duration-200"
-            style={{
-              background: `linear-gradient(to bottom, rgba(255,255,255,${0.5 + audioLevel * 0.3}), transparent)`,
-              filter: 'blur(3px)',
-            }}
-          />
-          {/* Animated rays - extra glow */}
-          <div 
-            className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 animate-pulse"
-            style={{
-              background: `radial-gradient(ellipse at top, hsla(var(--primary) / ${0.5 + audioLevel * 0.4}), transparent 70%)`,
-            }}
-          />
-        </div>
-      )}
-
-      {/* Ground glow - ONLY for extra loud (Level 2) */}
-      {isMainSinger && isExtraLoud && (
-        <div 
-          className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-56 h-14 rounded-full pointer-events-none z-0 transition-opacity duration-200 animate-pulse"
-          style={{
-            background: `radial-gradient(ellipse, hsla(var(--primary) / ${0.6 + audioLevel * 0.3}), transparent 70%)`,
-            filter: 'blur(12px)',
-          }}
-        />
-      )}
 
       {hasCustomAvatar ? (
         <div 
@@ -97,18 +55,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
           )}
         </div>
       ) : (
-        <div className={cn(
-          "relative transition-all duration-200",
-          isMainSinger && isExtraLoud && "main-singer-spotlight"
-        )}
-        style={{
-          filter: isMainSinger 
-            ? isExtraLoud 
-              ? `drop-shadow(0 0 ${30 + audioLevel * 30}px hsl(var(--primary) / ${glowIntensity})) drop-shadow(0 0 ${60 + audioLevel * 40}px hsl(var(--accent) / 0.4))`
-              : `drop-shadow(0 0 ${10 + audioLevel * 15}px hsl(var(--primary) / ${glowIntensity * 0.6}))`
-            : 'none',
-        }}
-        >
+        <div className="relative">
           <HumanAvatar 
             avatarId={user.avatarId} 
             size={size} 
@@ -118,10 +65,9 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
       )}
       {showName && (
         <span className={cn(
-          'text-sm font-medium truncate max-w-24 px-2 py-0.5 rounded transition-all duration-200',
+          'text-sm font-medium truncate max-w-24 px-2 py-0.5 rounded',
           user.isSpeaking ? 'text-neon-green' : 'text-foreground/80',
-          isMainSinger && !isExtraLoud && 'bg-primary/20 text-primary font-bold scale-105',
-          isMainSinger && isExtraLoud && 'bg-primary/40 text-primary font-black scale-110 animate-pulse'
+          isMainSinger && 'bg-primary/20 text-primary font-bold'
         )}>
           {user.nickname}
         </span>

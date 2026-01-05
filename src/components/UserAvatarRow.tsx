@@ -3,7 +3,7 @@ import { User, RoomMode, BattleFormat } from '@/types/karaoke';
 import { UserAvatar } from './UserAvatar';
 import { LightStick, LIGHTSTICK_COLORS } from './effects/LightStick';
 import { VoteKickButton } from './VoteKick';
-import { SingerSpotlight, MusicNotesEffect, DustFallEffect } from './effects/SingerEffects';
+import { MusicNotesEffect, DustFallEffect } from './effects/SingerEffects';
 import { cn } from '@/lib/utils';
 import {
   Popover,
@@ -112,7 +112,7 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
 
     return (
       <div key={user.id} className={cn(
-        "flex items-end gap-1 group relative transition-all duration-200",
+        "flex items-end gap-1 group relative",
         isMainSinger && isExtraLoud && "z-30",
         isMainSinger && !isExtraLoud && "z-20",
         !isMainSinger && "z-10",
@@ -120,12 +120,10 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
       )}
       style={{
         transform: `scale(${dynamicScale}) translateY(${translateY}px)`,
+        transition: 'transform 0.08s ease-out',
       }}
       >
-        {/* Spotlight effect only for EXTRA LOUD singing (Level 2) */}
-        <SingerSpotlight isMainSinger={isMainSinger && isExtraLoud} audioLevel={userAudioLevel} />
-        
-        {/* Music notes floating effect for normal loud singing (Level 1+) */}
+        {/* Music notes floating effect for loud singing */}
         <MusicNotesEffect isActive={isMainSinger && user.isSpeaking && isNormalLoud} audioLevel={userAudioLevel} />
 
         {/* Vote kick button */}
