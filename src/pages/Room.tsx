@@ -6,6 +6,7 @@ import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
 import { useLyrics } from '@/hooks/useLyrics';
 import { useLyricsPreload } from '@/hooks/useLyricsPreload';
 import { useMicrophone } from '@/hooks/useMicrophone';
+import { useVoiceChat } from '@/hooks/useVoiceChat';
 import { useTheme } from '@/contexts/ThemeContext';
 import { LyricsDisplay } from '@/components/LyricsDisplay';
 import { PlayerControls } from '@/components/PlayerControls';
@@ -21,6 +22,7 @@ import { DustFallEffect } from '@/components/effects/SingerEffects';
 import { useAudioReactive } from '@/hooks/useAudioReactive';
 import { useVoteKick } from '@/components/VoteKick';
 import { VotingPanel } from '@/components/VotingPanel';
+import { VoiceChatPanel } from '@/components/VoiceChatPanel';
 import { LogOut, Swords, Mic2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -88,6 +90,18 @@ const Room = () => {
   // Reactions and waving
   const { reactions, sendReaction } = useReactions(channel, user?.id || '');
   const { isWaving, toggleWaving, wavingUsers } = useWaving(channel, user?.id || '');
+  
+  // Voice chat
+  const {
+    isEnabled: isVoiceChatEnabled,
+    isMicMuted: isVoiceMicMuted,
+    remoteUsers: voiceRemoteUsers,
+    toggleVoiceChat,
+    toggleMicMute: toggleVoiceMicMute,
+    setUserVolume: setVoiceUserVolume,
+    setUserMuted: setVoiceUserMuted,
+    error: voiceChatError,
+  } = useVoiceChat(channel, user?.id || '', users);
   
   // Vote kick
   const handleUserKicked = useCallback(() => {
@@ -290,6 +304,19 @@ const Room = () => {
             {roomMode === 'team-battle' ? <Swords className="w-3 h-3" /> : <Mic2 className="w-3 h-3" />}
             {roomMode === 'team-battle' ? 'Team Battle' : 'Free Sing'}
           </div>
+
+          {/* Voice Chat Panel */}
+          <VoiceChatPanel
+            isEnabled={isVoiceChatEnabled}
+            isMicMuted={isVoiceMicMuted}
+            remoteUsers={voiceRemoteUsers}
+            users={users}
+            onToggleVoiceChat={toggleVoiceChat}
+            onToggleMicMute={toggleVoiceMicMute}
+            onSetUserVolume={setVoiceUserVolume}
+            onSetUserMuted={setVoiceUserMuted}
+            error={voiceChatError}
+          />
 
           {/* Unified Voting Panel */}
           <VotingPanel
