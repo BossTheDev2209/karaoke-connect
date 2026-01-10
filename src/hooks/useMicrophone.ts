@@ -62,6 +62,11 @@ export const useMicrophone = (
 
   const eqFiltersRef = useRef<BiquadFilterNode[]>([]);
 
+  // NOTE: stopMic gets re-created when roomUsers/channel/currentUserId change.
+  // If we depend on it directly in an effect cleanup, React will call that cleanup on *every* re-render.
+  // This ref ensures we only stop the mic on unmount.
+  const stopMicRef = useRef<() => void>(() => {});
+
   // Analyze remote audio levels
   const analyzeRemoteAudio = useCallback(() => {
     const levels: Record<string, number> = {};
@@ -476,6 +481,7 @@ export const useMicrophone = (
       speechEndTimeRef.current = 0;
 
       analyze();
+      console.log('[Mic] Mic enabled');
       setIsEnabled(true);
       setError(null);
 
@@ -488,6 +494,7 @@ export const useMicrophone = (
   }, [analyze, announceJoin]);
 
   const stopMic = useCallback(() => {
+    console.log('[Mic] stopMic called');
     // Announce leaving before cleanup
     announceLeave();
 
@@ -524,6 +531,11 @@ export const useMicrophone = (
     lastSpeakingRef.current = false;
   }, [announceLeave, closePeerConnection]);
 
+  // Keep latest stopMic in a ref so our unmount cleanup doesn't fire on every re-render.
+  useEffect(() => {
+    stopMicRef.current = stopMic;
+  }, [stopMic]);
+
   const toggleMic = useCallback((initialEQ?: number[]) => {
     if (isEnabled) {
       stopMic();
@@ -557,11 +569,12 @@ export const useMicrophone = (
     }
   }, [roomUsers, closePeerConnection]);
 
+  // Stop mic only on unmount (NOT whenever stopMic callback identity changes)
   useEffect(() => {
     return () => {
-      stopMic();
+      stopMicRef.current?.();
     };
-  }, [stopMic]);
+  }, []);
 
   return { isSpeaking, volume, isEnabled, toggleMic, applyEQ, error, remoteAudioLevels };
 };
