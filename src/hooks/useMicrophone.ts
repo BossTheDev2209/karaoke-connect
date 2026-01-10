@@ -416,18 +416,18 @@ export const useMicrophone = (
         d.label.toLowerCase().includes('headset')
       );
 
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const constraints: MediaStreamConstraints = {
         audio: {
           deviceId: preferredDevice?.deviceId ? { ideal: preferredDevice.deviceId } : undefined,
-          echoCancellation: { ideal: true },
-          noiseSuppression: { ideal: true },
-          autoGainControl: { ideal: true },
-          googEchoCancellation: true,
-          googAutoGainControl: true,
-          googNoiseSuppression: true,
-          googHighpassFilter: true,
-        } as MediaTrackConstraints,
-      });
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      };
+      
+      console.log('[Mic] Requesting microphone with constraints:', constraints);
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log('[Mic] Got microphone stream:', stream.getTracks().map(t => t.label));
 
       const audioContext = new AudioContext();
       const source = audioContext.createMediaStreamSource(stream);
