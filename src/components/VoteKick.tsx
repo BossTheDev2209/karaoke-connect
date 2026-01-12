@@ -113,9 +113,8 @@ export const useVoteKick = (
     // Subscribe to room events
     channel.on('broadcast', { event: 'room_event' }, handleBroadcast);
 
-    return () => {
-      channel.unsubscribe();
-    };
+    // Listener cleanup is handled by useRoom when channel is destroyed
+    // Do NOT unsubscribe here as it kills the entire room connection
   }, [channel, currentUserId, activeVoteKick, onUserKicked]);
 
   // Auto-expire vote after 30 seconds
