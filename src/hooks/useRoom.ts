@@ -170,6 +170,8 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
             break;
           case 'speaking_update': {
             const { userId, isSpeaking, audioLevel } = data.payload as { userId: string; isSpeaking: boolean; audioLevel?: number };
+            // Skip our own updates - already applied locally for instant feedback
+            if (userId === user?.id) break;
             setUsers(prev => prev.map(u => 
               u.id === userId ? { ...u, isSpeaking, audioLevel } : u
             ));
@@ -450,10 +452,18 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
       lastSpeakingBroadcastRef.current = now;
       lastSpeakingStateRef.current = { isSpeaking, audioLevel: audioLevel || 0 };
       
+      // Optimistic local update - apply immediately for instant feedback
+      setUsers(prev => prev.map(u => 
+        u.id === user.id ? { ...u, isSpeaking, audioLevel } : u
+      ));
+      
+      // Round audioLevel to 2 decimals to reduce payload size
+      const roundedLevel = audioLevel !== undefined ? Math.round(audioLevel * 100) / 100 : undefined;
+      
       channelRef.current?.send({
         type: 'broadcast',
         event: 'room_event',
-        payload: { type: 'speaking_update', payload: { userId: user.id, isSpeaking, audioLevel } },
+        payload: { type: 'speaking_update', payload: { userId: user.id, isSpeaking, audioLevel: roundedLevel } },
       });
     }
   }, [user]);
