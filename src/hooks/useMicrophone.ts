@@ -64,6 +64,29 @@ interface PeerState {
   audioEl?: HTMLAudioElement;
 }
 
+// Modify SDP to set Opus audio quality parameters
+// This improves voice quality from ~32kbps default to 64kbps
+const setOpusQuality = (sdp: string): string => {
+  // Find the Opus codec line and add parameters
+  // Format: a=fmtp:111 minptime=10;useinbandfec=1
+  const opusPayloadMatch = sdp.match(/a=rtpmap:(\d+) opus/);
+  if (!opusPayloadMatch) return sdp;
+  
+  const opusPayload = opusPayloadMatch[1];
+  const fmtpRegex = new RegExp(`a=fmtp:${opusPayload} (.+)`);
+  
+  if (fmtpRegex.test(sdp)) {
+    // Append to existing fmtp line
+    return sdp.replace(fmtpRegex, `a=fmtp:${opusPayload} $1;maxaveragebitrate=64000;stereo=0;sprop-stereo=0`);
+  } else {
+    // Add new fmtp line after rtpmap
+    return sdp.replace(
+      new RegExp(`(a=rtpmap:${opusPayload} opus[^\\r\\n]+)`),
+      `$1\r\na=fmtp:${opusPayload} minptime=10;maxaveragebitrate=64000;stereo=0;sprop-stereo=0;useinbandfec=1`
+    );
+  }
+};
+
 export const useMicrophone = (
   onSpeakingChange?: (isSpeaking: boolean, level: number) => void,
   channel?: RealtimeChannel | null,
@@ -346,7 +369,12 @@ export const useMicrophone = (
         pendingCandidatesRef.current.delete(from);
 
         const answerDesc = await pc.createAnswer();
-        await pc.setLocalDescription(answerDesc);
+        // Enhance Opus quality before setting local description
+        const enhancedAnswer = new RTCSessionDescription({
+          type: answerDesc.type,
+          sdp: setOpusQuality(answerDesc.sdp || ''),
+        });
+        await pc.setLocalDescription(enhancedAnswer);
 
         channel.send({
           type: 'broadcast',
@@ -355,7 +383,7 @@ export const useMicrophone = (
             type: 'answer',
             from: currentUserId,
             to: from,
-            answer: answerDesc,
+            answer: enhancedAnswer,
           },
         });
       } else if (type === 'answer') {
@@ -383,7 +411,12 @@ export const useMicrophone = (
         if (currentUserId < from) {
           const pc = createPeerConnection(from, true);
           const offerDesc = await pc.createOffer();
-          await pc.setLocalDescription(offerDesc);
+          // Enhance Opus quality before setting local description
+          const enhancedOffer = new RTCSessionDescription({
+            type: offerDesc.type,
+            sdp: setOpusQuality(offerDesc.sdp || ''),
+          });
+          await pc.setLocalDescription(enhancedOffer);
 
           channel.send({
             type: 'broadcast',
@@ -392,7 +425,7 @@ export const useMicrophone = (
               type: 'offer',
               from: currentUserId,
               to: from,
-              offer: offerDesc,
+              offer: enhancedOffer,
             },
           });
         }
@@ -462,6 +495,11 @@ export const useMicrophone = (
       const constraints: MediaStreamConstraints = {
         audio: {
           deviceId: preferredDevice?.deviceId ? { ideal: preferredDevice.deviceId } : undefined,
+          // Quality settings for singing
+          sampleRate: { ideal: 48000 },       // High sample rate for quality
+          sampleSize: { ideal: 16 },          // 16-bit audio
+          channelCount: { ideal: 1 },          // Mono is fine for voice
+          // Processing settings
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
@@ -475,14 +513,17 @@ export const useMicrophone = (
       const audioContext = new AudioContext();
       const source = audioContext.createMediaStreamSource(stream);
       
+      // High-pass filter to remove low rumble and plosives
       const highpassFilter = audioContext.createBiquadFilter();
       highpassFilter.type = 'highpass';
-      highpassFilter.frequency.value = 80;
+      highpassFilter.frequency.value = 80;  // Cut below 80Hz (room rumble)
       highpassFilter.Q.value = 0.7;
       
+      // Low-pass filter - set high to preserve voice clarity!
+      // Previous value of 4000Hz was cutting off brightness and clarity
       const lowpassFilter = audioContext.createBiquadFilter();
       lowpassFilter.type = 'lowpass';
-      lowpassFilter.frequency.value = 4000;
+      lowpassFilter.frequency.value = 12000;  // Keep up to 12kHz for clear vocals
       lowpassFilter.Q.value = 0.7;
       
       const bands = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
