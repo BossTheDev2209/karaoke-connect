@@ -224,8 +224,13 @@ const Room = () => {
     clockOffset,
   ]);
 
-  // Audio reactive for light sticks (after isPlaying is defined)
-  const { intensity: audioIntensity, beatPhase, isBeat, bpm } = useAudioReactive({ enabled: isPlaying, sensitivity: 6, targetBpm: 120 });
+  // Audio reactive for light sticks (enabled if Room is playing, even if local audio is buffering/blocked)
+  // This ensures visuals are active immediately after refresh
+  const { intensity: audioIntensity, beatPhase, isBeat, bpm } = useAudioReactive({ 
+    enabled: playbackState.isPlaying, 
+    sensitivity: 6, 
+    targetBpm: 120 
+  });
 
   // Calculate max audio level from all users for screen effects
   const maxUserAudioLevel = useMemo(() => {
