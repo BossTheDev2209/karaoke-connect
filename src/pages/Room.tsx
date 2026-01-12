@@ -70,7 +70,8 @@ const Room = () => {
     playbackState, 
     roomMode,
     battleFormat,
-    isConnected, 
+    isConnected,
+    isHost,
     channel, 
     updatePlayback, 
     updateQueue, 
@@ -252,7 +253,7 @@ const Room = () => {
     updateSpeaking(isSpeaking, level);
   }, [updateSpeaking]);
 
-  const { isEnabled: isMicEnabled, toggleMic, applyEQ, remoteAudioLevels } = useMicrophone(
+  const { isEnabled: isMicEnabled, toggleMic, applyEQ, remoteAudioLevels, webrtcStats } = useMicrophone(
     handleSpeakingChange,
     channel,
     user?.id,
@@ -331,10 +332,30 @@ const Room = () => {
       <header className="flex items-center justify-between">
         <RoomCodeDisplay code={code} />
         <div className="flex items-center gap-2">
+          {/* Connection indicator */}
           <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-neon-green' : 'bg-destructive'}`} />
           <span className="text-sm text-muted-foreground">
-            {users.length} online{networkLatency > 0 && ` · ${networkLatency}ms`}
+            {users.length} online
+            {networkLatency > 0 && ` · ${networkLatency}ms`}
+            {isMicEnabled && webrtcStats.connectedPeers > 0 && (
+              <span className={cn(
+                "ml-1",
+                webrtcStats.connectionQuality === 'excellent' && "text-green-400",
+                webrtcStats.connectionQuality === 'good' && "text-green-500",
+                webrtcStats.connectionQuality === 'fair' && "text-yellow-500",
+                webrtcStats.connectionQuality === 'poor' && "text-red-500",
+              )}>
+                · 🎤{webrtcStats.avgLatency > 0 ? `${webrtcStats.avgLatency}ms` : '⚡'}
+              </span>
+            )}
           </span>
+          
+          {/* Host Badge */}
+          {isHost && (
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 border border-amber-500/50 text-amber-400">
+              👑 Host
+            </div>
+          )}
           
           {/* Mode Badge */}
           <div className={cn(

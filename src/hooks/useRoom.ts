@@ -9,6 +9,7 @@ interface UseRoomReturn {
   playbackState: PlaybackState;
   currentUser: User | null;
   isConnected: boolean;
+  isHost: boolean;
   channel: RealtimeChannel | null;
   updatePlayback: (state: Partial<PlaybackState>) => void;
   updateQueue: (queue: Song[]) => void;
@@ -505,9 +506,9 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
     });
   }, []);
 
-  // Auto-assign teams when switching to team-battle
+  // Auto-assign teams when switching to team-battle (only host to prevent race conditions)
   useEffect(() => {
-    if (roomMode === 'team-battle' && users.length > 0) {
+    if (roomMode === 'team-battle' && users.length > 0 && isHostRef.current) {
       const needsAssignment = users.some(u => !u.team);
       if (needsAssignment) {
         const newTeams: Record<string, 'left' | 'right'> = {};
@@ -517,7 +518,7 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
         updateTeams(newTeams);
       }
     }
-  }, [roomMode, users.length]);
+  }, [roomMode, users.length, updateTeams]);
 
   // Scoring logic for Team Battle
   useEffect(() => {
@@ -544,6 +545,7 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
     battleFormat,
     currentUser: user,
     isConnected,
+    isHost: isHostRef.current,
     channel: channelRef.current,
     updatePlayback,
     updateQueue,

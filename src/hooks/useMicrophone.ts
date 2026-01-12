@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
+interface WebRTCStats {
+  connectedPeers: number;
+  avgLatency: number; // in ms
+  connectionQuality: 'excellent' | 'good' | 'fair' | 'poor' | 'disconnected';
+}
+
 interface UseMicrophoneReturn {
   isSpeaking: boolean;
   volume: number;
@@ -9,6 +15,7 @@ interface UseMicrophoneReturn {
   applyEQ: (settings: number[]) => void;
   error: string | null;
   remoteAudioLevels: Record<string, number>;
+  webrtcStats: WebRTCStats;
 }
 
 // Higher threshold to avoid false positives - requires real voice input
@@ -19,11 +26,37 @@ const MIN_SPEECH_DURATION = 150;
 // Cooldown after speech ends to prevent rapid toggling
 const SPEECH_COOLDOWN = 200;
 
+// Enhanced ICE servers for better connectivity
+// STUN servers help with NAT traversal (peer discovery)
+// TURN servers relay traffic when P2P fails (firewall bypass)
 const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
+    // Google STUN servers (free, reliable)
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    // Twilio STUN (backup)
+    { urls: 'stun:global.stun.twilio.com:3478' },
+    // OpenRelay free TURN server (for firewall bypass)
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
   ],
+  iceCandidatePoolSize: 10, // Pre-gather candidates for faster connection
 };
 
 interface PeerState {
@@ -43,6 +76,11 @@ export const useMicrophone = (
   const [isEnabled, setIsEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [remoteAudioLevels, setRemoteAudioLevels] = useState<Record<string, number>>({});
+  const [webrtcStats, setWebrtcStats] = useState<WebRTCStats>({
+    connectedPeers: 0,
+    avgLatency: 0,
+    connectionQuality: 'disconnected',
+  });
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -569,6 +607,70 @@ export const useMicrophone = (
     }
   }, [roomUsers, closePeerConnection]);
 
+  // Track WebRTC connection stats
+  useEffect(() => {
+    if (!isEnabled) {
+      setWebrtcStats({ connectedPeers: 0, avgLatency: 0, connectionQuality: 'disconnected' });
+      return;
+    }
+
+    const measureStats = async () => {
+      const peers = Array.from(peersRef.current.values());
+      const connectedPeers = peers.filter(p => p.pc.connectionState === 'connected').length;
+      
+      if (connectedPeers === 0) {
+        setWebrtcStats({ connectedPeers: 0, avgLatency: 0, connectionQuality: 'disconnected' });
+        return;
+      }
+
+      // Get RTT from peer connections
+      let totalRtt = 0;
+      let rttCount = 0;
+
+      for (const peer of peers) {
+        if (peer.pc.connectionState !== 'connected') continue;
+        
+        try {
+          const stats = await peer.pc.getStats();
+          stats.forEach((report) => {
+            if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+              if (report.currentRoundTripTime !== undefined) {
+                totalRtt += report.currentRoundTripTime * 1000; // Convert to ms
+                rttCount++;
+              }
+            }
+          });
+        } catch {
+          // Stats not available
+        }
+      }
+
+      const avgLatency = rttCount > 0 ? Math.round(totalRtt / rttCount) : 0;
+      
+      // Determine quality based on latency
+      let connectionQuality: WebRTCStats['connectionQuality'];
+      if (avgLatency === 0) {
+        connectionQuality = connectedPeers > 0 ? 'good' : 'disconnected';
+      } else if (avgLatency < 50) {
+        connectionQuality = 'excellent';
+      } else if (avgLatency < 100) {
+        connectionQuality = 'good';
+      } else if (avgLatency < 200) {
+        connectionQuality = 'fair';
+      } else {
+        connectionQuality = 'poor';
+      }
+
+      setWebrtcStats({ connectedPeers, avgLatency, connectionQuality });
+    };
+
+    // Measure immediately and then every 2 seconds
+    measureStats();
+    const interval = setInterval(measureStats, 2000);
+
+    return () => clearInterval(interval);
+  }, [isEnabled]);
+
   // Stop mic only on unmount (NOT whenever stopMic callback identity changes)
   useEffect(() => {
     return () => {
@@ -576,5 +678,5 @@ export const useMicrophone = (
     };
   }, []);
 
-  return { isSpeaking, volume, isEnabled, toggleMic, applyEQ, error, remoteAudioLevels };
+  return { isSpeaking, volume, isEnabled, toggleMic, applyEQ, error, remoteAudioLevels, webrtcStats };
 };
