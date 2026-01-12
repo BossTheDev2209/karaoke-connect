@@ -19,6 +19,7 @@ interface UseRoomReturn {
   roomMode: RoomMode;
   battleFormat?: BattleFormat;
   requestSync: () => void;
+  seek: (time: number) => void;
   networkLatency: number;
   clockOffset: number;
 }
@@ -57,6 +58,12 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
 
   // Store latest state in refs for sync responses
   const queueRef = useRef<Song[]>([]);
+  const clockOffsetRef = useRef(0);
+
+  // Keep clockOffset ref in sync
+  useEffect(() => {
+    clockOffsetRef.current = clockOffset;
+  }, [clockOffset]);
   const playbackRef = useRef<PlaybackState>(DEFAULT_PLAYBACK);
   const roomModeRef = useRef<RoomMode>('free-sing');
   const battleFormatRef = useRef<BattleFormat | undefined>();
@@ -176,6 +183,18 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
             setUsers(prev => prev.map(u => 
               u.id === userId ? { ...u, isSpeaking, audioLevel } : u
             ));
+            break;
+          }
+          case 'seek_event': {
+            const { time, timestamp, seekerId } = data.payload as { time: number; timestamp: number; seekerId: string };
+            // Ignore own seeks
+            if (seekerId === user?.id) break;
+            
+            setPlaybackState(prev => ({
+              ...prev,
+              currentTime: time,
+              lastUpdate: Date.now() + clockOffsetRef.current // Convert to Server/Host time reference
+            }));
             break;
           }
           case 'mode_update': {
@@ -429,6 +448,35 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
     });
   }, [playbackState]);
 
+  const seek = useCallback((time: number) => {
+    if (!user) return;
+    
+    // 1. Optimistic local update
+    const newState = { ...playbackState, currentTime: time, lastUpdate: Date.now() };
+    setPlaybackState(newState);
+    
+    // 2. Broadcast prioritized seek event
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'room_event',
+      payload: { 
+        type: 'seek_event', 
+        payload: { 
+          time, 
+          timestamp: Date.now(),
+          seekerId: user.id 
+        } 
+      },
+    });
+    
+    // 3. Also send standard playback update for redundancy (but seek_event handles priority)
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'room_event',
+      payload: { type: 'playback_update', payload: newState },
+    });
+  }, [playbackState, user]);
+
   const updateQueue = useCallback((newQueue: Song[]) => {
     setQueue(newQueue);
     channelRef.current?.send({
@@ -553,6 +601,7 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
     updateMode,
     updateTeams,
     requestSync,
+    seek,
     networkLatency,
     clockOffset,
   };

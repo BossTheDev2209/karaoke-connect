@@ -79,10 +79,11 @@ const Room = () => {
     updateMode,
     updateTeams,
     requestSync,
+    seek, // Destructure new seek function
     networkLatency,
     clockOffset
   } = useRoom(code || '', user);
-  
+
   const currentSong = queue[playbackState.currentSongIndex];
   
   // Update theme context with current video ID for auto-theme
@@ -277,8 +278,8 @@ const Room = () => {
   };
 
   const handleSeek = (time: number) => {
-    seekTo(time);
-    updatePlayback({ currentTime: time });
+    seekTo(time); // Instant local feedback
+    seek(time);   // Robust broadcast
   };
 
   const handleNext = () => {

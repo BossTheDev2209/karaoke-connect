@@ -89,6 +89,7 @@ export type RealtimePayload = {
     | 'speaking_update' 
     | 'sync_request' 
     | 'full_sync_response'
+    | 'seek_event'
     | 'vote_kick_start' 
     | 'vote_kick_vote' 
     | 'kick_user'
