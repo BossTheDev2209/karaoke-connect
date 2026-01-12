@@ -60,6 +60,13 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
   const roomModeRef = useRef<RoomMode>('free-sing');
   const battleFormatRef = useRef<BattleFormat | undefined>();
 
+  // Speaking update throttle state
+  const lastSpeakingBroadcastRef = useRef<number>(0);
+  const lastSpeakingStateRef = useRef<{ isSpeaking: boolean; audioLevel: number }>({ 
+    isSpeaking: false, 
+    audioLevel: 0 
+  });
+
   // Calculate average RTT from samples
   const getAverageRTT = useCallback(() => {
     const samples = rttSamplesRef.current;
@@ -430,11 +437,25 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
 
   const updateSpeaking = useCallback((isSpeaking: boolean, audioLevel?: number) => {
     if (!user) return;
-    channelRef.current?.send({
-      type: 'broadcast',
-      event: 'room_event',
-      payload: { type: 'speaking_update', payload: { userId: user.id, isSpeaking, audioLevel } },
-    });
+    
+    const now = Date.now();
+    const lastState = lastSpeakingStateRef.current;
+    const timeSinceLastBroadcast = now - lastSpeakingBroadcastRef.current;
+    
+    // Always broadcast if speaking state changed, otherwise throttle to 200ms (5/sec max)
+    const stateChanged = isSpeaking !== lastState.isSpeaking;
+    const shouldBroadcast = stateChanged || timeSinceLastBroadcast >= 200;
+    
+    if (shouldBroadcast) {
+      lastSpeakingBroadcastRef.current = now;
+      lastSpeakingStateRef.current = { isSpeaking, audioLevel: audioLevel || 0 };
+      
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'room_event',
+        payload: { type: 'speaking_update', payload: { userId: user.id, isSpeaking, audioLevel } },
+      });
+    }
   }, [user]);
 
   const requestSync = useCallback(() => {
