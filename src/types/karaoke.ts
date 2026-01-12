@@ -95,6 +95,9 @@ export type RealtimePayload = {
     | 'mode_vote_start'
     | 'mode_vote_cast'
     | 'mode_update'
-    | 'team_update';
+    | 'team_update'
+    | 'rtt_ping'
+    | 'rtt_pong'
+    | 'sync_heartbeat';
   payload: unknown;
 };

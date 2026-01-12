@@ -77,7 +77,9 @@ const Room = () => {
     updateSpeaking, 
     updateMode,
     updateTeams,
-    requestSync 
+    requestSync,
+    networkLatency,
+    clockOffset
   } = useRoom(code || '', user);
   
   const currentSong = queue[playbackState.currentSongIndex];
@@ -137,7 +139,12 @@ const Room = () => {
 
   const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded);
 
+  // Playback rate ref for gradual sync adjustments
+  const playbackRateRef = useRef(1.0);
+  const syncCorrectionTimeoutRef = useRef<number | null>(null);
+
   // Apply remote room playback state to our local player (seek + play/pause) so everyone stays in sync.
+  // Uses tighter drift threshold (0.3s) and gradual playback rate adjustments for small drifts.
   useEffect(() => {
     if (!isReady) return;
     if (!currentSong) return;
@@ -145,13 +152,51 @@ const Room = () => {
     const now = Date.now();
     const baseTime = playbackState.currentTime || 0;
     const elapsed = Math.max(0, (now - (playbackState.lastUpdate || now)) / 1000);
-    const targetTime = playbackState.isPlaying ? baseTime + elapsed : baseTime;
+    
+    // Apply clock offset compensation for better sync across devices
+    const offsetCompensation = clockOffset / 1000; // Convert ms to seconds
+    const targetTime = playbackState.isPlaying 
+      ? baseTime + elapsed + offsetCompensation 
+      : baseTime;
 
-    // 1) Correct drift (but avoid constant micro-seeking)
-    const drift = Math.abs(targetTime - currentTime);
-    if (Number.isFinite(targetTime) && drift > 1.2) {
-      markApplyingRemote();
-      seekTo(targetTime);
+    // Calculate drift
+    const drift = targetTime - currentTime;
+    const absDrift = Math.abs(drift);
+
+    // Tighter drift correction thresholds
+    const HARD_SEEK_THRESHOLD = 1.0; // Hard seek for > 1 second drift
+    const GRADUAL_SYNC_THRESHOLD = 0.3; // Start correcting at 0.3 seconds
+
+    if (Number.isFinite(targetTime)) {
+      if (absDrift > HARD_SEEK_THRESHOLD) {
+        // Large drift: hard seek
+        console.log(`[Sync] Hard seek: drift=${drift.toFixed(2)}s`);
+        markApplyingRemote();
+        seekTo(targetTime);
+        playbackRateRef.current = 1.0;
+      } else if (absDrift > GRADUAL_SYNC_THRESHOLD) {
+        // Medium drift: gradual correction via playback rate
+        // Speed up or slow down playback to catch up
+        const correction = drift > 0 ? 1.03 : 0.97; // 3% speed adjustment
+        
+        if (playbackRateRef.current !== correction) {
+          console.log(`[Sync] Gradual correction: drift=${drift.toFixed(2)}s, rate=${correction}`);
+          playbackRateRef.current = correction;
+          
+          // Clear any existing timeout
+          if (syncCorrectionTimeoutRef.current) {
+            clearTimeout(syncCorrectionTimeoutRef.current);
+          }
+          
+          // Reset playback rate after correction period
+          syncCorrectionTimeoutRef.current = window.setTimeout(() => {
+            playbackRateRef.current = 1.0;
+          }, 2000);
+        }
+      } else if (playbackRateRef.current !== 1.0) {
+        // Within tolerance, reset playback rate
+        playbackRateRef.current = 1.0;
+      }
     }
 
     // 2) Match play/pause
@@ -174,6 +219,7 @@ const Room = () => {
     pause,
     seekTo,
     markApplyingRemote,
+    clockOffset,
   ]);
 
   // Audio reactive for light sticks (after isPlaying is defined)
@@ -286,7 +332,9 @@ const Room = () => {
         <RoomCodeDisplay code={code} />
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-neon-green' : 'bg-destructive'}`} />
-          <span className="text-sm text-muted-foreground">{users.length} online</span>
+          <span className="text-sm text-muted-foreground">
+            {users.length} online{networkLatency > 0 && ` · ${networkLatency}ms`}
+          </span>
           
           {/* Mode Badge */}
           <div className={cn(
