@@ -273,7 +273,7 @@ const Room = () => {
   if (!user || !code) return null;
 
   return (
-    <div className="h-screen flex flex-col p-4 gap-4 overflow-hidden">
+    <div className="h-screen flex flex-col p-4 gap-3 overflow-hidden">
       {/* Celebration effects */}
       {celebrationEnabled && <CelebrationOverlay theme={celebration} />}
       
@@ -328,7 +328,7 @@ const Room = () => {
       </header>
 
       {/* Main content - Video takes priority */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3">
         {/* Queue panel */}
         <div className="lg:col-span-3 card-karaoke overflow-hidden flex flex-col">
           <h3 className="font-semibold mb-3 text-primary">Queue</h3>
@@ -347,8 +347,8 @@ const Room = () => {
         </div>
 
         {/* Video & Lyrics - Main focus */}
-        <div className="lg:col-span-6 flex flex-col gap-4">
-          <div className="card-karaoke aspect-video relative flex-1">
+        <div className="lg:col-span-6 flex flex-col gap-3 min-h-0">
+          <div className="card-karaoke relative flex-1 min-h-0">
             <div id="youtube-player" className="w-full h-full rounded-lg overflow-hidden" />
 
             {/* Sing React overlay with light sticks */}
@@ -378,7 +378,7 @@ const Room = () => {
               </div>
             )}
           </div>
-          <div className="card-karaoke h-[160px] shrink-0">
+          <div className="card-karaoke h-[140px] shrink-0">
             <LyricsDisplay 
               lyrics={lyrics} 
               currentLineIndex={currentLineIndex} 
