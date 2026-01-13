@@ -125,13 +125,15 @@ export const EQSettings: React.FC<EQSettingsProps> = ({
             <div className="space-y-2">
                 <div className="flex justify-between items-center">
                     <Label className="text-xs font-medium">Pre-Amp Gain</Label>
-                    <span className="text-xs font-mono text-indigo-400 font-bold">{Math.round(micGain * 100)}%</span>
+                    <span className="text-xs font-mono text-indigo-400 font-bold">
+                        {micGain > 0 ? '+' : ''}{Math.round(micGain)}dB
+                    </span>
                 </div>
                 <Slider
                     value={[micGain]}
-                    min={0.1}
-                    max={3.0}
-                    step={0.1}
+                    min={-12}
+                    max={24}
+                    step={0.5}
                     onValueChange={([val]) => onMicGainChange?.(val)}
                     className="py-1"
                 />

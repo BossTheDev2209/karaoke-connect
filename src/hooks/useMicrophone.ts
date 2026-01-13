@@ -168,9 +168,9 @@ export const useMicrophone = (
   const [noiseSuppression, setNoiseSuppression] = useState(false); // Default OFF
   const [echoCancellation, setEchoCancellation] = useState(true); // Default ON
   const [autoGainControl, setAutoGainControl] = useState(false); // Default OFF
-  const [micGain, setMicGain] = useState(1.0);
-  const [compressorThreshold, setCompressorThreshold] = useState(-24); // dB
-  const [compressorRatio, setCompressorRatio] = useState(12);
+  const [micGain, setMicGain] = useState(0); // dB (Default 0dB)
+  const [compressorThreshold, setCompressorThreshold] = useState(-8); // dB (raised from -24dB to fix low volume)
+  const [compressorRatio, setCompressorRatio] = useState(4); // Milder ratio (was 12)
 
   // DSP Nodes Refs
   const inputGainRef = useRef<GainNode | null>(null);
@@ -312,10 +312,12 @@ export const useMicrophone = (
     animationRef.current = requestAnimationFrame(analyze);
   }, [onSpeakingChange, analyzeRemoteAudio, threshold]);
 
-  // Update Input Gain dynamically
+  // Update Input Gain dynamically (Convert dB to Linear)
   useEffect(() => {
     if (inputGainRef.current && audioContextRef.current) {
-      inputGainRef.current.gain.setTargetAtTime(micGain, audioContextRef.current.currentTime, 0.1);
+      // dB to Linear: 10 ^ (dB / 20)
+      const linearGain = Math.pow(10, micGain / 20);
+      inputGainRef.current.gain.setTargetAtTime(linearGain, audioContextRef.current.currentTime, 0.1);
     }
   }, [micGain]);
 
@@ -676,7 +678,8 @@ export const useMicrophone = (
       
       // -- Input Stage --
       const inputGain = audioContext.createGain();
-      inputGain.gain.value = micGain;
+      // dB to Linear: 10 ^ (dB / 20)
+      inputGain.gain.value = Math.pow(10, micGain / 20);
       inputGainRef.current = inputGain;
       source.connect(inputGain);
 
