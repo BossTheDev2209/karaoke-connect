@@ -20,7 +20,7 @@ import { ReactionBar, FloatingReactions, useReactions, useWaving } from '@/compo
 import { SingReactOverlay } from '@/components/effects/SingReactOverlay';
 import { DustFallEffect } from '@/components/effects/SingerEffects';
 import { useAudioReactive } from '@/hooks/useAudioReactive';
-import { useVoteKick } from '@/components/VoteKick';
+import { useVoteKick, VoteKickOverlay } from '@/components/VoteKick';
 import { VotingPanel } from '@/components/VotingPanel';
 import { SyncLockOverlay, useSyncLock } from '@/components/SyncLockOverlay';
 
@@ -572,6 +572,17 @@ const Room = () => {
         userVolumes={userVolumes}
         onVolumeChange={handleUserVolumeChange}
       />
+      
+      {/* Vote Kick Overlay - Animated center popup */}
+      {activeVoteKick && (
+        <VoteKickOverlay
+          voteKick={activeVoteKick}
+          currentUserId={user.id}
+          hasVoted={hasVoted}
+          onVoteYes={voteYes}
+          onVoteNo={voteNo}
+        />
+      )}
     </div>
   );
 };

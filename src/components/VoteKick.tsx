@@ -134,7 +134,14 @@ export const useVoteKick = (
   }, [activeVoteKick]);
 
   const startVoteKick = useCallback((target: User) => {
-    if (!channel || users.length < 2) return;
+    if (!channel || users.length < 3) {
+      toast({
+        title: 'Cannot start vote',
+        description: 'You need at least 3 people in the room to start a vote kick.',
+        variant: 'destructive',
+      });
+      return;
+    }
     
     // Need absolute majority to kick (> 50% of people in room)
     const requiredVotes = Math.floor(users.length / 2) + 1;
@@ -246,6 +253,7 @@ export const VoteKickButton: React.FC<VoteKickButtonProps> = ({
             <AlertDialogTitle>Start vote to kick {user.nickname}?</AlertDialogTitle>
             <AlertDialogDescription>
               This will start a vote among all room members. The user will be kicked if enough people vote yes.
+              (Requires at least 3 people in the room)
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -274,7 +282,9 @@ interface VoteKickBannerProps {
   onVoteNo: () => void;
 }
 
-export const VoteKickBanner: React.FC<VoteKickBannerProps> = ({
+import { cn } from '@/lib/utils';
+
+export const VoteKickOverlay: React.FC<VoteKickBannerProps> = ({
   voteKick,
   currentUserId,
   hasVoted,
@@ -282,42 +292,72 @@ export const VoteKickBanner: React.FC<VoteKickBannerProps> = ({
   onVoteNo,
 }) => {
   const isTarget = voteKick.targetUserId === currentUserId;
+  const [isMinimized, setIsMinimized] = useState(false);
+
+  // Auto-minimize after 3 seconds
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsMinimized(true);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
-    <div className="relative w-full mt-4 z-10 animate-fade-in">
-      <div className="glass-morphism border-2 border-destructive/30 rounded-2xl px-4 py-3 shadow-xl flex flex-col gap-3">
+    <div 
+      className={cn(
+        "fixed z-50 transition-all duration-700 ease-in-out",
+        isMinimized 
+          ? "bottom-20 right-4 w-72" 
+          : "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 scale-110"
+      )}
+    >
+      <div className={cn(
+        "glass-morphism border-2 border-destructive/30 shadow-2xl flex flex-col gap-3 overflow-hidden transition-all",
+        isMinimized ? "rounded-xl px-4 py-3" : "rounded-2xl px-6 py-5 bg-background/95 backdrop-blur-xl"
+      )}>
         <div className="flex items-center gap-3">
-          <div className="p-1.5 bg-destructive/10 rounded-full shrink-0">
-            <UserX className="w-5 h-5 text-destructive animate-pulse" />
+          <div className={cn(
+            "rounded-full shrink-0 flex items-center justify-center bg-destructive/10 text-destructive animate-pulse transition-all",
+            isMinimized ? "p-1.5 w-8 h-8" : "p-3 w-12 h-12"
+          )}>
+            <UserX className={cn("transition-all", isMinimized ? "w-5 h-5" : "w-6 h-6")} />
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold truncate">
-              {isTarget ? 'Vote to kick you' : `Kick ${voteKick.targetNickname}?`}
-            </p>
+          <div className="flex-1 min-w-0">
+            <h3 className={cn("font-bold truncate transition-all", isMinimized ? "text-sm" : "text-lg")}>
+              {isTarget ? 'Vote to kick you!' : `Kick ${voteKick.targetNickname}?`}
+            </h3>
             <p className="text-xs text-muted-foreground">
               {voteKick.votes.length}/{voteKick.requiredVotes} votes needed
             </p>
           </div>
         </div>
         
+        {/* Progress Bar */}
+        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-destructive transition-all duration-500"
+            style={{ width: `${(voteKick.votes.length / voteKick.requiredVotes) * 100}%` }}
+          />
+        </div>
+
         {!isTarget && !hasVoted && (
-          <div className="flex gap-2">
+          <div className={cn("flex gap-2 transition-all", isMinimized ? "mt-0" : "mt-2")}>
             <Button
-              size="sm"
+              size={isMinimized ? "sm" : "default"}
               variant="destructive"
               onClick={onVoteYes}
-              className="flex-1 h-8 text-xs"
+              className="flex-1"
             >
-              <Check className="w-3.5 h-3.5 mr-1" />
+              <Check className="w-4 h-4 mr-1.5" />
               Yes
             </Button>
             <Button
-              size="sm"
+              size={isMinimized ? "sm" : "default"}
               variant="outline"
               onClick={onVoteNo}
-              className="flex-1 h-8 text-xs bg-background/50"
+              className="flex-1"
             >
-              <X className="w-3.5 h-3.5 mr-1" />
+              <X className="w-4 h-4 mr-1.5" />
               No
             </Button>
           </div>
@@ -325,7 +365,7 @@ export const VoteKickBanner: React.FC<VoteKickBannerProps> = ({
         
         {(hasVoted || isTarget) && (
           <div className="text-center py-1">
-            <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60">
+            <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60 animate-pulse">
               {isTarget ? 'Waiting for results...' : 'Vote Registered'}
             </span>
           </div>
