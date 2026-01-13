@@ -364,8 +364,9 @@ export const useMicrophone = (
       audioEl.srcObject = remoteStream;
       
       // Apply user volume if set, default to max if not specified
+      // Note: HTMLMediaElement.volume must be between 0 and 1, so clamp it
       if (userVolumes && userVolumes[remoteUserId] !== undefined) {
-        audioEl.volume = userVolumes[remoteUserId] / 100;
+        audioEl.volume = Math.min(1.0, Math.max(0, userVolumes[remoteUserId] / 100));
       } else {
         audioEl.volume = 1.0; // Full volume by default
       }
@@ -837,7 +838,8 @@ export const useMicrophone = (
     
     peersRef.current.forEach((peer, odels) => {
       if (peer.audioEl && userVolumes[odels] !== undefined) {
-        peer.audioEl.volume = userVolumes[odels] / 100;
+        // Clamp to [0, 1] range - HTMLMediaElement.volume must be 0-1
+        peer.audioEl.volume = Math.min(1.0, Math.max(0, userVolumes[odels] / 100));
       }
     });
   }, [userVolumes]);
