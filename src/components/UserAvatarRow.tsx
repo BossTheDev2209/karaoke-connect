@@ -275,9 +275,9 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
     <div className="glass rounded-2xl p-6 bg-gradient-to-t from-background/80 to-transparent backdrop-blur-xl">
       {roomMode === 'team-battle' ? (
         <div className="flex flex-col gap-8">
-          <div className="flex items-stretch justify-between gap-0 min-h-[200px]">
+          <div className="flex flex-col lg:flex-row items-stretch justify-between gap-6 lg:gap-0 min-h-[200px]">
             {/* Left Team */}
-            <div className="flex-1 flex flex-col gap-6 pr-8 border-r border-blue-500/20">
+            <div className="flex-1 flex flex-col gap-6 pr-0 lg:pr-8 border-b lg:border-b-0 lg:border-r border-blue-500/20 pb-6 lg:pb-0">
               <div className="flex items-center justify-between h-12">
                 <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Team Blue</span>
                 <div className="flex flex-col items-end">
@@ -308,7 +308,7 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
             </div>
 
             {/* Right Team */}
-            <div className="flex-1 flex flex-col gap-6 pl-8 border-l border-red-500/20 text-right">
+            <div className="flex-1 flex flex-col gap-6 pl-0 lg:pl-8 lg:border-l border-red-500/20 text-right pt-2 lg:pt-0">
               <div className="flex items-center justify-between h-12">
                 <div className="flex flex-col items-start text-left">
                   <span className="text-3xl font-black text-red-500 leading-none">
@@ -343,7 +343,7 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
       ) : (
         <>
           <h3 className="text-center text-xs uppercase tracking-widest text-muted-foreground mb-4">Singers</h3>
-          <div className="flex items-end justify-center gap-8 flex-wrap">
+          <div className="flex items-end justify-start lg:justify-center gap-4 lg:gap-8 flex-nowrap lg:flex-wrap overflow-x-auto lg:overflow-visible pb-4 lg:pb-0 scrollbar-hide">
             {sortedUsers.map(renderUser)}
             {users.length === 0 && (
               <p className="text-muted-foreground">No singers yet — invite friends!</p>

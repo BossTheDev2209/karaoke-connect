@@ -376,7 +376,7 @@ const Room = () => {
       {/* Dust fall effect when singing EXTRA loudly (Level 2) */}
       <DustFallEffect isActive={isExtraLoudSinging && isPlaying} intensity={maxUserAudioLevel} />
       {/* Header */}
-      <header className="flex items-center justify-between">
+      <header className="flex flex-wrap gap-2 items-center justify-between">
         <RoomCodeDisplay code={code} />
         <div className="flex items-center gap-2">
           {/* Connection indicator */}
@@ -481,7 +481,7 @@ const Room = () => {
       {/* Main content - Video takes priority */}
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3">
         {/* Queue panel */}
-        <div className="lg:col-span-3 card-karaoke overflow-hidden flex flex-col">
+        <div className="lg:col-span-3 card-karaoke overflow-hidden flex flex-col order-3 lg:order-1">
           <h3 className="font-semibold mb-3 text-primary">Queue</h3>
           <div className="mb-3">
             <SongSearch onAddSong={handleAddSong} userId={user.id} />
@@ -498,7 +498,7 @@ const Room = () => {
         </div>
 
         {/* Video & Lyrics - Main focus */}
-        <div className="lg:col-span-6 flex flex-col gap-3 min-h-0">
+        <div className="lg:col-span-6 flex flex-col gap-3 min-h-0 order-1 lg:order-2">
           <div className="card-karaoke relative flex-1 min-h-0">
             <div id="youtube-player" className="w-full h-full rounded-lg overflow-hidden" />
 
@@ -547,7 +547,7 @@ const Room = () => {
         </div>
 
         {/* Controls panel */}
-        <div className="lg:col-span-3 card-karaoke flex flex-col">
+        <div className="lg:col-span-3 card-karaoke flex flex-col order-2 lg:order-3">
           <h3 className="font-semibold mb-4 text-primary">Now Playing</h3>
           {currentSong && (
             <div className="mb-4">
@@ -583,21 +583,23 @@ const Room = () => {
       </div>
 
       {/* User avatars */}
-      <UserAvatarRow 
-        users={users} 
-        currentUserId={user.id} 
-        wavingUsers={wavingUsers} 
-        audioIntensity={audioIntensity} 
-        beatPhase={beatPhase} 
-        isBeat={isBeat} 
-        bpm={bpm}
-        onStartVoteKick={startVoteKick}
-        voteKickDisabled={!!activeVoteKick}
-        roomMode={roomMode}
-        battleFormat={battleFormat}
-        userVolumes={userVolumes}
-        onVolumeChange={handleUserVolumeChange}
-      />
+      <div className="shrink-0 overflow-x-auto pb-2 -mx-4 px-4 lg:mx-0 lg:px-0">
+        <UserAvatarRow 
+          users={users} 
+          currentUserId={user.id} 
+          wavingUsers={wavingUsers} 
+          audioIntensity={audioIntensity} 
+          beatPhase={beatPhase} 
+          isBeat={isBeat} 
+          bpm={bpm}
+          onStartVoteKick={startVoteKick}
+          voteKickDisabled={!!activeVoteKick}
+          roomMode={roomMode}
+          battleFormat={battleFormat}
+          userVolumes={userVolumes}
+          onVolumeChange={handleUserVolumeChange}
+        />
+      </div>
       
       {/* Vote Kick Overlay - Animated center popup */}
       {activeVoteKick && (
