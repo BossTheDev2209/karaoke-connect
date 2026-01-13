@@ -272,6 +272,19 @@ const Room = () => {
     setMonitorEnabled,
     monitorVolume,
     setMonitorVolume,
+    // Advanced Processing
+    noiseSuppression,
+    setNoiseSuppression,
+    echoCancellation,
+    setEchoCancellation,
+    autoGainControl,
+    setAutoGainControl,
+    micGain,
+    setMicGain,
+    compressorThreshold,
+    setCompressorThreshold,
+    compressorRatio,
+    setCompressorRatio,
   } = useMicrophone(
     handleSpeakingChange,
     channel,
@@ -445,6 +458,19 @@ const Room = () => {
             onMonitorEnabledChange={setMonitorEnabled}
             monitorVolume={monitorVolume}
             onMonitorVolumeChange={setMonitorVolume}
+            // Advanced Audio
+            noiseSuppression={noiseSuppression}
+            onNoiseSuppressionChange={setNoiseSuppression}
+            echoCancellation={echoCancellation}
+            onEchoCancellationChange={setEchoCancellation}
+            autoGainControl={autoGainControl}
+            onAutoGainControlChange={setAutoGainControl}
+            micGain={micGain}
+            onMicGainChange={setMicGain}
+            compressorThreshold={compressorThreshold}
+            onCompressorThresholdChange={setCompressorThreshold}
+            compressorRatio={compressorRatio}
+            onCompressorRatioChange={setCompressorRatio}
           />
           <Button variant="ghost" size="icon" onClick={handleLeave}>
             <LogOut className="w-4 h-4" />

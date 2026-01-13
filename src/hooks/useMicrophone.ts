@@ -27,6 +27,19 @@ interface UseMicrophoneReturn {
   setMonitorEnabled: (enabled: boolean) => void;
   monitorVolume: number;
   setMonitorVolume: (value: number) => void;
+  // Advanced Audio Processing
+  noiseSuppression: boolean;
+  setNoiseSuppression: (val: boolean) => void;
+  echoCancellation: boolean;
+  setEchoCancellation: (val: boolean) => void;
+  autoGainControl: boolean;
+  setAutoGainControl: (val: boolean) => void;
+  micGain: number;
+  setMicGain: (val: number) => void;
+  compressorThreshold: number;
+  setCompressorThreshold: (val: number) => void;
+  compressorRatio: number;
+  setCompressorRatio: (val: number) => void;
 }
 
 // Helper to create reverb impulse response
@@ -151,7 +164,18 @@ export const useMicrophone = (
   const [isMonitorEnabled, setMonitorEnabled] = useState(false);
   const [monitorVolume, setMonitorVolumeState] = useState(0.5); // 50% default
   
+  // Advanced Audio Processing State
+  const [noiseSuppression, setNoiseSuppression] = useState(false); // Default OFF
+  const [echoCancellation, setEchoCancellation] = useState(true); // Default ON
+  const [autoGainControl, setAutoGainControl] = useState(false); // Default OFF
+  const [micGain, setMicGain] = useState(1.0);
+  const [compressorThreshold, setCompressorThreshold] = useState(-24); // dB
+  const [compressorRatio, setCompressorRatio] = useState(12);
+
   // DSP Nodes Refs
+  const inputGainRef = useRef<GainNode | null>(null);
+  const compressorRef = useRef<DynamicsCompressorNode | null>(null);
+
   const dryGainRef = useRef<GainNode | null>(null);
   const reverbGainRef = useRef<GainNode | null>(null);
   const echoGainRef = useRef<GainNode | null>(null);
@@ -287,6 +311,21 @@ export const useMicrophone = (
 
     animationRef.current = requestAnimationFrame(analyze);
   }, [onSpeakingChange, analyzeRemoteAudio, threshold]);
+
+  // Update Input Gain dynamically
+  useEffect(() => {
+    if (inputGainRef.current && audioContextRef.current) {
+      inputGainRef.current.gain.setTargetAtTime(micGain, audioContextRef.current.currentTime, 0.1);
+    }
+  }, [micGain]);
+
+  // Update Compressor settings dynamically
+  useEffect(() => {
+    if (compressorRef.current && audioContextRef.current) {
+      compressorRef.current.threshold.setTargetAtTime(compressorThreshold, audioContextRef.current.currentTime, 0.1);
+      compressorRef.current.ratio.setTargetAtTime(compressorRatio, audioContextRef.current.currentTime, 0.1);
+    }
+  }, [compressorThreshold, compressorRatio]);
 
 
 
@@ -621,10 +660,10 @@ export const useMicrophone = (
           sampleRate: { ideal: 48000 },       // High sample rate for quality
           sampleSize: { ideal: 16 },          // 16-bit audio
           channelCount: { ideal: 1 },          // Mono is fine for voice
-          // Processing settings
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
+          // Processing settings - Dynamic based on state
+          echoCancellation: echoCancellation,
+          noiseSuppression: noiseSuppression,
+          autoGainControl: autoGainControl,
         },
       };
       
@@ -635,12 +674,20 @@ export const useMicrophone = (
       const audioContext = new AudioContext();
       const source = audioContext.createMediaStreamSource(stream);
       
+      // -- Input Stage --
+      const inputGain = audioContext.createGain();
+      inputGain.gain.value = micGain;
+      inputGainRef.current = inputGain;
+      source.connect(inputGain);
+
       // High-pass filter to remove low rumble and plosives
       const highpassFilter = audioContext.createBiquadFilter();
       highpassFilter.type = 'highpass';
       highpassFilter.frequency.value = 80;  // Cut below 80Hz (room rumble)
       highpassFilter.Q.value = 0.7;
       
+      inputGain.connect(highpassFilter);
+
       // Low-pass filter - set high to preserve voice clarity!
       // Previous value of 4000Hz was cutting off brightness and clarity
       const lowpassFilter = audioContext.createBiquadFilter();
@@ -658,7 +705,6 @@ export const useMicrophone = (
         return filter;
       });
 
-      source.connect(highpassFilter);
       highpassFilter.connect(lowpassFilter);
       
       let lastNode: AudioNode = lowpassFilter;
@@ -673,11 +719,23 @@ export const useMicrophone = (
       const destination = audioContext.createMediaStreamDestination();
       processedStreamRef.current = destination.stream;
 
+      // -- Output Stage with Limiter --
+      const compressor = audioContext.createDynamicsCompressor();
+      compressor.threshold.value = compressorThreshold;
+      compressor.knee.value = 40;
+      compressor.ratio.value = compressorRatio;
+      compressor.attack.value = 0.003; 
+      compressor.release.value = 0.25;
+      compressorRef.current = compressor;
+      
+      // Connect compressor to destination
+      compressor.connect(destination);
+
       // 1. Dry Path (Original Signal)
       const dryGain = audioContext.createGain();
       dryGain.gain.value = 1.0; // Default on
       lastNode.connect(dryGain);
-      dryGain.connect(destination);
+      dryGain.connect(compressor); // Connect to compressor instead of destination
       dryGainRef.current = dryGain;
 
       // 2. Reverb Path (Convolver)
@@ -694,7 +752,7 @@ export const useMicrophone = (
       lastNode.connect(reverbGain);
       reverbGain.connect(reverbPreDelay);
       reverbPreDelay.connect(convolver);
-      convolver.connect(destination);
+      convolver.connect(compressor); // To compressor
       reverbGainRef.current = reverbGain;
 
       // 3. Echo Path (Delay)
@@ -711,7 +769,7 @@ export const useMicrophone = (
       echoGain.connect(echoDelay);
       echoDelay.connect(echoFeedback);
       echoFeedback.connect(echoDelay); // Feedback loop
-      echoDelay.connect(destination);
+      echoDelay.connect(compressor); // To compressor
       echoGainRef.current = echoGain;
 
       // Apply initial effect state
@@ -731,39 +789,16 @@ export const useMicrophone = (
       }
 
       // Connect to Analyser (Visualize the PROCESSED output)
-      // Note: connecting destination to analyser doesn't work well in all browsers.
-      // Better to connect the dry/wet gains to the analyser too.
-      // Or just use a master gain before destination.
+      // We see the signal AFTER dynamic processing
       const masterGain = audioContext.createGain();
       masterGain.gain.value = 1.0;
       
-      dryGain.connect(masterGain);
-      convolver.connect(masterGain);
-      echoDelay.connect(masterGain);
+      compressor.connect(masterGain);
       
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 512;
       analyser.smoothingTimeConstant = 0.7;
       
-      masterGain.connect(analyser);
-      // We already connected to destination above independently.
-      // Whatever, let's keep the graph simple:
-      // Nodes -> routing -> [dry/rev/echo] -> destination
-      // We can also tap [dry/rev/echo] -> analyser.
-      
-      // Let's reconnect properly to ensure Analyser sees the same as WebRTC
-      // Disconnect previous destination connections
-      dryGain.disconnect(destination);
-      convolver.disconnect(destination);
-      echoDelay.disconnect(destination);
-
-      // Connect to Master
-      dryGain.connect(masterGain);
-      convolver.connect(masterGain);
-      echoDelay.connect(masterGain);
-
-      // Connect Master to Destination (sending) and Analyser (visuals)
-      masterGain.connect(destination);
       masterGain.connect(analyser);
 
       // Monitor (Sidetone) - Connect to speakers so you can hear yourself
@@ -792,7 +827,7 @@ export const useMicrophone = (
       console.error('Microphone error:', err);
       setError('Could not access microphone');
     }
-  }, [analyze, announceJoin, isMonitorEnabled, monitorVolume]);
+  }, [analyze, announceJoin, isMonitorEnabled, monitorVolume, noiseSuppression, echoCancellation, autoGainControl, micGain, compressorThreshold, compressorRatio]);
 
   const stopMic = useCallback(() => {
     console.log('[Mic] stopMic called');
@@ -1071,5 +1106,18 @@ export const useMicrophone = (
     setMonitorEnabled,
     monitorVolume,
     setMonitorVolume,
+    // Advanced Audio Processing
+    noiseSuppression,
+    setNoiseSuppression,
+    echoCancellation,
+    setEchoCancellation,
+    autoGainControl,
+    setAutoGainControl,
+    micGain,
+    setMicGain,
+    compressorThreshold,
+    setCompressorThreshold,
+    compressorRatio,
+    setCompressorRatio,
   };
 };

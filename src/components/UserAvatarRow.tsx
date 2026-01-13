@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { User, RoomMode, BattleFormat } from '@/types/karaoke';
 import { UserAvatar } from './UserAvatar';
 import { LightStick, LIGHTSTICK_COLORS } from './effects/LightStick';
 import { VoteKickButton } from './VoteKick';
-import { MusicNotesEffect, DustFallEffect } from './effects/SingerEffects';
+import { MusicNotesEffect } from './effects/SingerEffects';
 import { cn } from '@/lib/utils';
 import {
   Popover,
@@ -12,6 +12,180 @@ import {
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { Volume2, VolumeX } from 'lucide-react';
+
+interface UserAvatarItemProps {
+  user: User;
+  currentUserId: string | null;
+  usersCount: number;
+  isWaving: boolean;
+  audioIntensity: number;
+  beatPhase: number;
+  isBeat: boolean;
+  bpm: number;
+  roomMode: RoomMode;
+  activeMainSingerId: string | null;
+  activeTeam: string | null;
+  voteKickDisabled: boolean;
+  onStartVoteKick?: (user: User) => void;
+  userVolume: number;
+  onVolumeChange?: (userId: string, volume: number) => void;
+  color: string;
+}
+
+const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
+  user,
+  currentUserId,
+  usersCount,
+  isWaving,
+  audioIntensity,
+  beatPhase,
+  isBeat,
+  bpm,
+  roomMode,
+  activeMainSingerId,
+  activeTeam,
+  voteKickDisabled,
+  onStartVoteKick,
+  userVolume,
+  onVolumeChange,
+  color,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const isMainSinger = user.id === activeMainSingerId;
+  const userAudioLevel = user.audioLevel || 0;
+  
+  // Cheerleader effect: jump if member of other team is singing
+  const isCheerleader = roomMode === 'team-battle' && activeTeam && user.team !== activeTeam && activeMainSingerId;
+
+  // Two-level sing react - LOWERED THRESHOLDS for more responsive feedback:
+  const isNormalLoud = userAudioLevel > 0.25;
+  const isExtraLoud = userAudioLevel > 0.50;
+  
+  // Dynamic scale: base 1.0, +0.15 if loud, +0.20 more if extra loud, +audio level bonus
+  // DISABLED if Popover is open to prevent wobbling
+  let dynamicScale = 1;
+  let translateY = 0;
+  
+  if (!isOpen && isMainSinger) {
+    if (isExtraLoud) {
+      // Level 2: Extra loud - massive scale with spotlight
+      dynamicScale = 1.35 + (userAudioLevel * 0.15);
+      translateY = -20 - (userAudioLevel * 10);
+    } else if (isNormalLoud) {
+      // Level 1: Normal loud - moderate scale up
+      dynamicScale = 1.15 + ((userAudioLevel - 0.15) * 0.4);
+      translateY = -8 - (userAudioLevel * 8);
+    } else if (userAudioLevel > 0.08) {
+      // Light speaking - subtle scale
+      dynamicScale = 1.05 + (userAudioLevel * 0.3);
+      translateY = -4;
+    }
+  }
+
+  // If popover is open, we can still subtly bounce for rhythm but avoid heavy transforms
+  // or just stay static. Static is safest for UI interaction.
+
+  return (
+    <div className={cn(
+      "flex items-end gap-1 group relative",
+      isMainSinger && isExtraLoud && "z-30",
+      isMainSinger && !isExtraLoud && "z-20",
+      !isMainSinger && "z-10",
+      !isOpen && isCheerleader && "animate-bounce" // Disable cheerleading bounce if open too
+    )}
+    style={{
+      transform: `scale(${dynamicScale}) translateY(${translateY}px)`,
+      transition: 'transform 0.08s ease-out',
+    }}
+    >
+      {/* Music notes floating effect for loud singing */}
+      <MusicNotesEffect isActive={isMainSinger && user.isSpeaking && isNormalLoud} audioLevel={userAudioLevel} />
+
+      {/* Vote kick button - Hide when setting volume to avoid clutter */}
+      {!isOpen && onStartVoteKick && usersCount >= 3 && (
+        <div className="absolute -top-1 -right-1 z-10">
+          <VoteKickButton
+            user={user}
+            currentUserId={currentUserId || ''}
+            onStartVote={onStartVoteKick}
+            disabled={voteKickDisabled}
+          />
+        </div>
+      )}
+
+      {/* Light stick on left side - synced to BPM */}
+      {isWaving && (
+        <div className="relative -mr-2 z-10">
+          <LightStick
+            color={color}
+            isWaving={true}
+            intensity={audioIntensity}
+            beatPhase={beatPhase}
+            isBeat={isBeat}
+            bpm={bpm}
+            size="sm"
+            className="transform -rotate-12"
+          />
+        </div>
+      )}
+      
+      <div className={cn(
+        'transition-transform duration-300',
+        !isOpen && (isWaving || isCheerleader) && 'animate-bounce-subtle'
+      )}>
+        <Popover open={isOpen} onOpenChange={setIsOpen}>
+          <PopoverTrigger asChild>
+            <button className="outline-none focus:ring-2 focus:ring-primary rounded-full transition-transform active:scale-95">
+              <UserAvatar
+                user={user}
+                size="lg"
+                showName
+                isMainSinger={isMainSinger}
+                audioLevel={userAudioLevel}
+                isExtraLoud={isExtraLoud}
+              />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-4 glass backdrop-blur-xl border-primary/20" side="top">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                    <Volume2 className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold">{user.nickname}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase">User Volume</p>
+                  </div>
+                </div>
+                <span className="text-xs font-mono font-bold text-primary">
+                  {Math.round(userVolume)}%
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <VolumeX className="w-4 h-4 text-muted-foreground" />
+                <Slider
+                  value={[userVolume]}
+                  max={200}
+                  step={1}
+                  onValueChange={([val]) => onVolumeChange?.(user.id, val)}
+                  className="flex-1"
+                />
+                <Volume2 className="w-4 h-4 text-primary" />
+              </div>
+              
+              <p className="text-[10px] text-center text-muted-foreground italic">
+                Volume changes are saved locally to your browser.
+              </p>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+    </div>
+  );
+};
 
 interface UserAvatarRowProps {
   users: User[];
@@ -68,148 +242,34 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
     : null;
 
   const mainSingerUser = users.find(u => u.id === activeMainSingerId);
-  const activeTeam = mainSingerUser?.team;
+  const activeTeam = mainSingerUser?.team || null;
 
   // Split users for Team Battle
   const leftTeam = users.filter(u => u.team === 'left');
   const rightTeam = users.filter(u => u.team === 'right');
   const unassigned = users.filter(u => !u.team);
 
-  const renderUser = (user: User) => {
-    const isWaving = wavingUsers.has(user.id);
-    const color = getUserColor(user.id);
-    const isMainSinger = user.id === activeMainSingerId;
-    const userAudioLevel = user.audioLevel || 0;
-    
-    // Cheerleader effect: jump if member of other team is singing
-    const isCheerleader = roomMode === 'team-battle' && activeTeam && user.team !== activeTeam && activeMainSingerId;
-
-    // Two-level sing react - LOWERED THRESHOLDS for more responsive feedback:
-    // Level 1: Normal loud (audioLevel > 0.25) - moderate scale up
-    // Level 2: Extra loud (audioLevel > 0.50) - bigger scale
-    const isNormalLoud = userAudioLevel > 0.25;
-    const isExtraLoud = userAudioLevel > 0.50;
-    
-    // Dynamic scale: base 1.0, +0.15 if loud, +0.20 more if extra loud, +audio level bonus
-    let dynamicScale = 1;
-    let translateY = 0;
-    
-    if (isMainSinger) {
-      if (isExtraLoud) {
-        // Level 2: Extra loud - massive scale with spotlight
-        dynamicScale = 1.35 + (userAudioLevel * 0.15);
-        translateY = -20 - (userAudioLevel * 10);
-      } else if (isNormalLoud) {
-        // Level 1: Normal loud - moderate scale up
-        dynamicScale = 1.15 + ((userAudioLevel - 0.15) * 0.4);
-        translateY = -8 - (userAudioLevel * 8);
-      } else if (userAudioLevel > 0.08) {
-        // Light speaking - subtle scale
-        dynamicScale = 1.05 + (userAudioLevel * 0.3);
-        translateY = -4;
-      }
-    }
-
-    return (
-      <div key={user.id} className={cn(
-        "flex items-end gap-1 group relative",
-        isMainSinger && isExtraLoud && "z-30",
-        isMainSinger && !isExtraLoud && "z-20",
-        !isMainSinger && "z-10",
-        isCheerleader && "animate-bounce"
-      )}
-      style={{
-        transform: `scale(${dynamicScale}) translateY(${translateY}px)`,
-        transition: 'transform 0.08s ease-out',
-      }}
-      >
-        {/* Music notes floating effect for loud singing */}
-        <MusicNotesEffect isActive={isMainSinger && user.isSpeaking && isNormalLoud} audioLevel={userAudioLevel} />
-
-        {/* Vote kick button */}
-        {onStartVoteKick && users.length >= 2 && (
-          <div className="absolute -top-1 -right-1 z-10">
-            <VoteKickButton
-              user={user}
-              currentUserId={currentUserId || ''}
-              onStartVote={onStartVoteKick}
-              disabled={voteKickDisabled}
-            />
-          </div>
-        )}
-
-        {/* Light stick on left side - synced to BPM */}
-        {isWaving && (
-          <div className="relative -mr-2 z-10">
-            <LightStick
-              color={color}
-              isWaving={true}
-              intensity={audioIntensity}
-              beatPhase={beatPhase}
-              isBeat={isBeat}
-              bpm={bpm}
-              size="sm"
-              className="transform -rotate-12"
-            />
-          </div>
-        )}
-        
-        <div className={cn(
-          'transition-transform duration-300',
-          (isWaving || isCheerleader) && 'animate-bounce-subtle'
-        )}>
-          <Popover>
-            <PopoverTrigger asChild>
-              <button className="outline-none focus:ring-2 focus:ring-primary rounded-full transition-transform active:scale-95">
-                <UserAvatar
-                  user={user}
-                  size="lg"
-                  showName
-                  isMainSinger={isMainSinger}
-                  audioLevel={userAudioLevel}
-                  isExtraLoud={isExtraLoud}
-                />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-4 glass backdrop-blur-xl border-primary/20" side="top">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                      <Volume2 className="w-4 h-4 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold">{user.nickname}</p>
-                      <p className="text-[10px] text-muted-foreground uppercase">User Volume</p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-mono font-bold text-primary">
-                    {Math.round((userVolumes[user.id] ?? 100))}%
-                  </span>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <VolumeX className="w-4 h-4 text-muted-foreground" />
-                  <Slider
-                    value={[userVolumes[user.id] ?? 100]}
-                    max={200}
-                    step={1}
-                    onValueChange={([val]) => onVolumeChange?.(user.id, val)}
-                    className="flex-1"
-                  />
-                  <Volume2 className="w-4 h-4 text-primary" />
-                </div>
-                
-                <p className="text-[10px] text-center text-muted-foreground italic">
-                  Volume changes are saved locally to your browser.
-                </p>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-      </div>
-    );
-  };
+  const renderUser = (user: User) => (
+    <UserAvatarItem 
+      key={user.id}
+      user={user}
+      currentUserId={currentUserId}
+      usersCount={users.length}
+      isWaving={wavingUsers.has(user.id)}
+      color={getUserColor(user.id)}
+      audioIntensity={audioIntensity}
+      beatPhase={beatPhase}
+      isBeat={isBeat}
+      bpm={bpm}
+      roomMode={roomMode || 'free-sing'}
+      activeMainSingerId={activeMainSingerId}
+      activeTeam={activeTeam}
+      voteKickDisabled={voteKickDisabled}
+      onStartVoteKick={onStartVoteKick}
+      userVolume={userVolumes[user.id] ?? 100}
+      onVolumeChange={onVolumeChange}
+    />
+  );
 
   return (
     <div className="glass rounded-2xl p-6 bg-gradient-to-t from-background/80 to-transparent backdrop-blur-xl">

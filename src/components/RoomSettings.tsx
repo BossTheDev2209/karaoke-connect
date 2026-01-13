@@ -35,6 +35,19 @@ interface RoomSettingsProps {
   onMonitorEnabledChange?: (enabled: boolean) => void;
   monitorVolume?: number;
   onMonitorVolumeChange?: (value: number) => void;
+  // Advanced Audio
+  noiseSuppression?: boolean;
+  onNoiseSuppressionChange?: (val: boolean) => void;
+  echoCancellation?: boolean;
+  onEchoCancellationChange?: (val: boolean) => void;
+  autoGainControl?: boolean;
+  onAutoGainControlChange?: (val: boolean) => void;
+  micGain?: number;
+  onMicGainChange?: (val: number) => void;
+  compressorThreshold?: number;
+  onCompressorThresholdChange?: (val: number) => void;
+  compressorRatio?: number;
+  onCompressorRatioChange?: (val: number) => void;
 }
 
 export const RoomSettings: React.FC<RoomSettingsProps> = ({
@@ -48,6 +61,18 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({
   onMonitorEnabledChange,
   monitorVolume,
   onMonitorVolumeChange,
+  noiseSuppression,
+  onNoiseSuppressionChange,
+  echoCancellation,
+  onEchoCancellationChange,
+  autoGainControl,
+  onAutoGainControlChange,
+  micGain,
+  onMicGainChange,
+  compressorThreshold,
+  onCompressorThresholdChange,
+  compressorRatio,
+  onCompressorRatioChange,
 }) => {
   const { 
     preset, 
@@ -249,6 +274,19 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({
               onMonitorEnabledChange={onMonitorEnabledChange}
               monitorVolume={monitorVolume}
               onMonitorVolumeChange={onMonitorVolumeChange}
+              // Advanced
+              noiseSuppression={noiseSuppression}
+              onNoiseSuppressionChange={onNoiseSuppressionChange}
+              echoCancellation={echoCancellation}
+              onEchoCancellationChange={onEchoCancellationChange}
+              autoGainControl={autoGainControl}
+              onAutoGainControlChange={onAutoGainControlChange}
+              micGain={micGain}
+              onMicGainChange={onMicGainChange}
+              compressorThreshold={compressorThreshold}
+              onCompressorThresholdChange={onCompressorThresholdChange}
+              compressorRatio={compressorRatio}
+              onCompressorRatioChange={onCompressorRatioChange}
             />
           </TabsContent>
         </Tabs>

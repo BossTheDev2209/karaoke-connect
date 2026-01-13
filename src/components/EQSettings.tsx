@@ -35,6 +35,19 @@ interface EQSettingsProps {
   onMonitorEnabledChange?: (enabled: boolean) => void;
   monitorVolume?: number;
   onMonitorVolumeChange?: (value: number) => void;
+  // Advanced Audio
+  noiseSuppression?: boolean;
+  onNoiseSuppressionChange?: (val: boolean) => void;
+  echoCancellation?: boolean;
+  onEchoCancellationChange?: (val: boolean) => void;
+  autoGainControl?: boolean;
+  onAutoGainControlChange?: (val: boolean) => void;
+  micGain?: number;
+  onMicGainChange?: (val: number) => void;
+  compressorThreshold?: number;
+  onCompressorThresholdChange?: (val: number) => void;
+  compressorRatio?: number;
+  onCompressorRatioChange?: (val: number) => void;
 }
 
 export const EQSettings: React.FC<EQSettingsProps> = ({ 
@@ -46,6 +59,18 @@ export const EQSettings: React.FC<EQSettingsProps> = ({
   onMonitorEnabledChange,
   monitorVolume = 0.5,
   onMonitorVolumeChange,
+  noiseSuppression = false,
+  onNoiseSuppressionChange,
+  echoCancellation = true,
+  onEchoCancellationChange,
+  autoGainControl = false,
+  onAutoGainControlChange,
+  micGain = 1.0,
+  onMicGainChange,
+  compressorThreshold = -24,
+  onCompressorThresholdChange,
+  compressorRatio = 12,
+  onCompressorRatioChange,
 }) => {
   const [settings, setSettings] = useState<number[]>(
     initialSettings || EQ_PRESETS["Flat"]
@@ -88,6 +113,76 @@ export const EQSettings: React.FC<EQSettingsProps> = ({
 
   return (
     <div className="space-y-6 p-1">
+      {/* Input Processing Section */}
+      <div className="space-y-4 p-4 rounded-xl bg-gradient-to-br from-indigo-500/5 to-purple-500/10 border border-indigo-500/20">
+        <div className="flex items-center gap-2">
+          <Mic className="w-5 h-5 text-indigo-400" />
+          <h3 className="font-bold">Microphone Processing</h3>
+        </div>
+        
+        <div className="space-y-4">
+            {/* Gain */}
+            <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                    <Label className="text-xs font-medium">Pre-Amp Gain</Label>
+                    <span className="text-xs font-mono text-indigo-400 font-bold">{Math.round(micGain * 100)}%</span>
+                </div>
+                <Slider
+                    value={[micGain]}
+                    min={0.1}
+                    max={3.0}
+                    step={0.1}
+                    onValueChange={([val]) => onMicGainChange?.(val)}
+                    className="py-1"
+                />
+            </div>
+
+            {/* Toggles */}
+            <div className="flex flex-col gap-3 pt-2">
+                <div className="flex items-center justify-between">
+                    <Label className="text-xs flex flex-col gap-0.5 pointer-events-none">
+                        <span className="font-medium">Noise Suppression</span>
+                        <span className="text-[9px] text-muted-foreground">Reduce background noise details</span>
+                    </Label>
+                    <Switch checked={noiseSuppression} onCheckedChange={onNoiseSuppressionChange} />
+                </div>
+                <div className="flex items-center justify-between">
+                    <Label className="text-xs flex flex-col gap-0.5 pointer-events-none">
+                        <span className="font-medium">Echo Cancellation</span>
+                        <span className="text-[9px] text-muted-foreground">Prevent speaker feedback</span>
+                    </Label>
+                    <Switch checked={echoCancellation} onCheckedChange={onEchoCancellationChange} />
+                </div>
+                 <div className="flex items-center justify-between">
+                    <Label className="text-xs flex flex-col gap-0.5 pointer-events-none">
+                        <span className="font-medium">Auto Gain Control</span>
+                        <span className="text-[9px] text-muted-foreground">Auto-level volume (disable for dynamics)</span>
+                    </Label>
+                    <Switch checked={autoGainControl} onCheckedChange={onAutoGainControlChange} />
+                </div>
+            </div>
+
+             {/* Compressor/Limiter */}
+            <div className="space-y-2 pt-3 border-t border-indigo-500/10">
+                <div className="flex justify-between items-center">
+                    <Label className="text-xs font-medium">Limiter Threshold</Label>
+                    <span className="text-xs font-mono text-indigo-400 font-bold">{compressorThreshold}dB</span>
+                </div>
+                <Slider
+                    value={[compressorThreshold]}
+                    min={-60}
+                    max={0}
+                    step={1}
+                    onValueChange={([val]) => onCompressorThresholdChange?.(val)}
+                    className="py-1"
+                />
+                 <p className="text-[9px] text-muted-foreground leading-tight">
+                    Prevents distortion when singing loud. Lower value = more compression.
+                </p>
+            </div>
+        </div>
+      </div>
+
       {/* Microphone Sensitivity Section */}
       <div className="space-y-4 p-4 rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20">
         <div className="flex items-center gap-2">
