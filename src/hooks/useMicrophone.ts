@@ -419,46 +419,73 @@ export const useMicrophone = (
 
       if (type === 'offer') {
         let pc = peersRef.current.get(from)?.pc;
+        
+        // Check if we already have a connection in stable state
+        // This means we already completed the handshake - don't process duplicate offers
+        if (pc && pc.signalingState === 'stable' && pc.connectionState === 'connected') {
+          console.log(`[Mic] Ignoring duplicate offer from ${from} - already connected`);
+          return;
+        }
+        
+        // If we have a connection in wrong state, close it and create new one
+        if (pc && pc.signalingState !== 'stable' && pc.signalingState !== 'have-remote-offer') {
+          console.log(`[Mic] Closing peer ${from} in bad state: ${pc.signalingState}`);
+          closePeerConnection(from);
+          pc = undefined;
+        }
+        
         if (!pc) {
           pc = createPeerConnection(from, false);
         }
 
-        await pc.setRemoteDescription(new RTCSessionDescription(offer));
-        
-        const pending = pendingCandidatesRef.current.get(from) || [];
-        for (const c of pending) {
-          await pc.addIceCandidate(new RTCIceCandidate(c));
-        }
-        pendingCandidatesRef.current.delete(from);
-
-        const answerDesc = await pc.createAnswer();
-        // Enhance Opus quality before setting local description
-        const enhancedAnswer = new RTCSessionDescription({
-          type: answerDesc.type,
-          sdp: setOpusQuality(answerDesc.sdp || ''),
-        });
-        await pc.setLocalDescription(enhancedAnswer);
-
-        channel.send({
-          type: 'broadcast',
-          event: 'mic_signal',
-          payload: {
-            type: 'answer',
-            from: currentUserId,
-            to: from,
-            answer: enhancedAnswer,
-          },
-        });
-      } else if (type === 'answer') {
-        const pc = peersRef.current.get(from)?.pc;
-        if (pc && pc.signalingState === 'have-local-offer') {
-          await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(offer));
           
           const pending = pendingCandidatesRef.current.get(from) || [];
           for (const c of pending) {
             await pc.addIceCandidate(new RTCIceCandidate(c));
           }
           pendingCandidatesRef.current.delete(from);
+
+          const answerDesc = await pc.createAnswer();
+          // Enhance Opus quality before setting local description
+          const enhancedAnswer = new RTCSessionDescription({
+            type: answerDesc.type,
+            sdp: setOpusQuality(answerDesc.sdp || ''),
+          });
+          await pc.setLocalDescription(enhancedAnswer);
+
+          channel.send({
+            type: 'broadcast',
+            event: 'mic_signal',
+            payload: {
+              type: 'answer',
+              from: currentUserId,
+              to: from,
+              answer: enhancedAnswer,
+            },
+          });
+        } catch (err) {
+          console.error(`[Mic] Error handling offer from ${from}:`, err);
+          // Close and let them retry
+          closePeerConnection(from);
+        }
+      } else if (type === 'answer') {
+        const pc = peersRef.current.get(from)?.pc;
+        if (pc && pc.signalingState === 'have-local-offer') {
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(answer));
+            
+            const pending = pendingCandidatesRef.current.get(from) || [];
+            for (const c of pending) {
+              await pc.addIceCandidate(new RTCIceCandidate(c));
+            }
+            pendingCandidatesRef.current.delete(from);
+          } catch (err) {
+            console.error(`[Mic] Error handling answer from ${from}:`, err);
+          }
+        } else {
+          console.log(`[Mic] Ignoring answer from ${from} - wrong state: ${pc?.signalingState}`);
         }
       } else if (type === 'ice_candidate') {
         const pc = peersRef.current.get(from)?.pc;

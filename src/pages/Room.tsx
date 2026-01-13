@@ -160,61 +160,76 @@ const Room = () => {
   // Playback rate ref for gradual sync adjustments
   const playbackRateRef = useRef(1.0);
   const syncCorrectionTimeoutRef = useRef<number | null>(null);
+  const lastSeekTimeRef = useRef<number>(0);
+  const videoLoadingRef = useRef<boolean>(false);
+
+  // Track when video ID changes to suppress sync during load
+  useEffect(() => {
+    if (currentSong?.videoId) {
+      videoLoadingRef.current = true;
+      const timeout = setTimeout(() => {
+        videoLoadingRef.current = false;
+      }, 2000); // Give 2 seconds for video to load before syncing
+      return () => clearTimeout(timeout);
+    }
+  }, [currentSong?.videoId]);
 
   // Apply remote room playback state to our local player (seek + play/pause) so everyone stays in sync.
   // Uses tighter drift threshold (0.3s) and gradual playback rate adjustments for small drifts.
   useEffect(() => {
     if (!isReady) return;
     if (!currentSong) return;
+    
+    // Don't sync while video is loading
+    if (videoLoadingRef.current) return;
 
     const now = Date.now();
     const baseTime = playbackState.currentTime || 0;
-    const elapsed = Math.max(0, (now - (playbackState.lastUpdate || now)) / 1000);
+    const lastUpdate = playbackState.lastUpdate || now;
+    
+    // Sanity check: lastUpdate should be reasonable (within last hour)
+    const elapsedSinceUpdate = now - lastUpdate;
+    if (elapsedSinceUpdate < 0 || elapsedSinceUpdate > 3600000) {
+      // Invalid lastUpdate, skip this sync
+      return;
+    }
+    
+    const elapsed = playbackState.isPlaying ? elapsedSinceUpdate / 1000 : 0;
     
     // Apply clock offset compensation for better sync across devices
-    const offsetCompensation = clockOffset / 1000; // Convert ms to seconds
-    const targetTime = playbackState.isPlaying 
-      ? baseTime + elapsed + offsetCompensation 
-      : baseTime;
+    // But cap the offset to reasonable bounds (max 5 seconds)
+    const clampedOffset = Math.max(-5000, Math.min(5000, clockOffset));
+    const offsetCompensation = clampedOffset / 1000;
+    
+    const targetTime = baseTime + elapsed + offsetCompensation;
+
+    // Sanity check: targetTime should be within video duration bounds
+    if (!Number.isFinite(targetTime) || targetTime < 0 || (duration > 0 && targetTime > duration + 5)) {
+      return;
+    }
 
     // Calculate drift
     const drift = targetTime - currentTime;
     const absDrift = Math.abs(drift);
 
-    // Tighter drift correction thresholds
-    const HARD_SEEK_THRESHOLD = 1.0; // Hard seek for > 1 second drift
-    const GRADUAL_SYNC_THRESHOLD = 0.3; // Start correcting at 0.3 seconds
+    // Cooldown: Don't seek more than once every 3 seconds to prevent loops
+    const SEEK_COOLDOWN = 3000;
+    const timeSinceLastSeek = now - lastSeekTimeRef.current;
 
-    if (Number.isFinite(targetTime)) {
-      if (absDrift > HARD_SEEK_THRESHOLD) {
-        // Large drift: hard seek
-        console.log(`[Sync] Hard seek: drift=${drift.toFixed(2)}s`);
-        markApplyingRemote();
-        seekTo(targetTime);
-        playbackRateRef.current = 1.0;
-      } else if (absDrift > GRADUAL_SYNC_THRESHOLD) {
-        // Medium drift: gradual correction via playback rate
-        // Speed up or slow down playback to catch up
-        const correction = drift > 0 ? 1.03 : 0.97; // 3% speed adjustment
-        
-        if (playbackRateRef.current !== correction) {
-          console.log(`[Sync] Gradual correction: drift=${drift.toFixed(2)}s, rate=${correction}`);
-          playbackRateRef.current = correction;
-          
-          // Clear any existing timeout
-          if (syncCorrectionTimeoutRef.current) {
-            clearTimeout(syncCorrectionTimeoutRef.current);
-          }
-          
-          // Reset playback rate after correction period
-          syncCorrectionTimeoutRef.current = window.setTimeout(() => {
-            playbackRateRef.current = 1.0;
-          }, 2000);
-        }
-      } else if (playbackRateRef.current !== 1.0) {
-        // Within tolerance, reset playback rate
-        playbackRateRef.current = 1.0;
-      }
+    // Drift correction thresholds
+    const HARD_SEEK_THRESHOLD = 2.0; // Hard seek for > 2 second drift (increased from 1.0)
+    const GRADUAL_SYNC_THRESHOLD = 0.5; // Start correcting at 0.5 seconds (increased from 0.3)
+
+    if (absDrift > HARD_SEEK_THRESHOLD && timeSinceLastSeek > SEEK_COOLDOWN) {
+      // Large drift: hard seek (but only if cooldown passed)
+      console.log(`[Sync] Hard seek: drift=${drift.toFixed(2)}s, target=${targetTime.toFixed(2)}s`);
+      markApplyingRemote();
+      seekTo(targetTime);
+      lastSeekTimeRef.current = now;
+      playbackRateRef.current = 1.0;
+    } else if (absDrift > GRADUAL_SYNC_THRESHOLD) {
+      // Medium drift: just log it, don't try gradual correction (causes issues)
+      // The next hard seek will catch up if needed
     }
 
     // 2) Match play/pause
@@ -232,6 +247,7 @@ const Room = () => {
     playbackState.currentTime,
     playbackState.lastUpdate,
     currentTime,
+    duration,
     isPlaying,
     play,
     pause,

@@ -256,14 +256,8 @@ export const useYouTubePlayer = (
       setHasCaptionsAvailable(false);
       playerRef.current.loadVideoById(videoId);
       
-      // Explicitly seek to 0 to ensure video starts from the beginning
-      // YouTube may cache the last position, so we force it to start
-      setTimeout(() => {
-        if (playerRef.current && isPlayerReady.current) {
-          playerRef.current.seekTo(0, true);
-          playerRef.current.playVideo();
-        }
-      }, 100);
+      // Let the sync mechanism handle seeking - don't force seek to 0 here
+      // The Room.tsx sync effect will position the video correctly
       
       setIsPlaying(true);
       // Check for captions on the new video
