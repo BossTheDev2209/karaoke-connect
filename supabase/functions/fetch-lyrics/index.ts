@@ -420,26 +420,46 @@ function removeAsianParentheses(text: string): string {
 
 // Calculate similarity score between two strings (0-1)
 function similarity(s1: string, s2: string): number {
-  const str1 = s1.toLowerCase();
-  const str2 = s2.toLowerCase();
+  if (!s1 || !s2) return 0;
+  const str1 = s1.toLowerCase().trim();
+  const str2 = s2.toLowerCase().trim();
   
   if (str1 === str2) return 1;
-  if (str1.includes(str2) || str2.includes(str1)) return 0.8;
+  if (str1.includes(str2) || str2.includes(str1)) {
+    // Penalize very short matches being found in long strings
+    const ratio = Math.min(str1.length, str2.length) / Math.max(str1.length, str2.length);
+    return 0.8 * ratio + 0.1; // Scale based on length ratio
+  }
   
-  const words1 = str1.split(/\s+/);
-  const words2 = str2.split(/\s+/);
-  const commonWords = words1.filter(w => words2.some(w2 => w2.includes(w) || w.includes(w2)));
+  const words1 = str1.split(/[\s-]+/);
+  const words2 = str2.split(/[\s-]+/);
+  const commonWords = words1.filter(w => w.length > 1 && words2.some(w2 => w2.includes(w) || w.includes(w2)));
   
   return commonWords.length / Math.max(words1.length, words2.length);
 }
 
 // Score a result based on how well it matches our query
 function scoreResult(result: any, queryArtist: string, queryTitle: string): number {
-  const artistScore = similarity(result.artistName || '', queryArtist);
-  const titleScore = similarity(result.trackName || '', queryTitle);
-  const hasSynced = result.syncedLyrics ? 0.5 : 0;
+  const resultArtist = result.artistName || '';
+  const resultTrack = result.trackName || '';
   
-  return (artistScore * 0.4) + (titleScore * 0.4) + hasSynced;
+  const artistScore = similarity(resultArtist, queryArtist);
+  const titleScore = similarity(resultTrack, queryTitle);
+  
+  // Penalize mismatched artists heavily
+  if (artistScore < 0.3 && queryArtist.length > 2) {
+    return 0; // Discard completely if artist is totally different
+  }
+
+  // Bonus for Thai characters matching if query had Thai
+  const thaiBonus = (containsThai(queryArtist) && containsThai(resultArtist)) || 
+                    (containsThai(queryTitle) && containsThai(resultTrack)) ? 0.2 : 0;
+
+  // Reduced synced bonus (was 0.5)
+  const hasSynced = result.syncedLyrics ? 0.15 : 0;
+  
+  // Weighted score: Title is most important, then Artist
+  return (titleScore * 0.5) + (artistScore * 0.35) + hasSynced + thaiBonus;
 }
 
 // Search LRCLIB with given parameters

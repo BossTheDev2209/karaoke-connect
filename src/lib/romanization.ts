@@ -125,11 +125,20 @@ const initialCodes = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', '�
 const vowelCodes = ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅗ', 'ㅘ', 'ㅙ', 'ㅚ', 'ㅛ', 'ㅜ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅠ', 'ㅡ', 'ㅢ', 'ㅣ'];
 const finalCodes = ['', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ', 'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
 
+// Extended map for standalone Jamo
+const jamoMap: Record<string, string> = {
+  ...koreanInitials,
+  ...koreanVowels,
+  ...koreanFinals
+};
+
 export const romanizeKorean = (text: string): string => {
   try {
     let result = '';
     for (const char of text) {
       const code = char.charCodeAt(0);
+      
+      // Handle composed syllables
       if (code >= 0xAC00 && code <= 0xD7A3) {
         const syllableIndex = code - 0xAC00;
         const initialIndex = Math.floor(syllableIndex / (21 * 28));
@@ -138,7 +147,21 @@ export const romanizeKorean = (text: string): string => {
         result += (koreanInitials[initialCodes[initialIndex]] || '') + 
                   (koreanVowels[vowelCodes[vowelIndex]] || '') + 
                   (koreanFinals[finalCodes[finalIndex]] || '');
-      } else {
+      } 
+      // Handle standalone Jamo (Compatibility Jamo)
+      else if (code >= 0x3130 && code <= 0x318F) {
+        result += jamoMap[char] || '';
+      }
+      // Handle standard Jamo 
+      else if (code >= 0x1100 && code <= 0x11FF) {
+         // These are rarer in standard text but exist (Combinable Jamo)
+         // Map is tricky as they are positional, but best effort:
+         // We can try to map from initial codes if match found
+         const idx = initialCodes.indexOf(char);
+         if(idx >= 0) result += koreanInitials[char];
+         else result += ''; // skip or fallback
+      }
+      else {
         result += char;
       }
     }
@@ -148,12 +171,37 @@ export const romanizeKorean = (text: string): string => {
   }
 };
 
+// Remove CJK characters that commonly persist (Hanzi, Kana, Hangul)
+const stripResidue = (text: string): string => {
+  return text
+    .replace(/[\u4e00-\u9fff]/g, '') // CJK Ideographs
+    .replace(/[\u3040-\u30ff]/g, '') // Kana
+    .replace(/[\uac00-\ud7af]/g, '') // Hangul Syllables
+    .replace(/[\u3130-\u318f]/g, '') // Jamo (Compatibility)
+    .replace(/[\u1100-\u11ff]/g, '') // Jamo (Standard)
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
 // Get romanization for any CJK text
 export const romanize = async (text: string): Promise<string | null> => {
   if (!containsCJK(text)) return null;
-  if (containsJapanese(text)) return await romanizeJapanese(text);
-  if (containsKorean(text)) return romanizeKorean(text);
-  if (containsChinese(text)) return romanizeChinese(text);
+  
+  let converted: string | null = null;
+  
+  if (containsJapanese(text)) {
+    converted = await romanizeJapanese(text);
+  } else if (containsKorean(text)) {
+    converted = romanizeKorean(text);
+  } else if (containsChinese(text)) {
+    converted = romanizeChinese(text);
+  }
+  
+  // Clean up any remaining characters that failed conversion (to avoid "mixing")
+  if (converted) {
+    return stripResidue(converted);
+  }
+  
   return null;
 };
 
