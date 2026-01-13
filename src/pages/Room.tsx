@@ -162,17 +162,37 @@ const Room = () => {
   const syncCorrectionTimeoutRef = useRef<number | null>(null);
   const lastSeekTimeRef = useRef<number>(0);
   const videoLoadingRef = useRef<boolean>(false);
+  const initialSyncDoneRef = useRef<string | null>(null); // Track which video we've done initial sync for
 
-  // Track when video ID changes to suppress sync during load
+  // Track when video ID changes - do initial sync after brief load
   useEffect(() => {
-    if (currentSong?.videoId) {
-      videoLoadingRef.current = true;
-      const timeout = setTimeout(() => {
-        videoLoadingRef.current = false;
-      }, 2000); // Give 2 seconds for video to load before syncing
-      return () => clearTimeout(timeout);
-    }
-  }, [currentSong?.videoId]);
+    if (!currentSong?.videoId) return;
+    if (!isReady) return;
+    
+    // Mark as loading
+    videoLoadingRef.current = true;
+    
+    // After brief delay, seek to the correct position from playbackState
+    const timeout = setTimeout(() => {
+      videoLoadingRef.current = false;
+      
+      // If this is a new video we haven't synced yet, seek to the start position
+      if (initialSyncDoneRef.current !== currentSong.videoId) {
+        initialSyncDoneRef.current = currentSong.videoId;
+        const targetTime = playbackState.currentTime || 0;
+        console.log(`[Sync] Initial sync for new video, seeking to ${targetTime}s`);
+        seekTo(targetTime);
+        lastSeekTimeRef.current = Date.now();
+        
+        // Match play state
+        if (playbackState.isPlaying) {
+          play();
+        }
+      }
+    }, 500); // Reduced from 2000ms to 500ms
+    
+    return () => clearTimeout(timeout);
+  }, [currentSong?.videoId, isReady, playbackState.currentTime, playbackState.isPlaying, seekTo, play]);
 
   // Apply remote room playback state to our local player (seek + play/pause) so everyone stays in sync.
   // Uses tighter drift threshold (0.3s) and gradual playback rate adjustments for small drifts.

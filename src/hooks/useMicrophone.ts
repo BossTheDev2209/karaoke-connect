@@ -283,7 +283,12 @@ export const useMicrophone = (
     if (peer) {
       peer.pc.close();
       if (peer.audioEl) {
+        peer.audioEl.pause();
         peer.audioEl.srcObject = null;
+        // Remove from DOM if it was appended
+        if (peer.audioEl.parentNode) {
+          peer.audioEl.parentNode.removeChild(peer.audioEl);
+        }
       }
       peersRef.current.delete(remoteUserId);
     }
@@ -336,17 +341,26 @@ export const useMicrophone = (
 
     // Handle remote audio
     pc.ontrack = (event) => {
-      console.log(`[Mic] Received audio track from ${remoteUserId}`);
+      console.log(`[Mic] Received audio track from ${remoteUserId}`, event.track);
       const [remoteStream] = event.streams;
+      
+      if (!remoteStream) {
+        console.warn(`[Mic] No remote stream from ${remoteUserId}`);
+        return;
+      }
       
       // Create audio element for playback
       let audioEl = peersRef.current.get(remoteUserId)?.audioEl;
       if (!audioEl) {
-        audioEl = new Audio();
+        audioEl = document.createElement('audio');
+        audioEl.id = `remote-audio-${remoteUserId}`;
         audioEl.autoplay = true;
-        // Important: Prevent pause from other tabs or system
-        audioEl.setAttribute('playsinline', '');
+        audioEl.playsInline = true;
+        // Append to DOM - some browsers require this for audio to actually play
+        document.body.appendChild(audioEl);
       }
+      
+      // Set the stream
       audioEl.srcObject = remoteStream;
       
       // Apply user volume if set, default to max if not specified
@@ -359,26 +373,31 @@ export const useMicrophone = (
       // Explicitly try to play the audio (required by browser autoplay policies)
       const playAudio = async () => {
         try {
+          // Make sure the element is not muted
+          audioEl!.muted = false;
           await audioEl!.play();
-          console.log(`[Mic] Audio playback started for ${remoteUserId}`);
+          console.log(`[Mic] ✅ Audio playback started for ${remoteUserId}`);
         } catch (playError) {
           console.warn(`[Mic] Audio autoplay blocked for ${remoteUserId}:`, playError);
-          // Add a click handler to resume playback on user interaction
+          // Add a one-time click handler to resume playback on user interaction
           const resumeAudio = async () => {
             try {
+              audioEl!.muted = false;
               await audioEl!.play();
-              console.log(`[Mic] Audio resumed for ${remoteUserId} after user interaction`);
-              document.removeEventListener('click', resumeAudio);
-              document.removeEventListener('keydown', resumeAudio);
+              console.log(`[Mic] ✅ Audio resumed for ${remoteUserId} after user interaction`);
             } catch (e) {
               console.warn(`[Mic] Failed to resume audio for ${remoteUserId}:`, e);
             }
+            document.removeEventListener('click', resumeAudio);
+            document.removeEventListener('keydown', resumeAudio);
           };
-          document.addEventListener('click', resumeAudio, { once: true });
-          document.addEventListener('keydown', resumeAudio, { once: true });
+          document.addEventListener('click', resumeAudio);
+          document.addEventListener('keydown', resumeAudio);
         }
       };
-      playAudio();
+      
+      // Small delay to ensure stream is ready
+      setTimeout(playAudio, 100);
 
       // Create analyser for this remote user
       try {
