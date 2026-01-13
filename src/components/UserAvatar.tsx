@@ -2,6 +2,7 @@ import React from 'react';
 import { User } from '@/types/karaoke';
 import { HumanAvatar } from './HumanAvatar';
 import { cn } from '@/lib/utils';
+import { Mic, MicOff } from 'lucide-react';
 
 interface UserAvatarProps {
   user: User;
@@ -26,6 +27,13 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
     lg: 'w-28 h-28',
   };
 
+  // Mic indicator sizes based on avatar size
+  const micIndicatorSize = {
+    sm: 'w-4 h-4',
+    md: 'w-5 h-5',
+    lg: 'w-6 h-6',
+  };
+
   // Use custom avatar if available
   const hasCustomAvatar = user.customAvatarNormal;
   const currentImage = user.isSpeaking && user.customAvatarSpeaking 
@@ -34,6 +42,21 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
 
   return (
     <div className="flex flex-col items-center gap-1 relative">
+      {/* Mic status indicator */}
+      {user.isMicEnabled !== undefined && (
+        <div className={cn(
+          "absolute -top-1 -right-1 z-20 rounded-full p-1 shadow-lg border transition-all duration-300",
+          user.isMicEnabled 
+            ? "bg-neon-green/20 border-neon-green/50 text-neon-green" 
+            : "bg-muted/80 border-border text-muted-foreground"
+        )}>
+          {user.isMicEnabled ? (
+            <Mic className={cn(micIndicatorSize[size], user.isSpeaking && "animate-pulse")} />
+          ) : (
+            <MicOff className={micIndicatorSize[size]} />
+          )}
+        </div>
+      )}
 
       {hasCustomAvatar ? (
         <div 

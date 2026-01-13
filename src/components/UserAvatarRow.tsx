@@ -84,11 +84,11 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
     // Cheerleader effect: jump if member of other team is singing
     const isCheerleader = roomMode === 'team-battle' && activeTeam && user.team !== activeTeam && activeMainSingerId;
 
-    // Two-level sing react:
-    // Level 1: Normal loud (audioLevel > 0.45) - moderate scale up
-    // Level 2: Extra loud (audioLevel > 0.75) - bigger scale
-    const isNormalLoud = userAudioLevel > 0.45;
-    const isExtraLoud = userAudioLevel > 0.75;
+    // Two-level sing react - LOWERED THRESHOLDS for more responsive feedback:
+    // Level 1: Normal loud (audioLevel > 0.25) - moderate scale up
+    // Level 2: Extra loud (audioLevel > 0.50) - bigger scale
+    const isNormalLoud = userAudioLevel > 0.25;
+    const isExtraLoud = userAudioLevel > 0.50;
     
     // Dynamic scale: base 1.0, +0.15 if loud, +0.20 more if extra loud, +audio level bonus
     let dynamicScale = 1;
@@ -101,11 +101,11 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
         translateY = -20 - (userAudioLevel * 10);
       } else if (isNormalLoud) {
         // Level 1: Normal loud - moderate scale up
-        dynamicScale = 1.15 + ((userAudioLevel - 0.3) * 0.3);
-        translateY = -8 - (userAudioLevel * 5);
-      } else {
-        // Speaking but not loud
-        dynamicScale = 1.05 + (userAudioLevel * 0.2);
+        dynamicScale = 1.15 + ((userAudioLevel - 0.15) * 0.4);
+        translateY = -8 - (userAudioLevel * 8);
+      } else if (userAudioLevel > 0.08) {
+        // Light speaking - subtle scale
+        dynamicScale = 1.05 + (userAudioLevel * 0.3);
         translateY = -4;
       }
     }

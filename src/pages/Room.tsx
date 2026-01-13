@@ -76,7 +76,8 @@ const Room = () => {
     channel, 
     updatePlayback, 
     updateQueue, 
-    updateSpeaking, 
+    updateSpeaking,
+    updateMicStatus,
     updateMode,
     updateTeams,
     requestSync,
@@ -286,6 +287,12 @@ const Room = () => {
     setEqSettings(newSettings);
     applyEQ(newSettings);
   };
+
+  const handleMicToggle = useCallback(() => {
+    toggleMic(eqSettings);
+    // Broadcast mic status after toggle (inverted because toggleMic toggles the state)
+    updateMicStatus(!isMicEnabled);
+  }, [toggleMic, eqSettings, updateMicStatus, isMicEnabled]);
 
   const handlePlayPause = () => {
     if (isPlaying) {
@@ -534,7 +541,7 @@ const Room = () => {
             onSeek={handleSeek}
             onVolumeChange={handleVolumeChange}
             onMuteToggle={isMuted ? unmute : mute}
-            onMicToggle={() => toggleMic(eqSettings)}
+            onMicToggle={handleMicToggle}
             onSync={requestSync}
           />
 

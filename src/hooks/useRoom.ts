@@ -14,6 +14,7 @@ interface UseRoomReturn {
   updatePlayback: (state: Partial<PlaybackState>) => void;
   updateQueue: (queue: Song[]) => void;
   updateSpeaking: (isSpeaking: boolean, audioLevel?: number) => void;
+  updateMicStatus: (isMicEnabled: boolean) => void;
   updateMode: (mode: RoomMode, battleFormat?: BattleFormat) => void;
   updateTeams: (userTeams: Record<string, 'left' | 'right'>) => void;
   roomMode: RoomMode;
@@ -209,6 +210,15 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
               ...u,
               team: userTeams[u.id] || u.team
             })));
+            break;
+          }
+          case 'mic_status_update': {
+            const { userId, isMicEnabled } = data.payload as { userId: string; isMicEnabled: boolean };
+            // Skip our own updates
+            if (userId === user?.id) break;
+            setUsers(prev => prev.map(u => 
+              u.id === userId ? { ...u, isMicEnabled } : u
+            ));
             break;
           }
           case 'sync_request': {
@@ -532,6 +542,22 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
     });
   }, [user?.id, getAverageRTT]);
 
+  const updateMicStatus = useCallback((isMicEnabled: boolean) => {
+    if (!user) return;
+    
+    // Local update
+    setUsers(prev => prev.map(u => 
+      u.id === user.id ? { ...u, isMicEnabled } : u
+    ));
+    
+    // Broadcast to others
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'room_event',
+      payload: { type: 'mic_status_update', payload: { userId: user.id, isMicEnabled } },
+    });
+  }, [user]);
+
   const updateMode = useCallback((mode: RoomMode, format?: BattleFormat) => {
     setRoomMode(mode);
     setBattleFormat(format);
@@ -598,6 +624,7 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
     updatePlayback,
     updateQueue,
     updateSpeaking,
+    updateMicStatus,
     updateMode,
     updateTeams,
     requestSync,

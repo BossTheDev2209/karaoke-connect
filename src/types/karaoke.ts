@@ -8,6 +8,7 @@ export interface User {
   customAvatarNormal?: string;
   customAvatarSpeaking?: string;
   isSpeaking: boolean;
+  isMicEnabled?: boolean;
   audioLevel?: number;
   team?: 'left' | 'right';
   score?: number;
@@ -87,6 +88,7 @@ export type RealtimePayload = {
     | 'playback_update' 
     | 'queue_update' 
     | 'speaking_update' 
+    | 'mic_status_update'
     | 'sync_request' 
     | 'full_sync_response'
     | 'seek_event'
