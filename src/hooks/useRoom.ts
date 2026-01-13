@@ -171,9 +171,15 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
         const data = payload as RealtimePayload;
         
         switch (data.type) {
-          case 'playback_update':
-            setPlaybackState(data.payload as PlaybackState);
+          case 'playback_update': {
+            const newState = data.payload as PlaybackState;
+            // Only accept updates that are newer than our current state
+            setPlaybackState(prev => {
+              if (newState.lastUpdate < prev.lastUpdate) return prev;
+              return newState;
+            });
             break;
+          }
           case 'queue_update':
             setQueue(data.payload as Song[]);
             break;
@@ -191,11 +197,17 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
             // Ignore own seeks
             if (seekerId === user?.id) break;
             
-            setPlaybackState(prev => ({
-              ...prev,
-              currentTime: time,
-              lastUpdate: Date.now() + clockOffsetRef.current // Convert to Server/Host time reference
-            }));
+            setPlaybackState(prev => {
+              // Create new state with adjusted timestamp
+              const newState = {
+                ...prev,
+                currentTime: time,
+                lastUpdate: Date.now() + clockOffsetRef.current // Convert to Server/Host time reference
+              };
+              // Only apply if newer (though seeks are usually intentional overrides)
+              if (newState.lastUpdate < prev.lastUpdate) return prev;
+              return newState;
+            });
             break;
           }
           case 'mode_update': {
@@ -264,6 +276,9 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
               
               setQueue(syncData.queue);
               setPlaybackState(syncData.playbackState);
+              // Update ref immediately 
+              playbackRef.current = syncData.playbackState;
+              
               setRoomMode(syncData.roomMode);
               setBattleFormat(syncData.battleFormat);
               hasSyncedRef.current = true;
@@ -322,8 +337,13 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
               const offset = heartbeatData.serverTime - localTime;
               setClockOffset(prev => (prev + offset) / 2); // Smooth the offset
               
-              // Update playback state for continuous sync
-              setPlaybackState(heartbeatData.playbackState);
+              // Update playback state for continuous sync - but prevent race conditions
+              setPlaybackState(prev => {
+                // If the heartbeat state is older than our last update (unlikely from host, but possible via clock skew/reordering)
+                // Actually, just trust host, but monotonic time is safer
+                if (heartbeatData.playbackState.lastUpdate < prev.lastUpdate) return prev;
+                return heartbeatData.playbackState;
+              });
             }
             break;
           }
@@ -451,6 +471,9 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
   const updatePlayback = useCallback((state: Partial<PlaybackState>) => {
     const newState = { ...playbackState, ...state, lastUpdate: Date.now() };
     setPlaybackState(newState);
+    // FIX: Update ref immediately so heartbeats see it
+    playbackRef.current = newState;
+    
     channelRef.current?.send({
       type: 'broadcast',
       event: 'room_event',
@@ -464,6 +487,8 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
     // 1. Optimistic local update
     const newState = { ...playbackState, currentTime: time, lastUpdate: Date.now() };
     setPlaybackState(newState);
+    // FIX: Update ref immediately
+    playbackRef.current = newState;
     
     // 2. Broadcast prioritized seek event
     channelRef.current?.send({
