@@ -355,7 +355,6 @@ export const useMicrophone = (
         audioEl = document.createElement('audio');
         audioEl.id = `remote-audio-${remoteUserId}`;
         audioEl.autoplay = true;
-        audioEl.playsInline = true;
         // Append to DOM - some browsers require this for audio to actually play
         document.body.appendChild(audioEl);
       }
