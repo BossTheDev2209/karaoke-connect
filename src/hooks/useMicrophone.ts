@@ -124,12 +124,12 @@ const setOpusQuality = (sdp: string): string => {
   
   if (fmtpRegex.test(sdp)) {
     // Append to existing fmtp line
-    return sdp.replace(fmtpRegex, `a=fmtp:${opusPayload} $1;maxaveragebitrate=64000;stereo=0;sprop-stereo=0`);
+    return sdp.replace(fmtpRegex, `a=fmtp:${opusPayload} $1;maxaveragebitrate=128000;stereo=1;sprop-stereo=1;usedtx=0;useinbandfec=1;cbr=1`);
   } else {
     // Add new fmtp line after rtpmap
     return sdp.replace(
       new RegExp(`(a=rtpmap:${opusPayload} opus[^\\r\\n]+)`),
-      `$1\r\na=fmtp:${opusPayload} minptime=10;maxaveragebitrate=64000;stereo=0;sprop-stereo=0;useinbandfec=1`
+      `$1\r\na=fmtp:${opusPayload} minptime=10;maxaveragebitrate=128000;stereo=1;sprop-stereo=1;usedtx=0;useinbandfec=1;cbr=1`
     );
   }
 };
@@ -718,10 +718,6 @@ export const useMicrophone = (
 
       // --- DSP EFFECT ROUTING ---
       
-      // Create Destination for WebRTC
-      const destination = audioContext.createMediaStreamDestination();
-      processedStreamRef.current = destination.stream;
-
       // -- Output Stage with Limiter --
       const compressor = audioContext.createDynamicsCompressor();
       compressor.threshold.value = compressorThreshold;
@@ -730,9 +726,6 @@ export const useMicrophone = (
       compressor.attack.value = 0.003; 
       compressor.release.value = 0.25;
       compressorRef.current = compressor;
-      
-      // Connect compressor to destination
-      compressor.connect(destination);
 
       // 1. Dry Path (Original Signal)
       const dryGain = audioContext.createGain();
@@ -803,6 +796,11 @@ export const useMicrophone = (
       analyser.smoothingTimeConstant = 0.7;
       
       masterGain.connect(analyser);
+
+      const destination = audioContext.createMediaStreamDestination();
+      destination.channelCount = 2;
+      masterGain.connect(destination);
+      processedStreamRef.current = destination.stream;
 
       // Monitor (Sidetone) - Connect to speakers so you can hear yourself
       const monitorGain = audioContext.createGain();
