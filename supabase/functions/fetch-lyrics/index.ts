@@ -443,7 +443,17 @@ function scoreResult(result: any, queryArtist: string, queryTitle: string): numb
   const resultArtist = result.artistName || '';
   const resultTrack = result.trackName || '';
   
-  const artistScore = similarity(resultArtist, queryArtist);
+  let artistScore = similarity(resultArtist, queryArtist);
+
+  // Improve artist matching by checking Romanized variations (critical for Thai artists)
+  if (artistScore < 0.85 && containsThai(queryArtist)) {
+    const variations = getThaiArtistVariations(queryArtist);
+    for (const v of variations) {
+      const vScore = similarity(resultArtist, v);
+      if (vScore > artistScore) artistScore = vScore;
+    }
+  }
+  
   const titleScore = similarity(resultTrack, queryTitle);
   
   // Penalize mismatched artists heavily
