@@ -22,8 +22,9 @@ import { DustFallEffect } from '@/components/effects/SingerEffects';
 import { useAudioReactive } from '@/hooks/useAudioReactive';
 import { useVoteKick } from '@/components/VoteKick';
 import { VotingPanel } from '@/components/VotingPanel';
+import { SyncLockOverlay, useSyncLock } from '@/components/SyncLockOverlay';
 
-import { LogOut, Swords, Mic2 } from 'lucide-react';
+import { LogOut, Swords, Mic2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -140,6 +141,20 @@ const Room = () => {
   }, [queue.length, playbackState.currentSongIndex, updatePlayback]);
 
   const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded);
+
+  // Sync lock for synchronized playback start
+  const handleSyncLockComplete = useCallback(() => {
+    // Reset playback to start of current song and play
+    seekTo(0);
+    play();
+    updatePlayback({ isPlaying: true, currentTime: 0 });
+  }, [seekTo, play, updatePlayback]);
+
+  const { isSyncLockActive, startSyncLock } = useSyncLock(
+    channel,
+    isHost,
+    user?.id || ''
+  );
 
   // Playback rate ref for gradual sync adjustments
   const playbackRateRef = useRef(1.0);
@@ -330,6 +345,15 @@ const Room = () => {
       {/* Celebration effects */}
       {celebrationEnabled && <CelebrationOverlay theme={celebration} />}
       
+      {/* Sync Lock Overlay */}
+      <SyncLockOverlay
+        channel={channel}
+        isHost={isHost}
+        currentUserId={user.id}
+        onSyncStart={() => {}}
+        onCountdownComplete={handleSyncLockComplete}
+      />
+      
       {/* Floating reactions */}
       
       {/* Dust fall effect when singing EXTRA loudly (Level 2) */}
@@ -374,6 +398,22 @@ const Room = () => {
             {roomMode === 'team-battle' ? 'Team Battle' : 'Free Sing'}
           </div>
 
+
+          {/* Sync Lock Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={startSyncLock}
+            disabled={isSyncLockActive || !currentSong}
+            className={cn(
+              "gap-1.5",
+              isSyncLockActive && "animate-pulse"
+            )}
+            title="Start synchronized playback with 3-2-1 countdown"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Sync Lock</span>
+          </Button>
 
           {/* Unified Voting Panel */}
           <VotingPanel
