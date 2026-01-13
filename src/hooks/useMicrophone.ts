@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
+export type AudioEffectType = 'none' | 'reverb' | 'echo' | 'studio';
+
 interface WebRTCStats {
   connectedPeers: number;
   avgLatency: number; // in ms
@@ -13,10 +15,35 @@ interface UseMicrophoneReturn {
   isEnabled: boolean;
   toggleMic: (initialEQ?: number[]) => void;
   applyEQ: (settings: number[]) => void;
+  setEffect: (effect: AudioEffectType) => void;
+  currentEffect: AudioEffectType;
   error: string | null;
   remoteAudioLevels: Record<string, number>;
   webrtcStats: WebRTCStats;
 }
+
+// Helper to create reverb impulse response
+const createReverbImpulse = (ctx: AudioContext, duration: number = 2.0, decay: number = 2.0): AudioBuffer => {
+  const sampleRate = ctx.sampleRate;
+  const length = sampleRate * duration;
+  const impulse = ctx.createBuffer(2, length, sampleRate);
+  const left = impulse.getChannelData(0);
+  const right = impulse.getChannelData(1);
+
+  for (let i = 0; i < length; i++) {
+    const n = i; // sample index
+    // Simple exponential decay white noise
+    // Using a logarithmic decay for more natural sound
+    const gain = Math.pow(1 - n / length, decay); 
+    
+    // Add some "room" reflections
+    const val = (Math.random() * 2 - 1) * gain;
+    
+    left[i] = val;
+    right[i] = val;
+  }
+  return impulse;
+};
 
 // Higher threshold to avoid false positives - requires real voice input
 const VOLUME_THRESHOLD = 0.08;
@@ -108,6 +135,15 @@ export const useMicrophone = (
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const processedStreamRef = useRef<MediaStream | null>(null); // For sending DSP audio
+  const effectStateRef = useRef<AudioEffectType>('none'); // To track current effect without re-renders affecting graph
+  const [currentEffect, setCurrentEffect] = useState<AudioEffectType>('none');
+  
+  // DSP Nodes Refs
+  const dryGainRef = useRef<GainNode | null>(null);
+  const reverbGainRef = useRef<GainNode | null>(null);
+  const echoGainRef = useRef<GainNode | null>(null);
+  
   const animationRef = useRef<number>(0);
   const lastSpeakingRef = useRef(false);
   const lastUpdateRef = useRef(0);
@@ -239,14 +275,7 @@ export const useMicrophone = (
     animationRef.current = requestAnimationFrame(analyze);
   }, [onSpeakingChange, analyzeRemoteAudio]);
 
-  const applyEQ = useCallback((settings: number[]) => {
-    if (eqFiltersRef.current.length === 0) return;
-    settings.forEach((gain, i) => {
-      if (eqFiltersRef.current[i]) {
-        eqFiltersRef.current[i].gain.setTargetAtTime(gain, audioContextRef.current?.currentTime || 0, 0.1);
-      }
-    });
-  }, []);
+
 
   // Close peer connection
   const closePeerConnection = useCallback((remoteUserId: string) => {
@@ -273,10 +302,12 @@ export const useMicrophone = (
     
     const pc = new RTCPeerConnection(ICE_SERVERS);
     
-    // Add local tracks if we have a stream
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        pc.addTrack(track, streamRef.current!);
+    // Add local tracks - Use PROCESSED stream if available, otherwise raw
+    const streamToSend = processedStreamRef.current || streamRef.current;
+    
+    if (streamToSend) {
+      streamToSend.getTracks().forEach(track => {
+        pc.addTrack(track, streamToSend);
       });
     }
 
@@ -313,17 +344,49 @@ export const useMicrophone = (
       if (!audioEl) {
         audioEl = new Audio();
         audioEl.autoplay = true;
+        // Important: Prevent pause from other tabs or system
+        audioEl.setAttribute('playsinline', '');
       }
       audioEl.srcObject = remoteStream;
       
-      // Apply user volume if set
+      // Apply user volume if set, default to max if not specified
       if (userVolumes && userVolumes[remoteUserId] !== undefined) {
         audioEl.volume = userVolumes[remoteUserId] / 100;
+      } else {
+        audioEl.volume = 1.0; // Full volume by default
       }
+
+      // Explicitly try to play the audio (required by browser autoplay policies)
+      const playAudio = async () => {
+        try {
+          await audioEl!.play();
+          console.log(`[Mic] Audio playback started for ${remoteUserId}`);
+        } catch (playError) {
+          console.warn(`[Mic] Audio autoplay blocked for ${remoteUserId}:`, playError);
+          // Add a click handler to resume playback on user interaction
+          const resumeAudio = async () => {
+            try {
+              await audioEl!.play();
+              console.log(`[Mic] Audio resumed for ${remoteUserId} after user interaction`);
+              document.removeEventListener('click', resumeAudio);
+              document.removeEventListener('keydown', resumeAudio);
+            } catch (e) {
+              console.warn(`[Mic] Failed to resume audio for ${remoteUserId}:`, e);
+            }
+          };
+          document.addEventListener('click', resumeAudio, { once: true });
+          document.addEventListener('keydown', resumeAudio, { once: true });
+        }
+      };
+      playAudio();
 
       // Create analyser for this remote user
       try {
         const ctx = new AudioContext();
+        // Resume AudioContext if suspended (browser autoplay policy)
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(console.warn);
+        }
         const source = ctx.createMediaStreamSource(remoteStream);
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 256;
@@ -545,11 +608,104 @@ export const useMicrophone = (
         lastNode = filter;
       });
 
+      // --- DSP EFFECT ROUTING ---
+      
+      // Create Destination for WebRTC
+      const destination = audioContext.createMediaStreamDestination();
+      processedStreamRef.current = destination.stream;
+
+      // 1. Dry Path (Original Signal)
+      const dryGain = audioContext.createGain();
+      dryGain.gain.value = 1.0; // Default on
+      lastNode.connect(dryGain);
+      dryGain.connect(destination);
+      dryGainRef.current = dryGain;
+
+      // 2. Reverb Path (Convolver)
+      const reverbGain = audioContext.createGain();
+      reverbGain.gain.value = 0.0; // Default off
+      
+      const convolver = audioContext.createConvolver();
+      convolver.buffer = createReverbImpulse(audioContext, 2.5, 2.0); // 2.5s reverb tail
+      
+      // Optional: Pre-delay for reverb to make vocals clearer
+      const reverbPreDelay = audioContext.createDelay();
+      reverbPreDelay.delayTime.value = 0.02; // 20ms pre-delay
+
+      lastNode.connect(reverbGain);
+      reverbGain.connect(reverbPreDelay);
+      reverbPreDelay.connect(convolver);
+      convolver.connect(destination);
+      reverbGainRef.current = reverbGain;
+
+      // 3. Echo Path (Delay)
+      const echoGain = audioContext.createGain();
+      echoGain.gain.value = 0.0; // Default off
+      
+      const echoDelay = audioContext.createDelay();
+      echoDelay.delayTime.value = 0.25; // 250ms echo
+      
+      const echoFeedback = audioContext.createGain();
+      echoFeedback.gain.value = 0.4; // 40% feedback
+
+      lastNode.connect(echoGain);
+      echoGain.connect(echoDelay);
+      echoDelay.connect(echoFeedback);
+      echoFeedback.connect(echoDelay); // Feedback loop
+      echoDelay.connect(destination);
+      echoGainRef.current = echoGain;
+
+      // Apply initial effect state
+      const currentEffect = effectStateRef.current;
+      if (currentEffect === 'reverb' || currentEffect === 'studio') {
+        dryGain.gain.value = 1.0;
+        reverbGain.gain.value = 0.4;
+        echoGain.gain.value = 0.0;
+      } else if (currentEffect === 'echo') {
+        dryGain.gain.value = 1.0;
+        reverbGain.gain.value = 0.0;
+        echoGain.gain.value = 0.5;
+      } else {
+        dryGain.gain.value = 1.0;
+        reverbGain.gain.value = 0.0;
+        echoGain.gain.value = 0.0;
+      }
+
+      // Connect to Analyser (Visualize the PROCESSED output)
+      // Note: connecting destination to analyser doesn't work well in all browsers.
+      // Better to connect the dry/wet gains to the analyser too.
+      // Or just use a master gain before destination.
+      const masterGain = audioContext.createGain();
+      masterGain.gain.value = 1.0;
+      
+      dryGain.connect(masterGain);
+      convolver.connect(masterGain);
+      echoDelay.connect(masterGain);
+      
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 512;
       analyser.smoothingTimeConstant = 0.7;
       
-      lastNode.connect(analyser);
+      masterGain.connect(analyser);
+      // We already connected to destination above independently.
+      // Whatever, let's keep the graph simple:
+      // Nodes -> routing -> [dry/rev/echo] -> destination
+      // We can also tap [dry/rev/echo] -> analyser.
+      
+      // Let's reconnect properly to ensure Analyser sees the same as WebRTC
+      // Disconnect previous destination connections
+      dryGain.disconnect(destination);
+      convolver.disconnect(destination);
+      echoDelay.disconnect(destination);
+
+      // Connect to Master
+      dryGain.connect(masterGain);
+      convolver.connect(masterGain);
+      echoDelay.connect(masterGain);
+
+      // Connect Master to Destination (sending) and Analyser (visuals)
+      masterGain.connect(destination);
+      masterGain.connect(analyser);
 
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
@@ -608,6 +764,12 @@ export const useMicrophone = (
     setRemoteAudioLevels({});
     
     lastSpeakingRef.current = false;
+    
+    // DSP Cleanup
+    processedStreamRef.current = null;
+    dryGainRef.current = null;
+    reverbGainRef.current = null;
+    echoGainRef.current = null;
   }, [announceLeave, closePeerConnection]);
 
   // Keep latest stopMic in a ref so our unmount cleanup doesn't fire on every re-render.
@@ -633,6 +795,48 @@ export const useMicrophone = (
       }
     });
   }, [userVolumes]);
+
+  // Global handler to resume all audio on user interaction (browser autoplay policy workaround)
+  useEffect(() => {
+    if (!isEnabled) return;
+
+    const resumeAllAudio = async () => {
+      // Resume all peer audio elements
+      for (const [userId, peer] of peersRef.current) {
+        if (peer.audioEl && peer.audioEl.paused) {
+          try {
+            await peer.audioEl.play();
+            console.log(`[Mic] Resumed audio for ${userId} on user interaction`);
+          } catch (e) {
+            // Ignore errors, audio might not be ready
+          }
+        }
+      }
+      
+      // Resume all remote AudioContexts
+      for (const [userId, data] of remoteAnalysersRef.current) {
+        if (data.ctx.state === 'suspended') {
+          try {
+            await data.ctx.resume();
+            console.log(`[Mic] Resumed AudioContext for ${userId}`);
+          } catch (e) {
+            // Ignore errors
+          }
+        }
+      }
+    };
+
+    // Resume audio on any user interaction
+    document.addEventListener('click', resumeAllAudio);
+    document.addEventListener('keydown', resumeAllAudio);
+    document.addEventListener('touchstart', resumeAllAudio);
+
+    return () => {
+      document.removeEventListener('click', resumeAllAudio);
+      document.removeEventListener('keydown', resumeAllAudio);
+      document.removeEventListener('touchstart', resumeAllAudio);
+    };
+  }, [isEnabled]);
 
   // Handle users leaving the room
   useEffect(() => {
@@ -713,11 +917,59 @@ export const useMicrophone = (
   }, [isEnabled]);
 
   // Stop mic only on unmount (NOT whenever stopMic callback identity changes)
+  // Stop mic only on unmount (NOT whenever stopMic callback identity changes)
   useEffect(() => {
     return () => {
       stopMicRef.current?.();
     };
   }, []);
 
-  return { isSpeaking, volume, isEnabled, toggleMic, applyEQ, error, remoteAudioLevels, webrtcStats };
+  const setEffect = useCallback((effect: AudioEffectType) => {
+    setCurrentEffect(effect);
+    effectStateRef.current = effect;
+
+    // Apply gains immediately if mic is running
+    const ctx = audioContextRef.current;
+    if (ctx && dryGainRef.current) {
+      const now = ctx.currentTime;
+      const ramp = 0.1; // 100ms fade
+
+      if (effect === 'reverb' || effect === 'studio') {
+        dryGainRef.current.gain.setTargetAtTime(1.0, now, ramp);
+        reverbGainRef.current?.gain.setTargetAtTime(0.4, now, ramp);
+        echoGainRef.current?.gain.setTargetAtTime(0.0, now, ramp);
+      } else if (effect === 'echo') {
+        dryGainRef.current.gain.setTargetAtTime(1.0, now, ramp);
+        reverbGainRef.current?.gain.setTargetAtTime(0.0, now, ramp);
+        echoGainRef.current?.gain.setTargetAtTime(0.5, now, ramp);
+      } else {
+        dryGainRef.current.gain.setTargetAtTime(1.0, now, ramp);
+        reverbGainRef.current?.gain.setTargetAtTime(0.0, now, ramp);
+        echoGainRef.current?.gain.setTargetAtTime(0.0, now, ramp);
+      }
+    }
+  }, []);
+
+  const applyEQ = useCallback((settings: number[]) => {
+    if (eqFiltersRef.current.length > 0) {
+      eqFiltersRef.current.forEach((filter, i) => {
+        if (settings[i] !== undefined) {
+          filter.gain.setTargetAtTime(settings[i], audioContextRef.current?.currentTime || 0, 0.1);
+        }
+      });
+    }
+  }, []);
+
+  return { 
+    isSpeaking, 
+    volume, 
+    isEnabled, 
+    toggleMic, 
+    applyEQ, 
+    setEffect,
+    currentEffect,
+    error, 
+    remoteAudioLevels, 
+    webrtcStats 
+  };
 };

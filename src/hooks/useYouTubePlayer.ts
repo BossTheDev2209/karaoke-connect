@@ -255,6 +255,16 @@ export const useYouTubePlayer = (
       setAreCaptionsEnabled(false);
       setHasCaptionsAvailable(false);
       playerRef.current.loadVideoById(videoId);
+      
+      // Explicitly seek to 0 to ensure video starts from the beginning
+      // YouTube may cache the last position, so we force it to start
+      setTimeout(() => {
+        if (playerRef.current && isPlayerReady.current) {
+          playerRef.current.seekTo(0, true);
+          playerRef.current.playVideo();
+        }
+      }, 100);
+      
       setIsPlaying(true);
       // Check for captions on the new video
       setTimeout(() => {
