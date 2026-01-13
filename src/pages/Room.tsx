@@ -311,7 +311,19 @@ const Room = () => {
     updateSpeaking(isSpeaking, level);
   }, [updateSpeaking]);
 
-  const { isEnabled: isMicEnabled, toggleMic, applyEQ, remoteAudioLevels, webrtcStats } = useMicrophone(
+  const { 
+    isEnabled: isMicEnabled, 
+    toggleMic, 
+    applyEQ, 
+    remoteAudioLevels, 
+    webrtcStats,
+    threshold,
+    setThreshold,
+    isMonitorEnabled,
+    setMonitorEnabled,
+    monitorVolume,
+    setMonitorVolume,
+  } = useMicrophone(
     handleSpeakingChange,
     channel,
     user?.id,
@@ -478,6 +490,12 @@ const Room = () => {
             onCelebrationToggle={setCelebrationEnabled}
             eqSettings={eqSettings}
             onEqChange={handleEqChange}
+            threshold={threshold}
+            onThresholdChange={setThreshold}
+            isMonitorEnabled={isMonitorEnabled}
+            onMonitorEnabledChange={setMonitorEnabled}
+            monitorVolume={monitorVolume}
+            onMonitorVolumeChange={setMonitorVolume}
           />
           <Button variant="ghost" size="icon" onClick={handleLeave}>
             <LogOut className="w-4 h-4" />

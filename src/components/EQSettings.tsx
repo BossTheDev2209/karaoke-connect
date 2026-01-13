@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { 
   Select,
   SelectContent,
@@ -9,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Share2, Save, Undo2, Sliders } from 'lucide-react';
+import { Share2, Save, Undo2, Sliders, Mic, Headphones, Activity } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 export const EQ_BANDS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
@@ -26,11 +28,24 @@ export const EQ_PRESETS: Record<string, number[]> = {
 interface EQSettingsProps {
   initialSettings?: number[];
   onChange?: (settings: number[]) => void;
+  // New microphone settings
+  threshold?: number;
+  onThresholdChange?: (value: number) => void;
+  isMonitorEnabled?: boolean;
+  onMonitorEnabledChange?: (enabled: boolean) => void;
+  monitorVolume?: number;
+  onMonitorVolumeChange?: (value: number) => void;
 }
 
 export const EQSettings: React.FC<EQSettingsProps> = ({ 
   initialSettings,
-  onChange 
+  onChange,
+  threshold = 0.08,
+  onThresholdChange,
+  isMonitorEnabled = false,
+  onMonitorEnabledChange,
+  monitorVolume = 0.5,
+  onMonitorVolumeChange,
 }) => {
   const [settings, setSettings] = useState<number[]>(
     initialSettings || EQ_PRESETS["Flat"]
@@ -68,8 +83,85 @@ export const EQSettings: React.FC<EQSettingsProps> = ({
     });
   };
 
+  // Convert threshold to a more user-friendly percentage (0-100)
+  const sensitivityPercent = Math.round((1 - (threshold - 0.01) / 0.29) * 100);
+
   return (
-    <div className="space-y-8 p-1">
+    <div className="space-y-6 p-1">
+      {/* Microphone Sensitivity Section */}
+      <div className="space-y-4 p-4 rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20">
+        <div className="flex items-center gap-2">
+          <Activity className="w-5 h-5 text-primary" />
+          <h3 className="font-bold">Mic Sensitivity</h3>
+          <Badge variant="outline" className="ml-auto text-xs">
+            {sensitivityPercent}%
+          </Badge>
+        </div>
+        
+        <div className="space-y-2">
+          <Slider
+            value={[threshold]}
+            min={0.01}
+            max={0.3}
+            step={0.01}
+            onValueChange={([val]) => onThresholdChange?.(val)}
+            className="w-full"
+          />
+          <div className="flex justify-between text-[10px] text-muted-foreground">
+            <span>More Sensitive</span>
+            <span>Less Sensitive</span>
+          </div>
+        </div>
+        
+        <p className="text-[10px] text-muted-foreground leading-relaxed">
+          Adjust how easily the mic detects your voice. Lower sensitivity helps ignore background noise.
+        </p>
+      </div>
+
+      {/* Monitor (Hear Yourself) Section */}
+      <div className="space-y-4 p-4 rounded-xl bg-gradient-to-br from-accent/5 to-accent/10 border border-accent/20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Headphones className="w-5 h-5 text-accent-foreground" />
+            <h3 className="font-bold">Monitor (Hear Yourself)</h3>
+          </div>
+          <Switch
+            checked={isMonitorEnabled}
+            onCheckedChange={onMonitorEnabledChange}
+          />
+        </div>
+        
+        {isMonitorEnabled && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Monitor Volume</Label>
+              <span className="text-xs font-mono text-primary">
+                {Math.round(monitorVolume * 100)}%
+              </span>
+            </div>
+            <Slider
+              value={[monitorVolume]}
+              min={0}
+              max={1}
+              step={0.05}
+              onValueChange={([val]) => onMonitorVolumeChange?.(val)}
+              className="w-full"
+            />
+          </div>
+        )}
+        
+        <p className="text-[10px] text-muted-foreground leading-relaxed">
+          {isMonitorEnabled 
+            ? "⚠️ Use headphones to avoid feedback! You'll hear your processed voice in real-time."
+            : "Enable to hear your voice through your speakers/headphones while singing."
+          }
+        </p>
+      </div>
+
+      {/* Separator */}
+      <div className="border-t border-border/50" />
+
+      {/* EQ Section */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sliders className="w-5 h-5 text-primary" />

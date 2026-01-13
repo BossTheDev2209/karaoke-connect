@@ -20,6 +20,13 @@ interface UseMicrophoneReturn {
   error: string | null;
   remoteAudioLevels: Record<string, number>;
   webrtcStats: WebRTCStats;
+  // New settings
+  threshold: number;
+  setThreshold: (value: number) => void;
+  isMonitorEnabled: boolean;
+  setMonitorEnabled: (enabled: boolean) => void;
+  monitorVolume: number;
+  setMonitorVolume: (value: number) => void;
 }
 
 // Helper to create reverb impulse response
@@ -45,8 +52,8 @@ const createReverbImpulse = (ctx: AudioContext, duration: number = 2.0, decay: n
   return impulse;
 };
 
-// Higher threshold to avoid false positives - requires real voice input
-const VOLUME_THRESHOLD = 0.08;
+// Default threshold to avoid false positives - now user-adjustable
+const DEFAULT_VOLUME_THRESHOLD = 0.08;
 const SMOOTHING = 0.88;
 // Minimum speech duration to avoid flicker (ms)
 const MIN_SPEECH_DURATION = 150;
@@ -139,10 +146,16 @@ export const useMicrophone = (
   const effectStateRef = useRef<AudioEffectType>('none'); // To track current effect without re-renders affecting graph
   const [currentEffect, setCurrentEffect] = useState<AudioEffectType>('none');
   
+  // Adjustable threshold and monitoring settings
+  const [threshold, setThreshold] = useState(DEFAULT_VOLUME_THRESHOLD);
+  const [isMonitorEnabled, setMonitorEnabled] = useState(false);
+  const [monitorVolume, setMonitorVolumeState] = useState(0.5); // 50% default
+  
   // DSP Nodes Refs
   const dryGainRef = useRef<GainNode | null>(null);
   const reverbGainRef = useRef<GainNode | null>(null);
   const echoGainRef = useRef<GainNode | null>(null);
+  const monitorGainRef = useRef<GainNode | null>(null); // For hearing yourself
   
   const animationRef = useRef<number>(0);
   const lastSpeakingRef = useRef(false);
@@ -227,7 +240,7 @@ export const useMicrophone = (
     setVolume(normalizedVolume);
     
     const now = Date.now();
-    const isAboveThreshold = normalizedVolume > VOLUME_THRESHOLD;
+    const isAboveThreshold = normalizedVolume > threshold;
     
     let speaking = false;
     
@@ -273,7 +286,7 @@ export const useMicrophone = (
     analyzeRemoteAudio();
 
     animationRef.current = requestAnimationFrame(analyze);
-  }, [onSpeakingChange, analyzeRemoteAudio]);
+  }, [onSpeakingChange, analyzeRemoteAudio, threshold]);
 
 
 
@@ -753,6 +766,13 @@ export const useMicrophone = (
       masterGain.connect(destination);
       masterGain.connect(analyser);
 
+      // Monitor (Sidetone) - Connect to speakers so you can hear yourself
+      const monitorGain = audioContext.createGain();
+      monitorGain.gain.value = isMonitorEnabled ? monitorVolume : 0;
+      masterGain.connect(monitorGain);
+      monitorGain.connect(audioContext.destination); // Output to speakers
+      monitorGainRef.current = monitorGain;
+
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
       streamRef.current = stream;
@@ -772,7 +792,7 @@ export const useMicrophone = (
       console.error('Microphone error:', err);
       setError('Could not access microphone');
     }
-  }, [analyze, announceJoin]);
+  }, [analyze, announceJoin, isMonitorEnabled, monitorVolume]);
 
   const stopMic = useCallback(() => {
     console.log('[Mic] stopMic called');
@@ -816,6 +836,7 @@ export const useMicrophone = (
     dryGainRef.current = null;
     reverbGainRef.current = null;
     echoGainRef.current = null;
+    monitorGainRef.current = null;
   }, [announceLeave, closePeerConnection]);
 
   // Keep latest stopMic in a ref so our unmount cleanup doesn't fire on every re-render.
@@ -1007,6 +1028,31 @@ export const useMicrophone = (
     }
   }, []);
 
+  // Wrapper for setMonitorVolume that also updates the gain node in real-time
+  const setMonitorVolume = useCallback((value: number) => {
+    setMonitorVolumeState(value);
+    if (monitorGainRef.current && audioContextRef.current) {
+      const targetGain = isMonitorEnabled ? value : 0;
+      monitorGainRef.current.gain.setTargetAtTime(
+        targetGain,
+        audioContextRef.current.currentTime,
+        0.05 // 50ms ramp
+      );
+    }
+  }, [isMonitorEnabled]);
+
+  // Update monitor gain when isMonitorEnabled changes
+  useEffect(() => {
+    if (monitorGainRef.current && audioContextRef.current) {
+      const targetGain = isMonitorEnabled ? monitorVolume : 0;
+      monitorGainRef.current.gain.setTargetAtTime(
+        targetGain,
+        audioContextRef.current.currentTime,
+        0.05
+      );
+    }
+  }, [isMonitorEnabled, monitorVolume]);
+
   return { 
     isSpeaking, 
     volume, 
@@ -1017,6 +1063,13 @@ export const useMicrophone = (
     currentEffect,
     error, 
     remoteAudioLevels, 
-    webrtcStats 
+    webrtcStats,
+    // New settings
+    threshold,
+    setThreshold,
+    isMonitorEnabled,
+    setMonitorEnabled,
+    monitorVolume,
+    setMonitorVolume,
   };
 };

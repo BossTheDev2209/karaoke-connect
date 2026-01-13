@@ -28,6 +28,13 @@ interface RoomSettingsProps {
   onCelebrationToggle: (enabled: boolean) => void;
   eqSettings?: number[];
   onEqChange?: (settings: number[]) => void;
+  // Microphone settings
+  threshold?: number;
+  onThresholdChange?: (value: number) => void;
+  isMonitorEnabled?: boolean;
+  onMonitorEnabledChange?: (enabled: boolean) => void;
+  monitorVolume?: number;
+  onMonitorVolumeChange?: (value: number) => void;
 }
 
 export const RoomSettings: React.FC<RoomSettingsProps> = ({
@@ -35,6 +42,12 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({
   onCelebrationToggle,
   eqSettings,
   onEqChange,
+  threshold,
+  onThresholdChange,
+  isMonitorEnabled,
+  onMonitorEnabledChange,
+  monitorVolume,
+  onMonitorVolumeChange,
 }) => {
   const { 
     preset, 
@@ -229,7 +242,13 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({
           <TabsContent value="audio" className="mt-4 space-y-6 overflow-y-auto max-h-[70vh] pb-6 px-1">
             <EQSettings 
               initialSettings={eqSettings} 
-              onChange={onEqChange} 
+              onChange={onEqChange}
+              threshold={threshold}
+              onThresholdChange={onThresholdChange}
+              isMonitorEnabled={isMonitorEnabled}
+              onMonitorEnabledChange={onMonitorEnabledChange}
+              monitorVolume={monitorVolume}
+              onMonitorVolumeChange={onMonitorVolumeChange}
             />
           </TabsContent>
         </Tabs>
