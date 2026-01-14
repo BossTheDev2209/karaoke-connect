@@ -7,7 +7,7 @@ const corsHeaders = {
 
 const LRCLIB_API = 'https://lrclib.net/api';
 const GENIUS_API = 'https://api.genius.com';
-const MUSIXMATCH_API = 'https://api.musixmatch.com/ws/1.1';
+const LYRICS_OVH_API = 'https://api.lyrics.ovh/v1'; // Free, no API key needed
 
 // Thai character range detection
 function containsThai(text: string): boolean {
@@ -568,77 +568,121 @@ async function searchLRCLIB(trackName: string, artistName?: string): Promise<any
   }
 }
 
-// NEW: Search Musixmatch API (better Thai coverage)
-async function searchMusixmatch(trackName: string, artistName?: string, apiKey?: string): Promise<any> {
-  if (!apiKey) return null;
+// FREE: Search Lyrics.ovh API (no API key needed)
+async function searchLyricsOvh(artistName: string, trackName: string): Promise<{ lyrics: string | null; artist: string | null; title: string | null }> {
+  console.log(`Searching Lyrics.ovh: "${artistName}" - "${trackName}"`);
   
-  console.log(`Searching Musixmatch: track="${trackName}" artist="${artistName || 'any'}"`);
-
   try {
-    // Step 1: Search for track
-    const searchUrl = new URL(`${MUSIXMATCH_API}/track.search`);
-    searchUrl.searchParams.set('q_track', trackName);
-    if (artistName) {
-      searchUrl.searchParams.set('q_artist', artistName);
-    }
-    searchUrl.searchParams.set('page_size', '5');
-    searchUrl.searchParams.set('s_track_rating', 'desc');
-    searchUrl.searchParams.set('apikey', apiKey);
-
-    const searchResponse = await fetch(searchUrl.toString());
-    if (!searchResponse.ok) {
-      console.error('Musixmatch search failed:', searchResponse.status);
-      return null;
-    }
-
-    const searchData = await searchResponse.json();
-    const tracks = searchData.message?.body?.track_list || [];
+    // Lyrics.ovh uses URL path format: /v1/{artist}/{title}
+    const encodedArtist = encodeURIComponent(artistName);
+    const encodedTrack = encodeURIComponent(trackName);
+    const url = `${LYRICS_OVH_API}/${encodedArtist}/${encodedTrack}`;
     
-    if (tracks.length === 0) {
-      console.log('No Musixmatch results found');
-      return null;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'KaraokeApp/1.0' },
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.log('Lyrics.ovh: No lyrics found');
+      } else {
+        console.error('Lyrics.ovh search failed:', response.status);
+      }
+      return { lyrics: null, artist: artistName, title: trackName };
     }
 
-    // Get the first matching track
-    const track = tracks[0].track;
-    const trackId = track.track_id;
+    const data = await response.json();
     
-    console.log(`Musixmatch found: "${track.artist_name}" - "${track.track_name}"`);
-
-    // Step 2: Get lyrics for this track
-    const lyricsUrl = new URL(`${MUSIXMATCH_API}/track.lyrics.get`);
-    lyricsUrl.searchParams.set('track_id', trackId);
-    lyricsUrl.searchParams.set('apikey', apiKey);
-
-    const lyricsResponse = await fetch(lyricsUrl.toString());
-    if (!lyricsResponse.ok) {
-      console.error('Musixmatch lyrics fetch failed:', lyricsResponse.status);
-      return null;
+    if (!data.lyrics) {
+      console.log('Lyrics.ovh: Empty lyrics response');
+      return { lyrics: null, artist: artistName, title: trackName };
     }
 
-    const lyricsData = await lyricsResponse.json();
-    const lyricsBody = lyricsData.message?.body?.lyrics;
-    
-    if (!lyricsBody || !lyricsBody.lyrics_body) {
-      console.log('Musixmatch: No lyrics body found');
-      return null;
-    }
-
-    // Clean up Musixmatch lyrics (they add a disclaimer at the end)
-    let lyrics = lyricsBody.lyrics_body
-      .replace(/\*+\s*This Lyrics is NOT for Commercial use\s*\*+/gi, '')
-      .replace(/\(\d+\)$/g, '')
-      .trim();
-
+    console.log(`Lyrics.ovh found lyrics: ${data.lyrics.length} chars`);
     return {
-      plainLyrics: lyrics,
-      trackName: track.track_name,
-      artistName: track.artist_name,
-      source: 'musixmatch'
+      lyrics: data.lyrics.trim(),
+      artist: artistName,
+      title: trackName
     };
   } catch (err) {
-    console.error('Musixmatch fetch error:', err);
-    return null;
+    console.error('Lyrics.ovh fetch error:', err);
+    return { lyrics: null, artist: artistName, title: trackName };
+  }
+}
+
+// FREE: Scrape AZLyrics (no API key needed)
+async function scrapeAZLyrics(artistName: string, trackName: string): Promise<{ lyrics: string | null; artist: string | null; title: string | null }> {
+  console.log(`Scraping AZLyrics: "${artistName}" - "${trackName}"`);
+  
+  try {
+    // AZLyrics URL format: https://www.azlyrics.com/lyrics/{artist}/{song}.html
+    // Artist and song names need to be lowercase, no spaces, no special chars
+    const cleanArtist = artistName.toLowerCase()
+      .replace(/^the\s+/i, '') // Remove leading "The"
+      .replace(/[^a-z0-9]/g, '');
+    const cleanTrack = trackName.toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+    
+    if (!cleanArtist || !cleanTrack) {
+      console.log('AZLyrics: Cannot form valid URL');
+      return { lyrics: null, artist: artistName, title: trackName };
+    }
+    
+    const url = `https://www.azlyrics.com/lyrics/${cleanArtist}/${cleanTrack}.html`;
+    console.log(`AZLyrics URL: ${url}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      },
+    });
+
+    if (!response.ok) {
+      console.log('AZLyrics: Page not found or blocked');
+      return { lyrics: null, artist: artistName, title: trackName };
+    }
+
+    const html = await response.text();
+    
+    // AZLyrics lyrics are in a div without id or class, after the comment
+    // <!-- Usage of azlyrics.com content by any third-party lyrics provider is prohibited by our licensing agreement. Sorry about that. -->
+    const lyricsMatch = html.match(/<!-- Usage of azlyrics\.com content.*?-->\s*([\s\S]*?)<\/div>/i);
+    
+    if (!lyricsMatch || !lyricsMatch[1]) {
+      // Try alternate pattern
+      const altMatch = html.match(/<div[^>]*>\s*<!-- Usage of azlyrics\.com.*?-->([\s\S]*?)<\/div>/i);
+      if (!altMatch || !altMatch[1]) {
+        console.log('AZLyrics: Could not extract lyrics from page');
+        return { lyrics: null, artist: artistName, title: trackName };
+      }
+    }
+
+    let lyrics = (lyricsMatch?.[1] || '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#x27;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    if (lyrics.length < 50) {
+      console.log('AZLyrics: Extracted lyrics too short');
+      return { lyrics: null, artist: artistName, title: trackName };
+    }
+
+    console.log(`AZLyrics found lyrics: ${lyrics.length} chars`);
+    return {
+      lyrics,
+      artist: artistName,
+      title: trackName
+    };
+  } catch (err) {
+    console.error('AZLyrics scrape error:', err);
+    return { lyrics: null, artist: artistName, title: trackName };
   }
 }
 
@@ -855,9 +899,8 @@ serve(async (req) => {
     console.log(`Cleaned artist: "${cleanedArtist}" | Primary: "${primaryArtist}"`);
     console.log(`Cleaned title: "${cleanedTitle}" | Song name: "${songName}" | First part: "${firstPart}"`);
 
-    // API Keys
+    // API Keys (only Genius requires a key, Lyrics.ovh is free)
     const geniusApiKey = Deno.env.get('GENIUS_API_KEY');
-    const musixmatchApiKey = Deno.env.get('MUSIXMATCH_API_KEY');
 
     // IMPROVED: Search strategies - prioritize exact matches first
     const searchStrategies: Array<{ track: string; artist: string | undefined }> = [
@@ -951,33 +994,40 @@ serve(async (req) => {
       }
     }
 
-    // FALLBACK 1: Try Musixmatch API (good for Asian music)
-    if (musixmatchApiKey) {
-      console.log('Trying Musixmatch API...');
+    // FALLBACK 1: Try Lyrics.ovh (FREE, no API key needed)
+    console.log('Trying Lyrics.ovh (free)...');
+    
+    const lyricsOvhQueries = [
+      { artist: primaryArtist, track: songName },
+      { artist: cleanedArtist, track: firstPart },
+      { artist: primaryArtist, track: firstPart },
+    ];
+    
+    // Add romanized artist variations for Thai
+    if (containsThai(artist)) {
+      const variations = getThaiArtistVariations(artist);
+      for (const v of variations.slice(0, 2)) { // Limit to first 2 variations
+        lyricsOvhQueries.push({ artist: v, track: songName });
+        lyricsOvhQueries.push({ artist: v, track: firstPart });
+      }
+    }
+    
+    for (const query of lyricsOvhQueries) {
+      if (!query.artist || !query.track || query.artist.length < 2 || query.track.length < 2) continue;
       
-      const musixmatchQueries = [
-        { track: songName, artist: cleanedArtist },
-        { track: firstPart, artist: primaryArtist },
-        { track: songName, artist: undefined },
-      ];
-      
-      for (const query of musixmatchQueries) {
-        if (!query.track || query.track.length < 2) continue;
-        
-        const result = await searchMusixmatch(query.track, query.artist, musixmatchApiKey);
-        if (result && result.plainLyrics && validateLyrics(result.plainLyrics, title, artist)) {
-          console.log(`Musixmatch found valid lyrics: "${result.artistName}" - "${result.trackName}"`);
-          return new Response(
-            JSON.stringify({
-              syncedLyrics: null,
-              plainLyrics: result.plainLyrics,
-              trackName: result.trackName,
-              artistName: result.artistName,
-              source: 'musixmatch',
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
+      const result = await searchLyricsOvh(query.artist, query.track);
+      if (result.lyrics && validateLyrics(result.lyrics, title, artist)) {
+        console.log(`Lyrics.ovh found valid lyrics`);
+        return new Response(
+          JSON.stringify({
+            syncedLyrics: null,
+            plainLyrics: result.lyrics,
+            trackName: result.title,
+            artistName: result.artist,
+            source: 'lyrics.ovh',
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
     }
 
