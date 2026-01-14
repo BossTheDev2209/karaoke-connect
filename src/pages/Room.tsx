@@ -48,8 +48,8 @@ export default function Room() {
     const saved = localStorage.getItem('karaoke_user');
     return saved ? JSON.parse(saved) : {
       id: crypto.randomUUID(),
-      name: `User ${Math.floor(Math.random() * 1000)}`,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Date.now()}`,
+      nickname: `User ${Math.floor(Math.random() * 1000)}`,
+      avatarId: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Date.now()}`,
       isHost: false,
       score: 0
     };
@@ -907,13 +907,15 @@ export default function Room() {
         />
       </div>
       
-      <TeamBattleOverlay 
-        users={users} 
-        isPlaying={playbackState.isPlaying && roomMode === 'team-battle'} 
-        onContinue={handleNextRound}
-        showWinner={showWinnerScreen}
-        isHost={isHost}
-      />
+      {roomMode === 'team-battle' && (
+        <TeamBattleOverlay 
+          users={users} 
+          isPlaying={playbackState.isPlaying} 
+          onContinue={handleNextRound}
+          showWinner={showWinnerScreen}
+          isHost={isHost}
+        />
+      )}
       
       {/* Vote Kick Overlay - Animated center popup */}
       {activeVoteKick && (
