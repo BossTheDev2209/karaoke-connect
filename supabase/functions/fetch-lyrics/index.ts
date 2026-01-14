@@ -264,6 +264,294 @@ const THAI_ARTIST_MAPPINGS: Record<string, string[]> = {
   'เคลียร์': ['Klear'],
 };
 
+// ============ JAPANESE LANGUAGE SUPPORT ============
+
+// Japanese character detection (Hiragana, Katakana, Kanji)
+function containsJapanese(text: string): boolean {
+  // Hiragana: \u3040-\u309F, Katakana: \u30A0-\u30FF, Kanji: \u4E00-\u9FAF
+  return /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text);
+}
+
+// Extract Japanese text (Hiragana, Katakana, Kanji)
+function extractJapanese(text: string): string {
+  const matches = text.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]+/g);
+  return matches ? matches.join(' ') : '';
+}
+
+// ============ KOREAN LANGUAGE SUPPORT ============
+
+// Korean character detection (Hangul)
+function containsKorean(text: string): boolean {
+  // Hangul Syllables: \uAC00-\uD7AF, Hangul Jamo: \u1100-\u11FF
+  return /[\uAC00-\uD7AF\u1100-\u11FF]/.test(text);
+}
+
+// Extract Korean text (Hangul)
+function extractKorean(text: string): string {
+  const matches = text.match(/[\uAC00-\uD7AF\u1100-\u11FF]+/g);
+  return matches ? matches.join(' ') : '';
+}
+
+// ============ CHINESE LANGUAGE SUPPORT ============
+
+// Chinese character detection (CJK Unified Ideographs - overlaps with Japanese Kanji)
+function containsChinese(text: string): boolean {
+  // CJK: \u4E00-\u9FFF, check for Chinese-specific patterns
+  // If it has Japanese Hiragana/Katakana, it's likely Japanese, not Chinese
+  const hasCJK = /[\u4E00-\u9FFF]/.test(text);
+  const hasJapaneseKana = /[\u3040-\u309F\u30A0-\u30FF]/.test(text);
+  return hasCJK && !hasJapaneseKana;
+}
+
+// Extract Chinese text (CJK characters)
+function extractChinese(text: string): string {
+  const matches = text.match(/[\u4E00-\u9FFF]+/g);
+  return matches ? matches.join(' ') : '';
+}
+
+// ============ EXTRACT ROMANIZED TEXT (for any Asian language) ============
+
+function extractRomanized(text: string): string {
+  return text
+    // Remove Thai
+    .replace(/[\u0E00-\u0E7F]+/g, ' ')
+    // Remove Japanese (Hiragana, Katakana, Kanji)
+    .replace(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]+/g, ' ')
+    // Remove Korean (Hangul)
+    .replace(/[\uAC00-\uD7AF\u1100-\u11FF]+/g, ' ')
+    // Remove Chinese (CJK)
+    .replace(/[\u4E00-\u9FFF]+/g, ' ')
+    // Clean up
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// ============ JAPANESE ARTIST MAPPINGS ============
+
+const JAPANESE_ARTIST_MAPPINGS: Record<string, string[]> = {
+  // Major J-pop Artists
+  '米津玄師': ['Kenshi Yonezu', 'Yonezu Kenshi'],
+  'Kenshi Yonezu': ['Kenshi Yonezu', 'Yonezu Kenshi', '米津玄師'],
+  'YOASOBI': ['YOASOBI', 'Yoasobi'],
+  '優里': ['Yuuri', 'Yuri'],
+  'Yuuri': ['Yuuri', 'Yuri', '優里'],
+  'Ado': ['Ado', 'アド'],
+  'アド': ['Ado'],
+  'あいみょん': ['Aimyon', 'Aimyon'],
+  'Aimyon': ['Aimyon', 'あいみょん'],
+  '藤井風': ['Fujii Kaze', 'Kaze Fujii'],
+  'Fujii Kaze': ['Fujii Kaze', '藤井風'],
+  'Official髭男dism': ['Official HIGE DANdism', 'Higedan', 'Official Hige Dandism'],
+  'King Gnu': ['King Gnu', 'キングヌー'],
+  'キングヌー': ['King Gnu'],
+  'LiSA': ['LiSA', 'Lisa'],
+  '宇多田ヒカル': ['Utada Hikaru', 'Hikaru Utada'],
+  'Utada Hikaru': ['Utada Hikaru', '宇多田ヒカル'],
+  '椎名林檎': ['Sheena Ringo', 'Ringo Sheena'],
+  'Sheena Ringo': ['Sheena Ringo', '椎名林檎'],
+  'RADWIMPS': ['RADWIMPS', 'Radwimps'],
+  'Aimer': ['Aimer', 'エメ'],
+  'エメ': ['Aimer'],
+  '嵐': ['Arashi'],
+  'Arashi': ['Arashi', '嵐'],
+  'ONE OK ROCK': ['ONE OK ROCK', 'One Ok Rock', 'OOR'],
+  'back number': ['back number', 'Back Number'],
+  'Mrs. GREEN APPLE': ['Mrs. GREEN APPLE', 'Mrs Green Apple'],
+  'BUMP OF CHICKEN': ['BUMP OF CHICKEN', 'Bump of Chicken'],
+  'サザンオールスターズ': ['Southern All Stars', 'SAS'],
+  'Southern All Stars': ['Southern All Stars', 'サザンオールスターズ'],
+  'スピッツ': ['Spitz'],
+  'Spitz': ['Spitz', 'スピッツ'],
+  'Mr.Children': ['Mr.Children', 'Mister Children', 'ミスターチルドレン'],
+  'ミスターチルドレン': ['Mr.Children'],
+  '浜崎あゆみ': ['Ayumi Hamasaki', 'Hamasaki Ayumi'],
+  'Ayumi Hamasaki': ['Ayumi Hamasaki', '浜崎あゆみ'],
+  '安室奈美恵': ['Namie Amuro', 'Amuro Namie'],
+  'Namie Amuro': ['Namie Amuro', '安室奈美恵'],
+  'Perfume': ['Perfume', 'パフューム'],
+  'パフューム': ['Perfume'],
+  'きゃりーぱみゅぱみゅ': ['Kyary Pamyu Pamyu', 'KPP'],
+  'Kyary Pamyu Pamyu': ['Kyary Pamyu Pamyu', 'きゃりーぱみゅぱみゅ'],
+  '中島みゆき': ['Miyuki Nakajima', 'Nakajima Miyuki'],
+  'Miyuki Nakajima': ['Miyuki Nakajima', '中島みゆき'],
+  '星野源': ['Gen Hoshino', 'Hoshino Gen'],
+  'Gen Hoshino': ['Gen Hoshino', '星野源'],
+  'Creepy Nuts': ['Creepy Nuts'],
+  'SEKAI NO OWARI': ['SEKAI NO OWARI', 'End of the World'],
+  'Vaundy': ['Vaundy'],
+  'imase': ['imase', 'Imase'],
+  'TWICE': ['TWICE', 'Twice'],
+  'NiziU': ['NiziU', 'Niziu'],
+  'BE:FIRST': ['BE:FIRST', 'Be First'],
+  'JO1': ['JO1'],
+  'Snow Man': ['Snow Man', 'Snowman'],
+  'SixTONES': ['SixTONES', 'Sixtones'],
+  '乃木坂46': ['Nogizaka46', 'Nogizaka 46'],
+  'Nogizaka46': ['Nogizaka46', '乃木坂46'],
+  '日向坂46': ['Hinatazaka46', 'Hinatazaka 46'],
+  'Hinatazaka46': ['Hinatazaka46', '日向坂46'],
+  '櫻坂46': ['Sakurazaka46', 'Sakurazaka 46'],
+  'YUKI': ['YUKI', 'Yuki'],
+  'Superfly': ['Superfly'],
+  'miwa': ['miwa', 'Miwa'],
+  '絢香': ['Ayaka'],
+  'Ayaka': ['Ayaka', '絢香'],
+  'クリープハイプ': ['CreepHyp', 'Creep Hyp'],
+  'ASIAN KUNG-FU GENERATION': ['ASIAN KUNG-FU GENERATION', 'AKFG', 'Ajikan'],
+  'Linked Horizon': ['Linked Horizon'],
+  'Eve': ['Eve', 'イヴ'],
+  'ZUTOMAYO': ['ZUTOMAYO', 'Zutomayo', 'ずっと真夜中でいいのに。'],
+  'ずっと真夜中でいいのに。': ['ZUTOMAYO', 'Zutomayo'],
+  'Yorushika': ['Yorushika', 'ヨルシカ'],
+  'ヨルシカ': ['Yorushika'],
+  'Reol': ['Reol', 'れをる'],
+  'れをる': ['Reol'],
+};
+
+// ============ KOREAN ARTIST MAPPINGS ============
+
+const KOREAN_ARTIST_MAPPINGS: Record<string, string[]> = {
+  // K-pop Groups
+  'BTS': ['BTS', '방탄소년단', 'Bangtan Sonyeondan'],
+  '방탄소년단': ['BTS', 'Bangtan Sonyeondan'],
+  'BLACKPINK': ['BLACKPINK', 'Black Pink', '블랙핑크'],
+  '블랙핑크': ['BLACKPINK', 'Black Pink'],
+  'TWICE': ['TWICE', '트와이스'],
+  '트와이스': ['TWICE'],
+  'EXO': ['EXO', '엑소'],
+  '엑소': ['EXO'],
+  'NCT': ['NCT', '엔시티'],
+  'NCT 127': ['NCT 127', 'NCT127'],
+  'NCT Dream': ['NCT Dream', 'NCT DREAM'],
+  'Stray Kids': ['Stray Kids', 'SKZ', '스트레이 키즈'],
+  '스트레이 키즈': ['Stray Kids', 'SKZ'],
+  'SEVENTEEN': ['SEVENTEEN', '세븐틴', 'SVT'],
+  '세븐틴': ['SEVENTEEN', 'SVT'],
+  'ENHYPEN': ['ENHYPEN', '엔하이픈'],
+  '엔하이픈': ['ENHYPEN'],
+  'TXT': ['TXT', 'Tomorrow X Together', '투모로우바이투게더'],
+  '투모로우바이투게더': ['TXT', 'Tomorrow X Together'],
+  'LE SSERAFIM': ['LE SSERAFIM', 'Le Sserafim', '르세라핌'],
+  '르세라핌': ['LE SSERAFIM'],
+  'NewJeans': ['NewJeans', 'New Jeans', '뉴진스'],
+  '뉴진스': ['NewJeans'],
+  'IVE': ['IVE', '아이브'],
+  '아이브': ['IVE'],
+  'aespa': ['aespa', 'Aespa', '에스파'],
+  '에스파': ['aespa'],
+  'ITZY': ['ITZY', '있지'],
+  '있지': ['ITZY'],
+  'Red Velvet': ['Red Velvet', '레드벨벳'],
+  '레드벨벳': ['Red Velvet'],
+  'MAMAMOO': ['MAMAMOO', 'Mamamoo', '마마무'],
+  '마마무': ['MAMAMOO'],
+  'GOT7': ['GOT7', '갓세븐'],
+  '갓세븐': ['GOT7'],
+  'ATEEZ': ['ATEEZ', '에이티즈'],
+  '에이티즈': ['ATEEZ'],
+  'THE BOYZ': ['THE BOYZ', '더보이즈'],
+  '더보이즈': ['THE BOYZ'],
+  'TREASURE': ['TREASURE', '트레저'],
+  '트레저': ['TREASURE'],
+  '(G)I-DLE': ['(G)I-DLE', 'G-IDLE', 'GIDLE', '여자아이들'],
+  '여자아이들': ['(G)I-DLE', 'GIDLE'],
+  'NMIXX': ['NMIXX', '엔믹스'],
+  '엔믹스': ['NMIXX'],
+  'Kep1er': ['Kep1er', 'Kepler', '케플러'],
+  '케플러': ['Kep1er'],
+  
+  // Solo Artists
+  'IU': ['IU', '아이유', 'Lee Jieun'],
+  '아이유': ['IU', 'Lee Jieun'],
+  'G-Dragon': ['G-Dragon', 'GD', '지드래곤'],
+  '지드래곤': ['G-Dragon', 'GD'],
+  'JENNIE': ['JENNIE', 'Jennie', '제니'],
+  '제니': ['JENNIE'],
+  'ROSÉ': ['ROSÉ', 'Rose', 'Rosé', '로제'],
+  '로제': ['ROSÉ', 'Rose'],
+  'LISA': ['LISA', 'Lisa', '리사'],
+  '리사': ['LISA'],
+  'Jisoo': ['Jisoo', '지수'],
+  '지수': ['Jisoo'],
+  'V': ['V', 'Taehyung', '뷔', '태형'],
+  '뷔': ['V', 'Taehyung'],
+  'Jungkook': ['Jungkook', 'JK', '정국'],
+  '정국': ['Jungkook', 'JK'],
+  'Jimin': ['Jimin', '지민'],
+  '지민': ['Jimin'],
+  '태연': ['Taeyeon', 'TAEYEON'],
+  'Taeyeon': ['Taeyeon', '태연'],
+  '백현': ['Baekhyun', 'BAEKHYUN'],
+  'Baekhyun': ['Baekhyun', '백현'],
+  'PSY': ['PSY', 'Psy', '싸이'],
+  '싸이': ['PSY'],
+  'ZICO': ['ZICO', 'Zico', '지코'],
+  '지코': ['ZICO'],
+  'Crush': ['Crush', '크러쉬'],
+  '크러쉬': ['Crush'],
+  'DEAN': ['DEAN', 'Dean', '딘'],
+  '딘': ['DEAN'],
+  '헤이즈': ['Heize', 'HEIZE'],
+  'Heize': ['Heize', '헤이즈'],
+  '볼빨간사춘기': ['Bolbbalgan4', 'BOL4'],
+  'Bolbbalgan4': ['Bolbbalgan4', 'BOL4', '볼빨간사춘기'],
+  '악동뮤지션': ['Akdong Musician', 'AKMU'],
+  'AKMU': ['AKMU', 'Akdong Musician', '악동뮤지션'],
+};
+
+// ============ CHINESE ARTIST MAPPINGS ============
+
+const CHINESE_ARTIST_MAPPINGS: Record<string, string[]> = {
+  // Mandopop Artists
+  '周杰伦': ['Jay Chou', 'Zhou Jielun'],
+  'Jay Chou': ['Jay Chou', '周杰伦'],
+  '林俊杰': ['JJ Lin', 'Lin Junjie'],
+  'JJ Lin': ['JJ Lin', '林俊ie'],
+  '邓紫棋': ['G.E.M.', 'GEM', 'Deng Ziqi'],
+  'G.E.M.': ['G.E.M.', 'GEM', '邓紫棋'],
+  '周深': ['Zhou Shen', 'Charlie Zhou'],
+  'Zhou Shen': ['Zhou Shen', '周深'],
+  '毛不易': ['Mao Buyi', 'Mao Bu Yi'],
+  'Mao Buyi': ['Mao Buyi', '毛不易'],
+  '薛之谦': ['Joker Xue', 'Xue Zhiqian'],
+  'Joker Xue': ['Joker Xue', '薛之谦'],
+  '华晨宇': ['Hua Chenyu'],
+  'Hua Chenyu': ['Hua Chenyu', '华晨宇'],
+  '蔡徐坤': ['Cai Xukun', 'Kun'],
+  '王嘉尔': ['Jackson Wang', 'Wang Jiaer'],
+  'Jackson Wang': ['Jackson Wang', '王嘉尔'],
+  '张艺兴': ['Lay Zhang', 'Zhang Yixing'],
+  'Lay Zhang': ['Lay Zhang', '张艺兴', 'LAY'],
+  '鹿晗': ['Lu Han', 'Luhan'],
+  'Luhan': ['Lu Han', 'Luhan', '鹿晗'],
+  '蔡依林': ['Jolin Tsai', 'Cai Yilin'],
+  'Jolin Tsai': ['Jolin Tsai', '蔡依林'],
+  '张惠妹': ['A-Mei', 'Chang Hui-mei', 'aMEI'],
+  'A-Mei': ['A-Mei', '张惠妹'],
+  '孙燕姿': ['Stefanie Sun', 'Sun Yanzi'],
+  'Stefanie Sun': ['Stefanie Sun', '孙燕姿'],
+  '五月天': ['Mayday', 'Wu Yue Tian'],
+  'Mayday': ['Mayday', '五月天'],
+  '陈奕迅': ['Eason Chan', 'Chen Yixun'],
+  'Eason Chan': ['Eason Chan', '陈奕迅'],
+  '张学友': ['Jacky Cheung', 'Zhang Xueyou'],
+  'Jacky Cheung': ['Jacky Cheung', '张学友'],
+  '刘德华': ['Andy Lau', 'Liu Dehua'],
+  'Andy Lau': ['Andy Lau', '刘德华'],
+  '王菲': ['Faye Wong', 'Wang Fei'],
+  'Faye Wong': ['Faye Wong', '王菲'],
+  '李荣浩': ['Li Ronghao', 'Ronghao Li'],
+  'Li Ronghao': ['Li Ronghao', '李荣浩'],
+  '王力宏': ['Wang Leehom', 'Leehom Wang'],
+  'Wang Leehom': ['Wang Leehom', '王力宏'],
+  'TFBOYS': ['TFBOYS', 'TF Boys'],
+  'EXO-M': ['EXO-M', 'EXO M'],
+  '鄧紫棋': ['G.E.M.', 'GEM'], // Traditional Chinese
+  '張惠妹': ['A-Mei', 'aMEI'], // Traditional Chinese
+  '張學友': ['Jacky Cheung'], // Traditional Chinese
+  '劉德華': ['Andy Lau'], // Traditional Chinese
+};
+
 // Common Thai song title patterns - for better extraction
 const THAI_TITLE_PATTERNS = [
   // Pattern: "Thai Title (English Title)"
@@ -285,6 +573,75 @@ function getThaiArtistVariations(artist: string): string[] {
   }
   
   return variations;
+}
+
+// Get romanized variations for Japanese artist
+function getJapaneseArtistVariations(artist: string): string[] {
+  const variations: string[] = [];
+  
+  for (const [jpn, romanized] of Object.entries(JAPANESE_ARTIST_MAPPINGS)) {
+    if (artist.toLowerCase().includes(jpn.toLowerCase())) {
+      variations.push(...romanized);
+    }
+  }
+  
+  return variations;
+}
+
+// Get romanized variations for Korean artist
+function getKoreanArtistVariations(artist: string): string[] {
+  const variations: string[] = [];
+  
+  for (const [kor, romanized] of Object.entries(KOREAN_ARTIST_MAPPINGS)) {
+    if (artist.toLowerCase().includes(kor.toLowerCase())) {
+      variations.push(...romanized);
+    }
+  }
+  
+  return variations;
+}
+
+// Get romanized variations for Chinese artist
+function getChineseArtistVariations(artist: string): string[] {
+  const variations: string[] = [];
+  
+  for (const [chn, romanized] of Object.entries(CHINESE_ARTIST_MAPPINGS)) {
+    if (artist.toLowerCase().includes(chn.toLowerCase())) {
+      variations.push(...romanized);
+    }
+  }
+  
+  return variations;
+}
+
+// Get all artist variations (unified function for any Asian language)
+function getAsianArtistVariations(artist: string): string[] {
+  const variations: string[] = [];
+  
+  if (containsThai(artist)) {
+    variations.push(...getThaiArtistVariations(artist));
+  }
+  if (containsJapanese(artist)) {
+    variations.push(...getJapaneseArtistVariations(artist));
+  }
+  if (containsKorean(artist)) {
+    variations.push(...getKoreanArtistVariations(artist));
+  }
+  if (containsChinese(artist)) {
+    variations.push(...getChineseArtistVariations(artist));
+  }
+  
+  // Also check romanized input against mappings
+  const romanized = extractRomanized(artist);
+  if (romanized && romanized.length > 2) {
+    variations.push(...getThaiArtistVariations(romanized));
+    variations.push(...getJapaneseArtistVariations(romanized));
+    variations.push(...getKoreanArtistVariations(romanized));
+    variations.push(...getChineseArtistVariations(romanized));
+  }
+  
+  // Remove duplicates
+  return [...new Set(variations)];
 }
 
 // Clean YouTube-specific patterns from title
@@ -494,10 +851,11 @@ function scoreResult(result: any, queryArtist: string, queryTitle: string, origi
   let artistScore = similarity(resultArtist, queryArtistLower);
   let titleScore = similarity(resultTrack, queryTitleLower);
 
-  // Improve artist matching by checking Romanized variations (critical for Thai artists)
-  if (artistScore < 0.85 && containsThai(queryArtist)) {
-    const variations = getThaiArtistVariations(queryArtist);
-    for (const v of variations) {
+  // Improve artist matching by checking Romanized variations (for all Asian languages)
+  if (artistScore < 0.85) {
+    // Get all variations (Thai, Japanese, Korean, Chinese)
+    const allVariations = getAsianArtistVariations(queryArtist);
+    for (const v of allVariations) {
       const vScore = similarity(resultArtist, v.toLowerCase());
       if (vScore > artistScore) artistScore = vScore;
     }
@@ -523,20 +881,46 @@ function scoreResult(result: any, queryArtist: string, queryTitle: string, origi
     return (titleScore * 0.3) + (artistScore * 0.1);
   }
 
-  // Bonus for Thai characters matching if query had Thai
-  let thaiBonus = 0;
+  // Bonus for native script characters matching if query had them
+  let asianBonus = 0;
+  
+  // Thai bonus
   if (containsThai(queryArtist) && containsThai(resultArtist)) {
-    thaiBonus += 0.15;
+    asianBonus += 0.12;
   }
   if (containsThai(queryTitle) && containsThai(resultTrack)) {
-    thaiBonus += 0.15;
+    asianBonus += 0.12;
+  }
+  
+  // Japanese bonus
+  if (containsJapanese(queryArtist) && containsJapanese(resultArtist)) {
+    asianBonus += 0.12;
+  }
+  if (containsJapanese(queryTitle) && containsJapanese(resultTrack)) {
+    asianBonus += 0.12;
+  }
+  
+  // Korean bonus
+  if (containsKorean(queryArtist) && containsKorean(resultArtist)) {
+    asianBonus += 0.12;
+  }
+  if (containsKorean(queryTitle) && containsKorean(resultTrack)) {
+    asianBonus += 0.12;
+  }
+  
+  // Chinese bonus
+  if (containsChinese(queryArtist) && containsChinese(resultArtist)) {
+    asianBonus += 0.12;
+  }
+  if (containsChinese(queryTitle) && containsChinese(resultTrack)) {
+    asianBonus += 0.12;
   }
 
   // Reduced synced bonus
   const hasSynced = result.syncedLyrics ? 0.1 : 0;
   
   // Weighted score: Title is most important, then Artist
-  const baseScore = (titleScore * 0.50) + (artistScore * 0.35) + hasSynced + thaiBonus;
+  const baseScore = (titleScore * 0.50) + (artistScore * 0.35) + hasSynced + Math.min(asianBonus, 0.2);
   
   return Math.min(1, baseScore);
 }
@@ -927,6 +1311,12 @@ serve(async (req) => {
       searchStrategies.splice(2, 0, ...thaiStrategies);
     }
 
+    // Add Japanese/Korean/Chinese strategies
+    const asianStrategies = generateAsianSearchStrategies(artist, title, cleanedArtist, cleanedTitle);
+    if (asianStrategies.length > 0) {
+      searchStrategies.splice(2, 0, ...asianStrategies);
+    }
+
     // Remove duplicate searches
     const uniqueSearches = searchStrategies.filter((search, index, self) => 
       index === self.findIndex(s => 
@@ -1009,6 +1399,18 @@ serve(async (req) => {
       for (const v of variations.slice(0, 2)) { // Limit to first 2 variations
         lyricsOvhQueries.push({ artist: v, track: songName });
         lyricsOvhQueries.push({ artist: v, track: firstPart });
+      }
+    }
+    
+    // Add romanized artist variations for Japanese/Korean/Chinese
+    const asianVariations = getAsianArtistVariations(artist);
+    for (const v of asianVariations.slice(0, 3)) { // Limit to first 3 variations
+      lyricsOvhQueries.push({ artist: v, track: songName });
+      lyricsOvhQueries.push({ artist: v, track: firstPart });
+      // Also try with romanized title
+      const romanizedTitle = extractRomanized(title);
+      if (romanizedTitle && romanizedTitle.length >= 2) {
+        lyricsOvhQueries.push({ artist: v, track: romanizedTitle });
       }
     }
     
