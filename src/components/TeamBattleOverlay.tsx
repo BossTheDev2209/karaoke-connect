@@ -11,6 +11,7 @@ interface TeamBattleOverlayProps {
   onContinue?: () => void;
   showWinner?: boolean;
   isHost?: boolean;
+  currentUserId?: string;
 }
 
 export const TeamBattleOverlay: React.FC<TeamBattleOverlayProps> = ({
@@ -18,7 +19,8 @@ export const TeamBattleOverlay: React.FC<TeamBattleOverlayProps> = ({
   isPlaying,
   onContinue,
   showWinner = false,
-  isHost = false
+  isHost = false,
+  currentUserId
 }) => {
   // Calculate scores
   const { leftScore, rightScore, leftTeam, rightTeam } = useMemo(() => {
@@ -36,6 +38,10 @@ export const TeamBattleOverlay: React.FC<TeamBattleOverlayProps> = ({
     
     return { leftScore: lScore, rightScore: rScore, leftTeam: left, rightTeam: right };
   }, [users]);
+  
+  const userTeam = useMemo(() => {
+    return users.find(u => u.id === currentUserId)?.team;
+  }, [users, currentUserId]);
   
   // Calculate Progress (50% is tied)
   // Avoid division by zero
@@ -114,11 +120,29 @@ export const TeamBattleOverlay: React.FC<TeamBattleOverlayProps> = ({
                <span className="text-xl tabular-nums">{Math.floor(leftScore)}</span>
                <span className="text-xs opacity-80 uppercase">Team Pink</span>
             </div>
+
             <div className="flex items-center gap-2">
                <span className="text-xs opacity-80 uppercase">Team Blue</span>
                <span className="text-xl tabular-nums">{Math.floor(rightScore)}</span>
             </div>
           </div>
+          
+          {/* User Team Indicator */}
+          {userTeam && (
+             <div 
+               className={cn(
+                 "absolute -bottom-8 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase bg-white text-black shadow-lg border border-white/20 animate-bounce",
+                 userTeam === 'left' ? "left-10" : "right-10"
+               )}
+             >
+               YOU
+             </div>
+          )}
+        </div>
+        
+        {/* Instruction Message */}
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 text-white/50 text-xs font-medium tracking-widest uppercase animate-pulse">
+           Sing to Push!
         </div>
       </div>
       

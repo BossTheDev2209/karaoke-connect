@@ -277,6 +277,11 @@ export default function Room() {
   // State for Team Battle Winner Screen
   const [showWinnerScreen, setShowWinnerScreen] = useState(false);
 
+  // Close winner screen when song changes (for non-hosts reacting to host action)
+  useEffect(() => {
+    setShowWinnerScreen(false);
+  }, [playbackState.currentSongIndex]);
+
   // Auto-play next song when current ends (no looping)
   const handleVideoEnded = useCallback(() => {
     // Battle Mode Logic - Show Winner Screen first
@@ -914,6 +919,7 @@ export default function Room() {
           onContinue={handleNextRound}
           showWinner={showWinnerScreen}
           isHost={isHost}
+          currentUserId={user.id}
         />
       )}
       
