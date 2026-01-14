@@ -36,6 +36,19 @@ interface UseYouTubePlayerReturn {
   disableCaptions: () => void;
   areCaptionsEnabled: boolean;
   hasCaptionsAvailable: boolean;
+  // Error handling
+  error: YouTubeError | null;
+  clearError: () => void;
+}
+
+// YouTube error codes
+export type YouTubeErrorCode = 2 | 5 | 100 | 101 | 150;
+
+export interface YouTubeError {
+  code: YouTubeErrorCode;
+  message: string;
+  isAgeRestricted: boolean;
+  videoId: string;
 }
 
 declare global {
@@ -49,6 +62,7 @@ declare global {
           events?: {
             onReady?: () => void;
             onStateChange?: (event: { data: number }) => void;
+            onError?: (event: { data: number }) => void;
           };
         }
       ) => YouTubePlayer;
@@ -80,6 +94,7 @@ export const useYouTubePlayer = (
   const [hasEnded, setHasEnded] = useState(false);
   const [areCaptionsEnabled, setAreCaptionsEnabled] = useState(false);
   const [hasCaptionsAvailable, setHasCaptionsAvailable] = useState(false);
+  const [error, setError] = useState<YouTubeError | null>(null);
   const intervalRef = useRef<number>(0);
   const currentVideoIdRef = useRef<string | null>(null);
   const isPlayerReady = useRef(false);
@@ -194,6 +209,7 @@ export const useYouTubePlayer = (
             isPlayerReady.current = true;
             isInitializing.current = false;
             setIsReady(true);
+            setError(null); // Clear any previous error
             setDuration(newPlayer.getDuration());
             newPlayer.playVideo();
             // Check for captions availability after a short delay
@@ -214,12 +230,39 @@ export const useYouTubePlayer = (
 
             if (playing) {
               setDuration(newPlayer.getDuration());
+              setError(null); // Clear error if video starts playing
             }
 
             if (ended && !endedHandledRef.current) {
               endedHandledRef.current = true;
               onEndedRef.current?.();
             }
+          },
+          onError: (event) => {
+            const errorCode = event.data as YouTubeErrorCode;
+            console.error(`YouTube Player Error: ${errorCode}`);
+            
+            // Error codes:
+            // 2 - Invalid parameter
+            // 5 - HTML5 player error
+            // 100 - Video not found (removed/private)
+            // 101/150 - Video not allowed for embedded playback (age-restricted)
+            const errorMessages: Record<number, string> = {
+              2: 'Invalid video ID or parameters',
+              5: 'HTML5 player error - the video cannot be played',
+              100: 'Video not found - it may have been removed or set to private',
+              101: 'This video is age-restricted and cannot be embedded',
+              150: 'This video is age-restricted and cannot be embedded',
+            };
+            
+            const isAgeRestricted = errorCode === 101 || errorCode === 150;
+            
+            setError({
+              code: errorCode,
+              message: errorMessages[errorCode] || `Unknown error (code: ${errorCode})`,
+              isAgeRestricted,
+              videoId: currentVideoIdRef.current || videoId || '',
+            });
           },
         },
       });
@@ -361,6 +404,11 @@ export const useYouTubePlayer = (
     }
   }, []);
 
+  // Clear error state
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
   return {
     player: playerRef.current,
     isReady,
@@ -379,5 +427,7 @@ export const useYouTubePlayer = (
     disableCaptions,
     areCaptionsEnabled,
     hasCaptionsAvailable,
+    error,
+    clearError,
   };
 };

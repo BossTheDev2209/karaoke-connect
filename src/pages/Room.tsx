@@ -141,7 +141,7 @@ const Room = () => {
     }
   }, [queue.length, playbackState.currentSongIndex, updatePlayback]);
 
-  const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded, privacyMode);
+  const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable, error: playerError, clearError } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded, privacyMode);
 
   // Sync lock for synchronized playback start
   const handleSyncLockComplete = useCallback(() => {
@@ -526,6 +526,57 @@ const Room = () => {
             {!currentSong && (
               <div className="absolute inset-0 flex items-center justify-center bg-card/80 rounded-lg">
                 <p className="text-muted-foreground">Add songs to start!</p>
+              </div>
+            )}
+
+            {/* Player Error Overlay (Age-restricted, etc.) */}
+            {playerError && currentSong && (
+              <div className="absolute inset-0 flex items-center justify-center bg-card/95 rounded-lg backdrop-blur-sm z-10">
+                <div className="text-center p-6 max-w-md">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-destructive/20 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    {playerError.isAgeRestricted ? 'Age-Restricted Video' : 'Video Unavailable'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {playerError.message}
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                    <a
+                      href={`https://www.youtube.com/watch?v=${playerError.videoId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
+                      </svg>
+                      Watch on YouTube
+                    </a>
+                    {queue.length > 1 && (
+                      <button
+                        onClick={() => {
+                          clearError();
+                          handleVideoEnded();
+                        }}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors text-sm font-medium"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                        </svg>
+                        Skip to Next
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-3">
+                    {playerError.isAgeRestricted 
+                      ? 'Age-restricted videos can only be watched directly on YouTube'
+                      : 'This video cannot be played in an embedded player'}
+                  </p>
+                </div>
               </div>
             )}
           </div>
