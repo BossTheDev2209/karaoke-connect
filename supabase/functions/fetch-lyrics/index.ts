@@ -7,6 +7,7 @@ const corsHeaders = {
 
 const LRCLIB_API = 'https://lrclib.net/api';
 const GENIUS_API = 'https://api.genius.com';
+const MUSIXMATCH_API = 'https://api.musixmatch.com/ws/1.1';
 
 // Thai character range detection
 function containsThai(text: string): boolean {
@@ -263,12 +264,22 @@ const THAI_ARTIST_MAPPINGS: Record<string, string[]> = {
   'เคลียร์': ['Klear'],
 };
 
+// Common Thai song title patterns - for better extraction
+const THAI_TITLE_PATTERNS = [
+  // Pattern: "Thai Title (English Title)"
+  /^([\u0E00-\u0E7F][\u0E00-\u0E7F\s]+)\s*\([^)]+\)/,
+  // Pattern: "Thai Title - Artist"
+  /^([\u0E00-\u0E7F][\u0E00-\u0E7F\s]+)\s*[-–—]/,
+  // Pattern: Just Thai text at start
+  /^([\u0E00-\u0E7F][\u0E00-\u0E7F\s]+)/,
+];
+
 // Get romanized variations for Thai artist
 function getThaiArtistVariations(artist: string): string[] {
   const variations: string[] = [];
   
   for (const [thai, romanized] of Object.entries(THAI_ARTIST_MAPPINGS)) {
-    if (artist.includes(thai)) {
+    if (artist.toLowerCase().includes(thai.toLowerCase())) {
       variations.push(...romanized);
     }
   }
@@ -316,10 +327,26 @@ function cleanTitle(title: string): string {
     .replace(/Full\s*Lyrics/gi, '')
     .replace(/\|\s*.*$/g, '')
     .replace(/#\w+/g, '')
-    .replace(/[''""]/g, "'")
+    .replace(/[''""\u201C\u201D]/g, "'")
     .replace(/'([^']+)'/g, '$1')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+// IMPROVED: Extract Thai song title more accurately
+function extractThaiSongTitle(title: string): string | null {
+  // Try each pattern
+  for (const pattern of THAI_TITLE_PATTERNS) {
+    const match = title.match(pattern);
+    if (match && match[1]) {
+      const extracted = match[1].trim();
+      // Ensure it's meaningful (at least 2 Thai characters)
+      if (extracted.length >= 2) {
+        return extracted;
+      }
+    }
+  }
+  return null;
 }
 
 // Extract the FIRST part before any dash (usually the actual song name)
@@ -331,11 +358,22 @@ function extractFirstPart(title: string): string {
   return title;
 }
 
-// Extract song name from title (often in quotes or after dash)
+// IMPROVED: Better song name extraction
 function extractSongName(title: string, artist?: string): string {
   const cleanedTitle = cleanTitle(title);
   
-  // First try: extract the first part before any dash
+  // PRIORITY 1: For Thai songs, extract Thai title first
+  if (containsThai(cleanedTitle)) {
+    const thaiTitle = extractThaiSongTitle(cleanedTitle);
+    if (thaiTitle && thaiTitle.length >= 2) {
+      // Make sure it's not just the artist name
+      if (!artist || !containsThai(artist) || similarity(thaiTitle, extractThai(artist)) < 0.6) {
+        return thaiTitle;
+      }
+    }
+  }
+  
+  // PRIORITY 2: Extract the first part before any dash
   const firstPart = extractFirstPart(cleanedTitle);
   if (firstPart && firstPart.length >= 2 && firstPart !== cleanedTitle) {
     // Make sure it's not just the artist name
@@ -344,23 +382,15 @@ function extractSongName(title: string, artist?: string): string {
     }
   }
   
-  // For Thai songs: extract the Thai portion as the primary song name
-  if (containsThai(cleanedTitle)) {
-    const thaiPart = extractThai(cleanedTitle);
-    if (thaiPart && thaiPart.length >= 3) {
-      return thaiPart;
-    }
-  }
-  
-  // Try to find quoted song name
-  const quotedMatch = cleanedTitle.match(/[''""]([^''""\(\)]+)[''""]/) ||
+  // PRIORITY 3: Try to find quoted song name
+  const quotedMatch = cleanedTitle.match(/[''"""]([^''""\(\)]+)[''"""]/) ||
                       cleanedTitle.match(/'([^'\(\)]+)'/) ||
                       cleanedTitle.match(/"([^"\(\)]+)"/);
   if (quotedMatch) {
     return quotedMatch[1].trim();
   }
   
-  // Try "Artist - Song" format
+  // PRIORITY 4: Try "Artist - Song" format (after the dash)
   const dashMatch = cleanedTitle.match(/[-–—]\s*(.+?)(?:\s*[\(\[\|]|$)/);
   if (dashMatch) {
     const extracted = dashMatch[1].trim();
@@ -418,58 +448,97 @@ function removeAsianParentheses(text: string): string {
     .trim();
 }
 
-// Calculate similarity score between two strings (0-1)
+// IMPROVED: Calculate similarity score between two strings (0-1)
 function similarity(s1: string, s2: string): number {
   if (!s1 || !s2) return 0;
   const str1 = s1.toLowerCase().trim();
   const str2 = s2.toLowerCase().trim();
   
   if (str1 === str2) return 1;
+  
+  // For Thai text, use character-level comparison
+  if (containsThai(str1) && containsThai(str2)) {
+    const thai1 = extractThai(str1);
+    const thai2 = extractThai(str2);
+    if (thai1 === thai2) return 0.95;
+    if (thai1.includes(thai2) || thai2.includes(thai1)) {
+      const ratio = Math.min(thai1.length, thai2.length) / Math.max(thai1.length, thai2.length);
+      return 0.8 * ratio;
+    }
+  }
+  
   if (str1.includes(str2) || str2.includes(str1)) {
     // Penalize very short matches being found in long strings
     const ratio = Math.min(str1.length, str2.length) / Math.max(str1.length, str2.length);
-    return 0.8 * ratio + 0.1; // Scale based on length ratio
+    return 0.75 * ratio + 0.1;
   }
   
-  const words1 = str1.split(/[\s-]+/);
-  const words2 = str2.split(/[\s-]+/);
-  const commonWords = words1.filter(w => w.length > 1 && words2.some(w2 => w2.includes(w) || w.includes(w2)));
+  const words1 = str1.split(/[\s-]+/).filter(w => w.length > 1);
+  const words2 = str2.split(/[\s-]+/).filter(w => w.length > 1);
+  const commonWords = words1.filter(w => words2.some(w2 => w2.includes(w) || w.includes(w2)));
+  
+  if (words1.length === 0 || words2.length === 0) return 0;
   
   return commonWords.length / Math.max(words1.length, words2.length);
 }
 
-// Score a result based on how well it matches our query
-function scoreResult(result: any, queryArtist: string, queryTitle: string): number {
-  const resultArtist = result.artistName || '';
-  const resultTrack = result.trackName || '';
+// IMPROVED: More aggressive scoring with better validation
+function scoreResult(result: any, queryArtist: string, queryTitle: string, originalTitle: string): number {
+  const resultArtist = (result.artistName || '').toLowerCase();
+  const resultTrack = (result.trackName || '').toLowerCase();
+  const queryArtistLower = queryArtist.toLowerCase();
+  const queryTitleLower = queryTitle.toLowerCase();
+  const originalTitleLower = originalTitle.toLowerCase();
   
-  let artistScore = similarity(resultArtist, queryArtist);
+  // Calculate base scores
+  let artistScore = similarity(resultArtist, queryArtistLower);
+  let titleScore = similarity(resultTrack, queryTitleLower);
 
   // Improve artist matching by checking Romanized variations (critical for Thai artists)
   if (artistScore < 0.85 && containsThai(queryArtist)) {
     const variations = getThaiArtistVariations(queryArtist);
     for (const v of variations) {
-      const vScore = similarity(resultArtist, v);
+      const vScore = similarity(resultArtist, v.toLowerCase());
       if (vScore > artistScore) artistScore = vScore;
     }
   }
   
-  const titleScore = similarity(resultTrack, queryTitle);
+  // Also try matching against original title (sometimes has more context)
+  const originalTitleScore = similarity(resultTrack, originalTitleLower);
+  if (originalTitleScore > titleScore) {
+    titleScore = originalTitleScore * 0.9; // Slight penalty for using original
+  }
   
-  // Penalize mismatched artists heavily
-  if (artistScore < 0.3 && queryArtist.length > 2) {
-    return 0; // Discard completely if artist is totally different
+  // STRICT VALIDATION: Penalize mismatched content heavily
+  
+  // If neither title nor artist match at all, reject
+  if (artistScore < 0.2 && titleScore < 0.2) {
+    console.log(`  Rejecting: "${resultArtist}" - "${resultTrack}" (no match)`);
+    return 0;
+  }
+  
+  // If artist is completely different and title only partial match, reduce score significantly
+  if (artistScore < 0.3 && titleScore < 0.5) {
+    console.log(`  Low score: "${resultArtist}" - "${resultTrack}" (weak match)`);
+    return (titleScore * 0.3) + (artistScore * 0.1);
   }
 
   // Bonus for Thai characters matching if query had Thai
-  const thaiBonus = (containsThai(queryArtist) && containsThai(resultArtist)) || 
-                    (containsThai(queryTitle) && containsThai(resultTrack)) ? 0.2 : 0;
+  let thaiBonus = 0;
+  if (containsThai(queryArtist) && containsThai(resultArtist)) {
+    thaiBonus += 0.15;
+  }
+  if (containsThai(queryTitle) && containsThai(resultTrack)) {
+    thaiBonus += 0.15;
+  }
 
-  // Reduced synced bonus (was 0.5)
-  const hasSynced = result.syncedLyrics ? 0.15 : 0;
+  // Reduced synced bonus
+  const hasSynced = result.syncedLyrics ? 0.1 : 0;
   
   // Weighted score: Title is most important, then Artist
-  return (titleScore * 0.5) + (artistScore * 0.35) + hasSynced + thaiBonus;
+  const baseScore = (titleScore * 0.50) + (artistScore * 0.35) + hasSynced + thaiBonus;
+  
+  return Math.min(1, baseScore);
 }
 
 // Search LRCLIB with given parameters
@@ -496,6 +565,80 @@ async function searchLRCLIB(trackName: string, artistName?: string): Promise<any
   } catch (err) {
     console.error('LRCLIB fetch error:', err);
     return [];
+  }
+}
+
+// NEW: Search Musixmatch API (better Thai coverage)
+async function searchMusixmatch(trackName: string, artistName?: string, apiKey?: string): Promise<any> {
+  if (!apiKey) return null;
+  
+  console.log(`Searching Musixmatch: track="${trackName}" artist="${artistName || 'any'}"`);
+
+  try {
+    // Step 1: Search for track
+    const searchUrl = new URL(`${MUSIXMATCH_API}/track.search`);
+    searchUrl.searchParams.set('q_track', trackName);
+    if (artistName) {
+      searchUrl.searchParams.set('q_artist', artistName);
+    }
+    searchUrl.searchParams.set('page_size', '5');
+    searchUrl.searchParams.set('s_track_rating', 'desc');
+    searchUrl.searchParams.set('apikey', apiKey);
+
+    const searchResponse = await fetch(searchUrl.toString());
+    if (!searchResponse.ok) {
+      console.error('Musixmatch search failed:', searchResponse.status);
+      return null;
+    }
+
+    const searchData = await searchResponse.json();
+    const tracks = searchData.message?.body?.track_list || [];
+    
+    if (tracks.length === 0) {
+      console.log('No Musixmatch results found');
+      return null;
+    }
+
+    // Get the first matching track
+    const track = tracks[0].track;
+    const trackId = track.track_id;
+    
+    console.log(`Musixmatch found: "${track.artist_name}" - "${track.track_name}"`);
+
+    // Step 2: Get lyrics for this track
+    const lyricsUrl = new URL(`${MUSIXMATCH_API}/track.lyrics.get`);
+    lyricsUrl.searchParams.set('track_id', trackId);
+    lyricsUrl.searchParams.set('apikey', apiKey);
+
+    const lyricsResponse = await fetch(lyricsUrl.toString());
+    if (!lyricsResponse.ok) {
+      console.error('Musixmatch lyrics fetch failed:', lyricsResponse.status);
+      return null;
+    }
+
+    const lyricsData = await lyricsResponse.json();
+    const lyricsBody = lyricsData.message?.body?.lyrics;
+    
+    if (!lyricsBody || !lyricsBody.lyrics_body) {
+      console.log('Musixmatch: No lyrics body found');
+      return null;
+    }
+
+    // Clean up Musixmatch lyrics (they add a disclaimer at the end)
+    let lyrics = lyricsBody.lyrics_body
+      .replace(/\*+\s*This Lyrics is NOT for Commercial use\s*\*+/gi, '')
+      .replace(/\(\d+\)$/g, '')
+      .trim();
+
+    return {
+      plainLyrics: lyrics,
+      trackName: track.track_name,
+      artistName: track.artist_name,
+      source: 'musixmatch'
+    };
+  } catch (err) {
+    console.error('Musixmatch fetch error:', err);
+    return null;
   }
 }
 
@@ -549,9 +692,13 @@ async function searchGenius(query: string, apiKey: string): Promise<{ lyrics: st
 
     const html = await lyricsResponse.text();
     
-    // Extract lyrics from Genius HTML
-    // Look for data-lyrics-container="true" divs
-    const lyricsMatch = html.match(/data-lyrics-container="true"[^>]*>([\s\S]*?)<\/div>/g);
+    // Extract lyrics from Genius HTML - try multiple patterns
+    let lyricsMatch = html.match(/data-lyrics-container="true"[^>]*>([\s\S]*?)<\/div>/g);
+    
+    if (!lyricsMatch) {
+      // Try alternate pattern
+      lyricsMatch = html.match(/<div class="[^"]*Lyrics__Container[^"]*"[^>]*>([\s\S]*?)<\/div>/g);
+    }
     
     if (!lyricsMatch) {
       console.log('Could not parse Genius lyrics from HTML');
@@ -598,7 +745,8 @@ function generateThaiSearchStrategies(
   
   console.log('Thai content detected, adding Thai-specific strategies');
   
-  const thaiTitle = extractThai(title);
+  // Extract Thai song title using improved patterns
+  const thaiTitle = extractThaiSongTitle(title) || extractThai(title);
   const romanizedTitle = extractNonThai(title)
     .replace(new RegExp(cleanedArtist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '')
     .replace(/^[-–—\s]+|[-–—\s]+$/g, '')
@@ -609,33 +757,39 @@ function generateThaiSearchStrategies(
   
   const artistVariations = getThaiArtistVariations(artist);
   
-  if (thaiTitle && thaiTitle.length >= 3) {
-    if (thaiArtist) {
+  // Strategy: Thai title + Thai artist
+  if (thaiTitle && thaiTitle.length >= 2) {
+    if (thaiArtist && thaiArtist.length >= 2) {
       strategies.push({ track: thaiTitle, artist: thaiArtist });
     }
-    if (romanizedArtist && romanizedArtist !== thaiArtist) {
+    // Thai title + romanized artist
+    if (romanizedArtist && romanizedArtist.length >= 2 && romanizedArtist !== thaiArtist) {
       strategies.push({ track: thaiTitle, artist: romanizedArtist });
     }
+    // Thai title only
     strategies.push({ track: thaiTitle, artist: undefined });
   }
   
+  // Look for English title in parentheses
   const englishInParens = title.match(/\(([A-Za-z][^)]*)\)/);
   if (englishInParens) {
     const englishTitle = englishInParens[1].trim();
     if (englishTitle.length >= 3) {
-      if (romanizedArtist) {
+      if (romanizedArtist && romanizedArtist.length >= 2) {
         strategies.push({ track: englishTitle, artist: romanizedArtist });
       }
       strategies.push({ track: englishTitle, artist: undefined });
     }
   }
   
-  if (romanizedTitle && romanizedTitle.length >= 3 && romanizedArtist) {
+  // Romanized title + romanized artist
+  if (romanizedTitle && romanizedTitle.length >= 3 && romanizedArtist && romanizedArtist.length >= 2) {
     strategies.push({ track: romanizedTitle, artist: romanizedArtist });
   }
   
+  // Try with artist mapping variations
   for (const romanizedVariation of artistVariations) {
-    if (thaiTitle && thaiTitle.length >= 3) {
+    if (thaiTitle && thaiTitle.length >= 2) {
       strategies.push({ track: thaiTitle, artist: romanizedVariation });
     }
     if (romanizedTitle && romanizedTitle.length >= 3) {
@@ -644,6 +798,29 @@ function generateThaiSearchStrategies(
   }
   
   return strategies;
+}
+
+// IMPROVED: Validate that lyrics look reasonable for the query
+function validateLyrics(lyrics: string, queryTitle: string, queryArtist: string): boolean {
+  if (!lyrics || lyrics.length < 50) {
+    console.log('Validation: Lyrics too short');
+    return false;
+  }
+  
+  // Check if lyrics contain at least some content
+  const lines = lyrics.split('\n').filter(l => l.trim().length > 0);
+  if (lines.length < 4) {
+    console.log('Validation: Too few lines');
+    return false;
+  }
+  
+  // For Thai songs, check if lyrics contain Thai characters
+  if (containsThai(queryTitle) || containsThai(queryArtist)) {
+    // It's okay if lyrics are romanized (transliterated) - don't require Thai chars
+    console.log('Validation: Thai query - allowing any lyrics');
+  }
+  
+  return true;
 }
 
 serve(async (req) => {
@@ -678,30 +855,34 @@ serve(async (req) => {
     console.log(`Cleaned artist: "${cleanedArtist}" | Primary: "${primaryArtist}"`);
     console.log(`Cleaned title: "${cleanedTitle}" | Song name: "${songName}" | First part: "${firstPart}"`);
 
-    // IMPROVED: Search strategies - prioritize simple song name first
+    // API Keys
+    const geniusApiKey = Deno.env.get('GENIUS_API_KEY');
+    const musixmatchApiKey = Deno.env.get('MUSIXMATCH_API_KEY');
+
+    // IMPROVED: Search strategies - prioritize exact matches first
     const searchStrategies: Array<{ track: string; artist: string | undefined }> = [
-      // Strategy 0: PRIORITY - Just the first part of the title (before any dash)
-      { track: firstPart, artist: undefined },
-      // Strategy 1: First part + any artist variation
+      // Strategy 0: Extracted song name (most accurate) + cleaned artist
+      { track: songName, artist: cleanedArtist },
+      // Strategy 1: First part of title + artist variations
       { track: firstPart, artist: cleanedArtist },
       { track: firstPart, artist: primaryArtist },
-      // Strategy 2: Extracted song name + cleaned artist
-      { track: songName, artist: cleanedArtist },
-      // Strategy 3: Cleaned title + cleaned artist  
+      // Strategy 2: Cleaned title + cleaned artist  
       { track: cleanedTitle, artist: cleanedArtist },
-      // Strategy 4: Title without featuring + primary artist
+      // Strategy 3: Title without featuring + primary artist
       { track: titleNoFeat, artist: primaryArtist },
-      // Strategy 5: Title without Asian text + artist without Asian text
+      // Strategy 4: Title without Asian text + artist without Asian text
       { track: titleNoAsian, artist: artistNoAsian },
-      // Strategy 6: Just the song name (broader search)
+      // Strategy 5: Broader searches (artist-agnostic)
       { track: songName, artist: undefined },
-      // Strategy 7: Cleaned title only
-      { track: cleanedTitle, artist: undefined },
+      { track: firstPart, artist: undefined },
     ];
     
     // Add Thai-specific strategies
     const thaiStrategies = generateThaiSearchStrategies(artist, title, cleanedArtist, cleanedTitle);
-    searchStrategies.push(...thaiStrategies);
+    // Insert Thai strategies after the first few to prioritize them for Thai content
+    if (thaiStrategies.length > 0) {
+      searchStrategies.splice(2, 0, ...thaiStrategies);
+    }
 
     // Remove duplicate searches
     const uniqueSearches = searchStrategies.filter((search, index, self) => 
@@ -711,7 +892,9 @@ serve(async (req) => {
     );
 
     let allResults: any[] = [];
+    let foundSynced = false;
 
+    // LRCLIB Search
     for (const search of uniqueSearches) {
       if (!search.track || search.track.length < 2) continue;
       
@@ -720,9 +903,13 @@ serve(async (req) => {
         allResults = [...allResults, ...results];
         if (results.some((r: any) => r.syncedLyrics)) {
           console.log(`Found synced lyrics on strategy: track="${search.track}" artist="${search.artist || 'any'}"`);
+          foundSynced = true;
           break;
         }
       }
+      
+      // Early exit if we have enough results
+      if (allResults.length >= 10) break;
     }
 
     // If LRCLIB found results, use them
@@ -733,45 +920,83 @@ serve(async (req) => {
 
       const scoredResults = uniqueResults.map(result => ({
         ...result,
-        score: scoreResult(result, cleanedArtist, songName || cleanedTitle)
-      })).sort((a, b) => b.score - a.score);
+        score: scoreResult(result, cleanedArtist, songName || cleanedTitle, title)
+      }))
+        .filter(r => r.score > 0.15) // Filter out very low scores
+        .sort((a, b) => b.score - a.score);
 
-      const bestMatch = scoredResults[0];
+      if (scoredResults.length > 0) {
+        const bestMatch = scoredResults[0];
 
-      console.log(`Found ${uniqueResults.length} unique results, best match score: ${bestMatch.score.toFixed(2)}`);
-      console.log(`Best match: "${bestMatch.artistName}" - "${bestMatch.trackName}"`);
-      console.log(`Has synced: ${!!bestMatch.syncedLyrics}, Has plain: ${!!bestMatch.plainLyrics}`);
+        console.log(`Found ${scoredResults.length} valid results, best match score: ${bestMatch.score.toFixed(2)}`);
+        console.log(`Best match: "${bestMatch.artistName}" - "${bestMatch.trackName}"`);
+        console.log(`Has synced: ${!!bestMatch.syncedLyrics}, Has plain: ${!!bestMatch.plainLyrics}`);
 
-      return new Response(
-        JSON.stringify({
-          syncedLyrics: bestMatch.syncedLyrics || null,
-          plainLyrics: bestMatch.plainLyrics || null,
-          trackName: bestMatch.trackName,
-          artistName: bestMatch.artistName,
-          source: 'lrclib',
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+        // Validate lyrics quality
+        const lyrics = bestMatch.syncedLyrics || bestMatch.plainLyrics || '';
+        if (validateLyrics(lyrics, title, artist)) {
+          return new Response(
+            JSON.stringify({
+              syncedLyrics: bestMatch.syncedLyrics || null,
+              plainLyrics: bestMatch.plainLyrics || null,
+              trackName: bestMatch.trackName,
+              artistName: bestMatch.artistName,
+              source: 'lrclib',
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else {
+          console.log('LRCLIB result failed validation, trying fallbacks...');
+        }
+      }
     }
 
-    // FALLBACK: Try Genius API
-    console.log('LRCLIB found nothing, trying Genius API...');
-    const geniusApiKey = Deno.env.get('GENIUS_API_KEY');
-    
+    // FALLBACK 1: Try Musixmatch API (good for Asian music)
+    if (musixmatchApiKey) {
+      console.log('Trying Musixmatch API...');
+      
+      const musixmatchQueries = [
+        { track: songName, artist: cleanedArtist },
+        { track: firstPart, artist: primaryArtist },
+        { track: songName, artist: undefined },
+      ];
+      
+      for (const query of musixmatchQueries) {
+        if (!query.track || query.track.length < 2) continue;
+        
+        const result = await searchMusixmatch(query.track, query.artist, musixmatchApiKey);
+        if (result && result.plainLyrics && validateLyrics(result.plainLyrics, title, artist)) {
+          console.log(`Musixmatch found valid lyrics: "${result.artistName}" - "${result.trackName}"`);
+          return new Response(
+            JSON.stringify({
+              syncedLyrics: null,
+              plainLyrics: result.plainLyrics,
+              trackName: result.trackName,
+              artistName: result.artistName,
+              source: 'musixmatch',
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+    }
+
+    // FALLBACK 2: Try Genius API
     if (geniusApiKey) {
-      // Try multiple Genius search queries
+      console.log('Trying Genius API...');
+      
       const geniusQueries = [
-        firstPart, // Just song name
-        `${firstPart} ${primaryArtist}`, // Song + artist
+        `${songName} ${primaryArtist}`,
+        `${firstPart} ${primaryArtist}`,
         songName,
-        `${songName} ${cleanedArtist}`,
-      ].filter((q, i, arr) => q && q.length >= 2 && arr.indexOf(q) === i);
+        firstPart,
+      ].filter((q, i, arr) => q && q.length >= 3 && arr.indexOf(q) === i);
 
       for (const query of geniusQueries) {
         const geniusResult = await searchGenius(query, geniusApiKey);
         
-        if (geniusResult.lyrics) {
-          console.log(`Genius found lyrics for: "${geniusResult.artist}" - "${geniusResult.title}"`);
+        if (geniusResult.lyrics && validateLyrics(geniusResult.lyrics, title, artist)) {
+          console.log(`Genius found valid lyrics for: "${geniusResult.artist}" - "${geniusResult.title}"`);
           return new Response(
             JSON.stringify({
               syncedLyrics: null,
@@ -784,9 +1009,9 @@ serve(async (req) => {
           );
         }
       }
-      console.log('Genius also found nothing');
+      console.log('Genius also found nothing valid');
     } else {
-      console.log('GENIUS_API_KEY not configured, skipping Genius fallback');
+      console.log('GENIUS_API_KEY not configured');
     }
 
     console.log('No lyrics found after all strategies');
