@@ -8,6 +8,8 @@ import { useLyricsPreload } from '@/hooks/useLyricsPreload';
 import { useMicrophone } from '@/hooks/useMicrophone';
 
 import { useTheme } from '@/contexts/ThemeContext';
+import { supabase } from '@/integrations/supabase/client';
+
 import { LyricsDisplay } from '@/components/LyricsDisplay';
 import { PlayerControls } from '@/components/PlayerControls';
 import { SongQueue } from '@/components/SongQueue';
@@ -24,14 +26,29 @@ import { useVoteKick, VoteKickOverlay } from '@/components/VoteKick';
 import { VotingPanel } from '@/components/VotingPanel';
 import { SyncLockOverlay, useSyncLock } from '@/components/SyncLockOverlay';
 
-import { LogOut, Swords, Mic2, Lock } from 'lucide-react';
+import { LogOut, Swords, Mic2, Lock, Sparkles, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-const Room = () => {
+
+
+export default function Room() {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
+  // Fix: destructure setVideoId, remove currentTheme (doesn't exist)
+  const { privacyMode, setVideoId } = useTheme();
+  
+  // Local user state (only set once on mount/entry)
+  const [user] = useState<User>(() => {
+    const saved = localStorage.getItem('karaoke_user');
+    return saved ? JSON.parse(saved) : {
+      id: crypto.randomUUID(),
+      name: `User ${Math.floor(Math.random() * 1000)}`,
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Date.now()}`,
+      isHost: false,
+      score: 0
+    };
+  });
   const [volume, setVolume] = useState(80);
   const [celebration] = useState(getCurrentCelebration());
   const [celebrationEnabled, setCelebrationEnabled] = useState(true);
@@ -54,16 +71,16 @@ const Room = () => {
   });
   
   // Theme context
-  const { setVideoId, privacyMode } = useTheme();
+  // const { setVideoId, privacyMode } = useTheme(); // This line is removed as per instruction
 
-  useEffect(() => {
-    const stored = sessionStorage.getItem('karaoke_user');
-    if (stored) {
-      setUser(JSON.parse(stored));
-    } else {
-      navigate('/');
-    }
-  }, [navigate]);
+  // useEffect(() => { // This useEffect block is removed as per instruction
+  //   const stored = sessionStorage.getItem('karaoke_user');
+  //   if (stored) {
+  //     setUser(JSON.parse(stored));
+  //   } else {
+  //     navigate('/');
+  //   }
+  // }, [navigate]);
 
   const { 
     users, 
@@ -86,7 +103,11 @@ const Room = () => {
     clockOffset
   } = useRoom(code || '', user);
 
-  const currentSong = queue[playbackState.currentSongIndex];
+  // Derived state
+  const currentSong = useMemo(() => 
+    queue[playbackState.currentSongIndex], 
+    [queue, playbackState.currentSongIndex]
+  );
   
   // Update theme context with current video ID for auto-theme
   useEffect(() => {
@@ -129,6 +150,85 @@ const Room = () => {
     if (applyingRemoteRef.current) return;
     updatePlayback({ isPlaying });
   }, [updatePlayback]);
+
+  // Recommendations state
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [isLoadingRecs, setIsLoadingRecs] = useState(false);
+
+  // Fetch recommendations when current song changes
+  useEffect(() => {
+    // Reset recommendations when song changes
+    setRecommendations([]); 
+    
+    if (!currentSong || !isHost || queue.length > 1) { 
+        return;
+    }
+    
+    const fetchRecs = async () => {
+      setIsLoadingRecs(true);
+      try {
+        const query = currentSong.artist ? `${currentSong.artist} karaoke` : `${currentSong.title} karaoke`;
+        console.log('Fetching recommendations for:', query);
+        
+        const { data, error } = await supabase.functions.invoke('youtube-search', {
+          body: { query, type: 'video' }
+        });
+        
+        if (data?.results) {
+          // Filter out current song and map to Song type
+          const recs = data.results
+            .filter((r: any) => r.videoId !== currentSong.videoId)
+            .slice(0, 3)
+            .map((r: any) => ({
+              id: crypto.randomUUID(),
+              videoId: r.videoId,
+              title: r.title,
+              artist: r.channelTitle, // Best guess
+              thumbnail: r.thumbnail,
+              duration: r.duration
+            }));
+          setRecommendations(recs);
+        }
+      } catch (err) {
+        console.error('Failed to fetch recommendations:', err);
+      } finally {
+        setIsLoadingRecs(false);
+      }
+    };
+    
+    fetchRecs();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSong?.videoId, queue.length, isHost]);
+
+  const addRecommendation = (rec: any) => {
+    const newSong: Song = {
+      id: crypto.randomUUID(),
+      videoId: rec.videoId,
+      title: rec.title,
+      artist: rec.artist,
+      duration: rec.duration || '3:00', // approximation
+      addedBy: (user as any).name || user.nickname || 'System',
+      thumbnail: rec.thumbnail
+    };
+    
+    // Update queue via useRoom hook (which expects Song[])
+    updateQueue([...queue, newSong]);
+
+    // If queue was empty (length <= 1 means we are on the last song or empty)
+    // We want to ensure the player picks it up.
+    // If playback finished, we might need to explicitly play.
+    setTimeout(() => {
+      // If we are at the end, move to next
+      if (!playbackState.isPlaying && playbackState.currentSongIndex >= queue.length - 1) {
+          updatePlayback({
+            currentSongIndex: queue.length, // Determine new index
+            isPlaying: true,
+            currentTime: 0
+          });
+      }
+    }, 500);
+    setRecommendations([]); // clear recs
+  };
 
   // Auto-play next song when current ends (no looping)
   const handleVideoEnded = useCallback(() => {
@@ -523,9 +623,49 @@ const Room = () => {
               </div>
             )}
 
+
             {!currentSong && (
               <div className="absolute inset-0 flex items-center justify-center bg-card/80 rounded-lg">
                 <p className="text-muted-foreground">Add songs to start!</p>
+              </div>
+            )}
+
+            {/* Recommendations Overlay (Up Next) */}
+            {!isPlaying && !playerError && queue.length <= 1 && recommendations.length > 0 && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md rounded-lg z-20 p-6 animate-in fade-in duration-300">
+                <div className="text-center mb-6">
+                  <h3 className="text-xl font-bold text-white mb-2">Up Next</h3>
+                  <p className="text-white/60 text-sm">Based on your last song</p>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl">
+                  {recommendations.map((rec) => (
+                    <div 
+                      key={rec.id}
+                      className="group relative aspect-video bg-black/50 rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                      onClick={() => addRecommendation(rec)}
+                    >
+                      <img src={rec.thumbnail} alt={rec.title} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
+                      <div className="absolute inset-0 flex flex-col justify-end p-3 bg-gradient-to-t from-black/90 to-transparent">
+                        <p className="text-white font-medium text-sm line-clamp-2 leading-tight">{rec.title}</p>
+                        <p className="text-white/60 text-xs mt-1 truncate">{rec.artist}</p>
+                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="bg-primary/90 text-primary-foreground rounded-full p-3 shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
+                          <Play className="w-6 h-6 fill-current" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <Button 
+                  variant="ghost" 
+                  className="mt-8 text-white/50 hover:text-white"
+                  onClick={() => setRecommendations([])}
+                >
+                  Cancel
+                </Button>
               </div>
             )}
 
@@ -666,4 +806,3 @@ const Room = () => {
   );
 };
 
-export default Room;
