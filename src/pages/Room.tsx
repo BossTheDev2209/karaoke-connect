@@ -54,7 +54,7 @@ const Room = () => {
   });
   
   // Theme context
-  const { setVideoId } = useTheme();
+  const { setVideoId, privacyMode } = useTheme();
 
   useEffect(() => {
     const stored = sessionStorage.getItem('karaoke_user');
@@ -141,7 +141,7 @@ const Room = () => {
     }
   }, [queue.length, playbackState.currentSongIndex, updatePlayback]);
 
-  const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded);
+  const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded, privacyMode);
 
   // Sync lock for synchronized playback start
   const handleSyncLockComplete = useCallback(() => {

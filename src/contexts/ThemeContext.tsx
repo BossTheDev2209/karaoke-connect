@@ -17,6 +17,8 @@ interface ThemeContextValue {
   setBackgroundEffect: (effect: BackgroundEffect) => void;
   karaokeFilterEnabled: boolean;
   setKaraokeFilterEnabled: (enabled: boolean) => void;
+  privacyMode: boolean;
+  setPrivacyMode: (enabled: boolean) => void;
   setVideoId: (videoId: string | null) => void;
   colors: ThemeColors;
 }
@@ -182,6 +184,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [preset, setPresetState] = useState<ThemePreset>('neon');
   const [backgroundEffect, setBackgroundEffectState] = useState<BackgroundEffect>('beat-sync');
   const [karaokeFilterEnabled, setKaraokeFilterEnabledState] = useState<boolean>(true);
+  const [privacyMode, setPrivacyModeState] = useState<boolean>(true); // Default ON for privacy
   const [videoId, setVideoId] = useState<string | null>(null);
   const [autoColors, setAutoColors] = useState<ThemeColors | null>(null);
   const extractionRef = useRef<string | null>(null);
@@ -213,6 +216,13 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     } catch {}
   }, []);
 
+  const setPrivacyMode = useCallback((enabled: boolean) => {
+    setPrivacyModeState(enabled);
+    try {
+      localStorage.setItem('karaoke_privacy_mode', enabled ? 'true' : 'false');
+    } catch {}
+  }, []);
+
   // Load saved preset on mount
   useEffect(() => {
     try {
@@ -229,6 +239,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       const savedFilter = localStorage.getItem('karaoke_search_filter');
       if (savedFilter !== null) {
         setKaraokeFilterEnabledState(savedFilter === 'true');
+      }
+
+      const savedPrivacy = localStorage.getItem('karaoke_privacy_mode');
+      if (savedPrivacy !== null) {
+        setPrivacyModeState(savedPrivacy === 'true');
       }
     } catch {}
   }, []);
@@ -265,6 +280,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       setBackgroundEffect, 
       karaokeFilterEnabled,
       setKaraokeFilterEnabled,
+      privacyMode,
+      setPrivacyMode,
       setVideoId, 
       colors 
     }}>

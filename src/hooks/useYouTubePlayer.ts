@@ -68,7 +68,8 @@ export const useYouTubePlayer = (
   containerId: string,
   videoId: string | null,
   onStateChange?: (isPlaying: boolean) => void,
-  onEnded?: () => void
+  onEnded?: () => void,
+  privacyMode: boolean = true
 ): UseYouTubePlayerReturn => {
   const playerRef = useRef<YouTubePlayer | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -185,6 +186,8 @@ export const useYouTubePlayer = (
           iv_load_policy: 3,
           playsinline: 1,
           cc_load_policy: 0, // Don't load captions by default
+          // Privacy mode: set origin to prevent watch history tracking
+          ...(privacyMode && { origin: window.location.origin }),
         },
         events: {
           onReady: () => {
@@ -233,7 +236,7 @@ export const useYouTubePlayer = (
         initPlayer();
       };
     }
-  }, [containerId, destroyPlayer, videoId]);
+  }, [containerId, destroyPlayer, videoId, privacyMode]);
 
   // Cleanup on unmount only (avoid destroying the player on every videoId change)
   useEffect(() => {

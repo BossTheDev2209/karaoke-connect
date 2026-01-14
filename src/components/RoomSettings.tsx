@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Palette, Sparkles, PartyPopper, Waves, Zap, Shapes, Music, Mic2 } from 'lucide-react';
+import { Settings, Palette, Sparkles, PartyPopper, Waves, Zap, Shapes, Music, Mic2, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -80,13 +80,15 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({
     backgroundEffect, 
     setBackgroundEffect,
     karaokeFilterEnabled,
-    setKaraokeFilterEnabled
+    setKaraokeFilterEnabled,
+    privacyMode,
+    setPrivacyMode
   } = useTheme();
 
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon">
+        <Button variant="outline" size="icon" className="bg-background/50 backdrop-blur-sm border-primary/20 hover:bg-primary/10 hover:border-primary/50 transition-all shadow-sm">
           <Settings className="w-4 h-4" />
         </Button>
       </SheetTrigger>
@@ -258,8 +260,32 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({
               />
             </div>
 
+            <div className="flex items-center justify-between p-4 rounded-lg bg-card border border-border">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-green-500/20 relative">
+                  <EyeOff className="w-5 h-5 text-green-500" />
+                  {privacyMode && (
+                    <div className="absolute inset-0 bg-green-500/30 rounded-full animate-ping" />
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="privacy-mode-toggle" className="text-sm font-medium">
+                    Privacy Mode
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Don't affect your YouTube recommendations
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="privacy-mode-toggle"
+                checked={privacyMode}
+                onCheckedChange={setPrivacyMode}
+              />
+            </div>
+
             <p className="text-xs text-muted-foreground text-center">
-              Celebrations auto-activate during special events like New Year, Christmas, and Halloween.
+              Privacy Mode prevents watched videos from appearing in your YouTube history and recommendations.
             </p>
           </TabsContent>
 
