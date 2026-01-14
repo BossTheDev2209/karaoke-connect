@@ -13,7 +13,7 @@ interface UseRoomReturn {
   channel: RealtimeChannel | null;
   updatePlayback: (state: Partial<PlaybackState>) => void;
   updateQueue: (queue: Song[]) => void;
-  updateSpeaking: (isSpeaking: boolean, audioLevel?: number) => void;
+  updateSpeaking: (isSpeaking: boolean, audioLevel?: number, score?: number) => void;
   updateMicStatus: (isMicEnabled: boolean) => void;
   updateMode: (mode: RoomMode, battleFormat?: BattleFormat) => void;
   updateTeams: (userTeams: Record<string, 'left' | 'right'>) => void;
@@ -197,11 +197,11 @@ export const useRoom = (
             setQueue(data.payload as Song[]);
             break;
           case 'speaking_update': {
-            const { userId, isSpeaking, audioLevel } = data.payload as { userId: string; isSpeaking: boolean; audioLevel?: number };
+            const { userId, isSpeaking, audioLevel, score } = data.payload as { userId: string; isSpeaking: boolean; audioLevel?: number; score?: number };
             // Skip our own updates - already applied locally for instant feedback
             if (userId === user?.id) break;
             setUsers(prev => prev.map(u => 
-              u.id === userId ? { ...u, isSpeaking, audioLevel } : u
+              u.id === userId ? { ...u, isSpeaking, audioLevel, score: score ?? u.score } : u
             ));
             break;
           }
@@ -534,7 +534,7 @@ export const useRoom = (
     });
   }, []);
 
-  const updateSpeaking = useCallback((isSpeaking: boolean, audioLevel?: number) => {
+  const updateSpeaking = useCallback((isSpeaking: boolean, audioLevel?: number, score?: number) => {
     if (!user) return;
     
     const now = Date.now();
@@ -551,7 +551,7 @@ export const useRoom = (
       
       // Optimistic local update - apply immediately for instant feedback
       setUsers(prev => prev.map(u => 
-        u.id === user.id ? { ...u, isSpeaking, audioLevel } : u
+        u.id === user.id ? { ...u, isSpeaking, audioLevel, score: score ?? u.score } : u
       ));
       
       // Round audioLevel to 2 decimals to reduce payload size
@@ -560,7 +560,7 @@ export const useRoom = (
       channelRef.current?.send({
         type: 'broadcast',
         event: 'room_event',
-        payload: { type: 'speaking_update', payload: { userId: user.id, isSpeaking, audioLevel: roundedLevel } },
+        payload: { type: 'speaking_update', payload: { userId: user.id, isSpeaking, audioLevel: roundedLevel, score } },
       });
     }
   }, [user]);

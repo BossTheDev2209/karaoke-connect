@@ -40,6 +40,8 @@ interface UseMicrophoneReturn {
   setCompressorThreshold: (val: number) => void;
   compressorRatio: number;
   setCompressorRatio: (val: number) => void;
+  isSinging: boolean;
+  singingScore: number;
 }
 
 // Helper to create reverb impulse response
@@ -135,11 +137,12 @@ const setOpusQuality = (sdp: string): string => {
 };
 
 export const useMicrophone = (
-  onSpeakingChange?: (isSpeaking: boolean, level: number) => void,
+  onSpeakingChange?: (isSpeaking: boolean, level: number, scoreIncrement?: number) => void,
   channel?: RealtimeChannel | null,
   currentUserId?: string,
   roomUsers?: { id: string }[],
-  userVolumes?: Record<string, number>
+  userVolumes?: Record<string, number>,
+  isLyricActive: boolean = false
 ): UseMicrophoneReturn => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [volume, setVolume] = useState(0);
@@ -171,6 +174,8 @@ export const useMicrophone = (
   const [micGain, setMicGain] = useState(0); // dB (Default 0dB)
   const [compressorThreshold, setCompressorThreshold] = useState(-8); // dB (raised from -24dB to fix low volume)
   const [compressorRatio, setCompressorRatio] = useState(4); // Milder ratio (was 12)
+  const [isSinging, setIsSinging] = useState(false);
+  const [singingScore, setSingingScore] = useState(0);
 
   // DSP Nodes Refs
   const inputGainRef = useRef<GainNode | null>(null);
@@ -188,6 +193,7 @@ export const useMicrophone = (
   const speechStartTimeRef = useRef(0);
   const speechEndTimeRef = useRef(0);
   const smoothedVolumeRef = useRef(0);
+  const singingScoreRef = useRef(0);
 
   // WebRTC state
   const peersRef = useRef<Map<string, PeerState>>(new Map());
@@ -303,14 +309,59 @@ export const useMicrophone = (
       lastUpdateRef.current = now;
       lastLevelRef.current = normalizedVolume;
       setIsSpeaking(speaking);
-      onSpeakingChange?.(speaking, speaking ? normalizedVolume : 0);
+      onSpeakingChange?.(speaking, speaking ? normalizedVolume : 0, 0);
+    }
+    
+    // --- Scoring Logic ---
+    // Execute scoring if mic is enabled and volume is decent
+    if (speaking && normalizedVolume > threshold) {
+      const timeData = new Float32Array(analyserRef.current.fftSize);
+      analyserRef.current.getFloatTimeDomainData(timeData);
+      
+      const zcr = getZCR(timeData);
+      const isTonal = detectPitch(timeData, sampleRate);
+      
+      // ZCR threshold: Singing usually < 0.1, Noise > 0.15
+      const isSingingDetected = isTonal && zcr < 0.15;
+      
+      setIsSinging(isSingingDetected);
+      
+      if (isSingingDetected) {
+        // Calculate Score Frame
+        // Base score: 10 points per second (assuming ~60fps analyze = ~0.16 pts/frame)
+        // With Rhythm:
+        // - Active Lyrics: 2x
+        // - Instrumental: 0.5x
+        let scoreIncrement = 0.5; // Base per frame
+        
+        if (isLyricActive) {
+          scoreIncrement = 1.0; // Bonus for singing during lyrics
+        } else {
+          scoreIncrement = 0.2; // Reduced for freestyle
+        }
+        
+        // Scale by volume/intensity (encourage projection)
+        scoreIncrement *= (0.5 + normalizedVolume); 
+        
+        // Update Ref and State
+        const newScore = singingScoreRef.current + scoreIncrement;
+        singingScoreRef.current = newScore;
+        setSingingScore(newScore);
+        
+        // Pass TOTAL SCORE to parent for broadcasting
+        if (shouldUpdate || Math.random() < 0.1) { // Throttle updates or send with speaking
+           onSpeakingChange?.(speaking, normalizedVolume, newScore);
+        }
+      }
+    } else {
+      setIsSinging(false);
     }
 
     // Analyze remote audio levels
     analyzeRemoteAudio();
 
     animationRef.current = requestAnimationFrame(analyze);
-  }, [onSpeakingChange, analyzeRemoteAudio, threshold]);
+  }, [onSpeakingChange, analyzeRemoteAudio, threshold, isLyricActive]);
 
   // Update Input Gain dynamically (Convert dB to Linear)
   useEffect(() => {
@@ -1120,5 +1171,61 @@ export const useMicrophone = (
     setCompressorThreshold,
     compressorRatio,
     setCompressorRatio,
+    isSinging,
+    singingScore
   };
+};
+
+// --- Audio Analysis Helpers ---
+
+// Calculate Zero Crossing Rate (Noise Detection)
+// High ZCR usually means fricatives (s, f, sh) or noise
+// Low ZCR usually means vowels or tonal sounds
+const getZCR = (buffer: Float32Array): number => {
+  let zcr = 0;
+  for (let i = 1; i < buffer.length; i++) {
+    const s1 = buffer[i - 1];
+    const s2 = buffer[i];
+    if ((s1 > 0 && s2 < 0) || (s1 < 0 && s2 > 0)) {
+      zcr++;
+    }
+  }
+  return zcr / buffer.length;
+};
+
+// Simple Autocorrelation for Pitch/Tone Detection
+// Returns true if a strong fundamental frequency is detected (singing)
+const detectPitch = (buffer: Float32Array, sampleRate: number): boolean => {
+  const rms = Math.sqrt(buffer.reduce((a, b) => a + b * b, 0) / buffer.length);
+  if (rms < 0.01) return false; // Too quiet
+
+  // Optimized range for human voice (85Hz - 1000Hz)
+  const minSamples = Math.floor(sampleRate / 1000); // ~44 at 44.1k
+  const maxSamples = Math.floor(sampleRate / 85);   // ~518 at 44.1k
+  
+  // We don't need exact pitch, just "is it tonal?"
+  // Tonal sounds have high correlation at the pitch period.
+  
+  let maxCorrelation = 0;
+  
+  // We scan a smaller window for performance
+  for (let offset = minSamples; offset < maxSamples; offset += 2) {
+    let correlation = 0;
+    // Compare first 256 samples
+    const limit = Math.min(buffer.length - offset, 256);
+    for (let i = 0; i < limit; i++) {
+      correlation += buffer[i] * buffer[i + offset];
+    }
+    
+    // Normalize by signal power (simplified)
+    if (correlation > maxCorrelation) {
+      maxCorrelation = correlation;
+    }
+  }
+
+  // Threshold: If correlation peak is > 60% of signal power squared (heuristic)
+  // For normalized cross-correlation 1.0 is perfect.
+  // Here we deal with raw amplitudes.
+  const power = rms * rms * 256; // approximate power over the window
+  return maxCorrelation > (power * 0.6);
 };

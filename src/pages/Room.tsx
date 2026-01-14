@@ -25,6 +25,7 @@ import { useAudioReactive } from '@/hooks/useAudioReactive';
 import { useVoteKick, VoteKickOverlay } from '@/components/VoteKick';
 import { VotingPanel } from '@/components/VotingPanel';
 import { SyncLockOverlay, useSyncLock } from '@/components/SyncLockOverlay';
+import { TeamBattleOverlay } from '@/components/TeamBattleOverlay';
 
 import { LogOut, Swords, Mic2, Lock, Sparkles, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -270,8 +271,17 @@ export default function Room() {
     setRecommendations([]); // clear recs
   };
 
+  // State for Team Battle Winner Screen
+  const [showWinnerScreen, setShowWinnerScreen] = useState(false);
+
   // Auto-play next song when current ends (no looping)
   const handleVideoEnded = useCallback(() => {
+    // Battle Mode Logic - Show Winner Screen first
+    if (roomMode === 'team-battle') {
+       setShowWinnerScreen(true);
+       return; // Don't advance yet
+    }
+
     const nextIndex = playbackState.currentSongIndex + 1;
     
     // Check if there's a pending sync for after-song mode
@@ -294,7 +304,20 @@ export default function Room() {
       updatePlayback({ isPlaying: false });
       setPendingSyncOnSongEnd(false); // Clear any pending if no more songs
     }
-  }, [queue.length, playbackState.currentSongIndex, updatePlayback, pendingSyncOnSongEnd, isHost]);
+  }, [queue.length, playbackState.currentSongIndex, updatePlayback, pendingSyncOnSongEnd, isHost, roomMode]);
+
+  const handleNextRound = useCallback(() => {
+     setShowWinnerScreen(false);
+     
+     // Advance to next song
+     const nextIndex = playbackState.currentSongIndex + 1;
+     if (nextIndex < queue.length) {
+       updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
+       // Optional: Reset scores here if we had a reset capability
+     } else {
+       updatePlayback({ isPlaying: false });
+     }
+  }, [playbackState.currentSongIndex, queue.length, updatePlayback]);
 
   const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable, error: playerError, clearError } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded, privacyMode);
 
@@ -416,8 +439,31 @@ export default function Room() {
     preloadedLyrics
   );
 
-  const handleSpeakingChange = useCallback((isSpeaking: boolean, level: number) => {
-    updateSpeaking(isSpeaking, level);
+  // Calculate if a lyric line is currently active (for Rhythm Scoring)
+  const isLyricActive = useMemo(() => {
+    if (!lyrics || lyrics.length === 0 || currentLineIndex === -1) return false;
+    if (currentLineIndex >= lyrics.length) return false;
+    
+    const currentLine = lyrics[currentLineIndex];
+    
+    // Determine end time
+    let endTime = Infinity;
+    if (currentLineIndex < lyrics.length - 1) {
+      endTime = lyrics[currentLineIndex + 1].time;
+    } else {
+      // Last line - assume 5 seconds
+      endTime = currentLine.time + 5;
+    }
+    
+    // Check if within time window and text is valid (not instrumental marker)
+    // Note: Some instrumentals might be marked in text, but usually empty/symbols
+    const isInstrumental = currentLine.text.includes('♪') || currentLine.text.includes('[') || !currentLine.text.trim();
+    
+    return currentTime >= currentLine.time && currentTime < endTime && !isInstrumental;
+  }, [lyrics, currentLineIndex, currentTime]);
+
+  const handleSpeakingChange = useCallback((isSpeaking: boolean, level: number, score?: number) => {
+    updateSpeaking(isSpeaking, level, score);
   }, [updateSpeaking]);
 
   const { 
@@ -450,7 +496,8 @@ export default function Room() {
     channel,
     user?.id,
     users,
-    userVolumes
+    userVolumes,
+    isLyricActive
   );
 
   const handleEqChange = (newSettings: number[]) => {
@@ -855,6 +902,14 @@ export default function Room() {
           onVolumeChange={handleUserVolumeChange}
         />
       </div>
+      
+      <TeamBattleOverlay 
+        users={users} 
+        isPlaying={playbackState.isPlaying && roomMode === 'team-battle'} 
+        onContinue={handleNextRound}
+        showWinner={showWinnerScreen}
+        isHost={isHost}
+      />
       
       {/* Vote Kick Overlay - Animated center popup */}
       {activeVoteKick && (
