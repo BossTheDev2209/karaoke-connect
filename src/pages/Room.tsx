@@ -45,7 +45,7 @@ export default function Room() {
   
   // Local user state (only set once on mount/entry)
   const [user] = useState<User>(() => {
-    const saved = localStorage.getItem('karaoke_user');
+    const saved = sessionStorage.getItem('karaoke_user') || localStorage.getItem('karaoke_user');
     return saved ? JSON.parse(saved) : {
       id: crypto.randomUUID(),
       nickname: `User ${Math.floor(Math.random() * 1000)}`,
@@ -93,9 +93,12 @@ export default function Room() {
   const startSyncLockRef = useRef<(() => void) | null>(null);
 
   // Handle user join for auto sync
-  const handleUserJoin = useCallback((userId: string) => {
+  const handleUserJoin = useCallback((joinedUser: User) => {
     console.log('User joined - checking auto sync settings:', autoSyncOnJoin);
     
+    // Notification
+    toast.success(`${joinedUser.nickname || 'A new user'} has joined the party! 🎉`);
+
     // Only host can trigger sync
     if (!isHostRef.current) return;
     
@@ -112,9 +115,6 @@ export default function Room() {
       console.log('Queuing sync for after current song ends');
       setPendingSyncOnSongEnd(true);
     }
-    
-    // Notification
-    toast.success('A new user has joined the party! 🎉');
   }, [autoSyncOnJoin]);
 
   const { 

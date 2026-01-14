@@ -40,7 +40,7 @@ const RTT_SAMPLE_COUNT = 5; // Average over 5 samples
 export const useRoom = (
   roomCode: string, 
   user: User | null,
-  onUserJoin?: (userId: string) => void
+  onUserJoin?: (user: User) => void
 ): UseRoomReturn => {
   const [users, setUsers] = useState<User[]>([]);
   const [queue, setQueue] = useState<Song[]>([]);
@@ -153,7 +153,7 @@ export const useRoom = (
         newUsers.forEach(newUser => {
           // Don't trigger for self
           if (newUser.id !== user?.id && onUserJoin) {
-            onUserJoin(newUser.id);
+            onUserJoin(newUser);
           }
         });
 
