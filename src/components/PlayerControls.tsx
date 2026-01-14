@@ -31,6 +31,7 @@ interface PlayerControlsProps {
   onMuteToggle: () => void;
   onMicToggle: () => void;
   onSync: () => void;
+  isHost?: boolean;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -50,6 +51,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   onMuteToggle,
   onMicToggle,
   onSync,
+  isHost = false
 }) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -88,15 +90,17 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           {isMicEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
         </Button>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onSync}
-          className="rounded-full"
-          title="Sync with room"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </Button>
+        {isHost && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onSync}
+            className="rounded-full"
+            title="Sync with room"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+        )}
 
         <Button
           variant="ghost"

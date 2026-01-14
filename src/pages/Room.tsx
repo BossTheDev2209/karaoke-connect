@@ -30,6 +30,7 @@ import { TeamBattleOverlay } from '@/components/TeamBattleOverlay';
 import { LogOut, Swords, Mic2, Lock, Sparkles, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 
 
@@ -108,10 +109,12 @@ export default function Room() {
         startSyncLockRef.current?.();
       }, 1000);
     } else if (autoSyncOnJoin === 'after-song' && playbackStateRef.current.isPlaying) {
-      // Queue sync for after song ends
       console.log('Queuing sync for after current song ends');
       setPendingSyncOnSongEnd(true);
     }
+    
+    // Notification
+    toast.success('A new user has joined the party! 🎉');
   }, [autoSyncOnJoin]);
 
   const { 
@@ -874,6 +877,7 @@ export default function Room() {
             onMuteToggle={isMuted ? unmute : mute}
             onMicToggle={handleMicToggle}
             onSync={requestSync}
+            isHost={isHost}
           />
 
           
