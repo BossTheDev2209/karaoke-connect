@@ -22,6 +22,8 @@ interface ThemeContextValue {
   setPrivacyMode: (enabled: boolean) => void;
   autoSyncOnJoin: AutoSyncMode;
   setAutoSyncOnJoin: (mode: AutoSyncMode) => void;
+  hideLyricsWhenNotFound: boolean;
+  setHideLyricsWhenNotFound: (hide: boolean) => void;
   setVideoId: (videoId: string | null) => void;
   colors: ThemeColors;
 }
@@ -189,6 +191,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [karaokeFilterEnabled, setKaraokeFilterEnabledState] = useState<boolean>(true);
   const [privacyMode, setPrivacyModeState] = useState<boolean>(true); // Default ON for privacy
   const [autoSyncOnJoin, setAutoSyncOnJoinState] = useState<AutoSyncMode>('off');
+  const [hideLyricsWhenNotFound, setHideLyricsWhenNotFoundState] = useState<boolean>(false);
   const [videoId, setVideoId] = useState<string | null>(null);
   const [autoColors, setAutoColors] = useState<ThemeColors | null>(null);
   const extractionRef = useRef<string | null>(null);
@@ -234,6 +237,13 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     } catch {}
   }, []);
 
+  const setHideLyricsWhenNotFound = useCallback((hide: boolean) => {
+    setHideLyricsWhenNotFoundState(hide);
+    try {
+      localStorage.setItem('karaoke_hide_lyrics_missing', hide ? 'true' : 'false');
+    } catch {}
+  }, []);
+
   // Load saved preset on mount
   useEffect(() => {
     try {
@@ -260,6 +270,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       const savedAutoSync = localStorage.getItem('karaoke_auto_sync_on_join') as AutoSyncMode | null;
       if (savedAutoSync && ['off', 'immediate', 'after-song'].includes(savedAutoSync)) {
         setAutoSyncOnJoinState(savedAutoSync);
+      }
+
+      const savedHideLyrics = localStorage.getItem('karaoke_hide_lyrics_missing');
+      if (savedHideLyrics !== null) {
+        setHideLyricsWhenNotFoundState(savedHideLyrics === 'true');
       }
     } catch {}
   }, []);
@@ -300,6 +315,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       setPrivacyMode,
       autoSyncOnJoin,
       setAutoSyncOnJoin,
+      hideLyricsWhenNotFound,
+      setHideLyricsWhenNotFound,
       setVideoId, 
       colors 
     }}>

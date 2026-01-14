@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Palette, Sparkles, PartyPopper, Waves, Zap, Shapes, Music, Mic2, EyeOff } from 'lucide-react';
+import { Settings, Palette, Sparkles, PartyPopper, Waves, Zap, Shapes, Music, Mic2, EyeOff, AlignVerticalJustifyCenter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -84,7 +84,9 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({
     privacyMode,
     setPrivacyMode,
     autoSyncOnJoin,
-    setAutoSyncOnJoin
+    setAutoSyncOnJoin,
+    hideLyricsWhenNotFound,
+    setHideLyricsWhenNotFound
   } = useTheme();
 
   return (
@@ -283,6 +285,27 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({
                 id="privacy-mode-toggle"
                 checked={privacyMode}
                 onCheckedChange={setPrivacyMode}
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-4 rounded-lg bg-card border border-border">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-primary/20 relative">
+                  <AlignVerticalJustifyCenter className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <Label htmlFor="hide-lyrics-toggle" className="text-sm font-medium">
+                    Hide Missing Lyrics
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Expand video if no lyrics found
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="hide-lyrics-toggle"
+                checked={hideLyricsWhenNotFound}
+                onCheckedChange={setHideLyricsWhenNotFound}
               />
             </div>
 

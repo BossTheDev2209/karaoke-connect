@@ -36,7 +36,7 @@ export default function Room() {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
   // Theme settings including autoSyncOnJoin
-  const { privacyMode, setVideoId, autoSyncOnJoin } = useTheme();
+  const { privacyMode, setVideoId, autoSyncOnJoin, hideLyricsWhenNotFound } = useTheme();
   
   // State for pending sync after song ends
   const [pendingSyncOnSongEnd, setPendingSyncOnSongEnd] = useState(false);
@@ -780,21 +780,25 @@ export default function Room() {
               </div>
             )}
           </div>
-          <div className="card-karaoke h-[140px] shrink-0">
-            <LyricsDisplay 
-              lyrics={lyrics} 
-              currentLineIndex={currentLineIndex} 
-              currentTime={currentTime} 
-              isLoading={lyricsLoading} 
-              error={lyricsError}
-              offset={lyricsOffset}
-              onOffsetChange={setLyricsOffset}
-              areCaptionsEnabled={areCaptionsEnabled}
-              hasCaptionsAvailable={hasCaptionsAvailable}
-              onEnableCaptions={enableCaptions}
-              onDisableCaptions={disableCaptions}
-            />
-          </div>
+          
+          {/* Lyrics Display - Hide if option enabled and no lyrics found */}
+          {!(hideLyricsWhenNotFound && (lyricsError || lyrics.length === 0)) && (
+            <div className="card-karaoke h-[140px] shrink-0">
+              <LyricsDisplay 
+                lyrics={lyrics} 
+                currentLineIndex={currentLineIndex} 
+                currentTime={currentTime} 
+                isLoading={lyricsLoading} 
+                error={lyricsError}
+                offset={lyricsOffset}
+                onOffsetChange={setLyricsOffset}
+                areCaptionsEnabled={areCaptionsEnabled}
+                hasCaptionsAvailable={hasCaptionsAvailable}
+                onEnableCaptions={enableCaptions}
+                onDisableCaptions={disableCaptions}
+              />
+            </div>
+          )}
         </div>
 
         {/* Controls panel */}
