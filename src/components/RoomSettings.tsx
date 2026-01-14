@@ -82,7 +82,9 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({
     karaokeFilterEnabled,
     setKaraokeFilterEnabled,
     privacyMode,
-    setPrivacyMode
+    setPrivacyMode,
+    autoSyncOnJoin,
+    setAutoSyncOnJoin
   } = useTheme();
 
   return (
@@ -287,6 +289,55 @@ export const RoomSettings: React.FC<RoomSettingsProps> = ({
             <p className="text-xs text-muted-foreground text-center">
               Privacy Mode prevents watched videos from appearing in your YouTube history and recommendations.
             </p>
+
+            {/* Auto Sync on Join */}
+            <div className="space-y-3 pt-2 border-t border-border">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M22 21v-2a4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 0 0 1 0 7.75"/>
+                </svg>
+                Auto Sync on Join
+              </Label>
+              <Select 
+                value={autoSyncOnJoin} 
+                onValueChange={(value: any) => setAutoSyncOnJoin(value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="off">
+                    <div className="flex items-center gap-2">
+                      <span>Off</span>
+                      <span className="text-muted-foreground text-xs">- Manual sync only</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="immediate">
+                    <div className="flex items-center gap-2">
+                      <span>Immediate</span>
+                      <span className="text-muted-foreground text-xs">- Sync when someone joins</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="after-song">
+                    <div className="flex items-center gap-2">
+                      <span>After Song</span>
+                      <span className="text-muted-foreground text-xs">- Wait for song to end</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground px-1">
+                {autoSyncOnJoin === 'immediate' 
+                  ? 'Triggers Sync Lock countdown immediately when a new user joins.'
+                  : autoSyncOnJoin === 'after-song'
+                  ? 'Waits for the current song to finish, then syncs everyone before the next song.'
+                  : 'Sync Lock can be triggered manually by the host (Host-only setting).'
+                }
+              </p>
+            </div>
           </TabsContent>
 
 

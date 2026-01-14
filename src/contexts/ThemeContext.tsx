@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 // Theme presets
 export type ThemePreset = 'auto' | 'neon' | 'ocean' | 'sunset' | 'forest' | 'galaxy' | 'retro' | 'midnight' | 'candy' | 'ember';
 export type BackgroundEffect = 'none' | 'beat-sync' | 'particles' | 'neon-grid' | 'wave-form';
+export type AutoSyncMode = 'off' | 'immediate' | 'after-song';
 
 interface ThemeColors {
   primary: string;   // HSL format: "280 100% 65%"
@@ -19,6 +20,8 @@ interface ThemeContextValue {
   setKaraokeFilterEnabled: (enabled: boolean) => void;
   privacyMode: boolean;
   setPrivacyMode: (enabled: boolean) => void;
+  autoSyncOnJoin: AutoSyncMode;
+  setAutoSyncOnJoin: (mode: AutoSyncMode) => void;
   setVideoId: (videoId: string | null) => void;
   colors: ThemeColors;
 }
@@ -185,6 +188,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [backgroundEffect, setBackgroundEffectState] = useState<BackgroundEffect>('beat-sync');
   const [karaokeFilterEnabled, setKaraokeFilterEnabledState] = useState<boolean>(true);
   const [privacyMode, setPrivacyModeState] = useState<boolean>(true); // Default ON for privacy
+  const [autoSyncOnJoin, setAutoSyncOnJoinState] = useState<AutoSyncMode>('off');
   const [videoId, setVideoId] = useState<string | null>(null);
   const [autoColors, setAutoColors] = useState<ThemeColors | null>(null);
   const extractionRef = useRef<string | null>(null);
@@ -223,6 +227,13 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     } catch {}
   }, []);
 
+  const setAutoSyncOnJoin = useCallback((mode: AutoSyncMode) => {
+    setAutoSyncOnJoinState(mode);
+    try {
+      localStorage.setItem('karaoke_auto_sync_on_join', mode);
+    } catch {}
+  }, []);
+
   // Load saved preset on mount
   useEffect(() => {
     try {
@@ -244,6 +255,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       const savedPrivacy = localStorage.getItem('karaoke_privacy_mode');
       if (savedPrivacy !== null) {
         setPrivacyModeState(savedPrivacy === 'true');
+      }
+
+      const savedAutoSync = localStorage.getItem('karaoke_auto_sync_on_join') as AutoSyncMode | null;
+      if (savedAutoSync && ['off', 'immediate', 'after-song'].includes(savedAutoSync)) {
+        setAutoSyncOnJoinState(savedAutoSync);
       }
     } catch {}
   }, []);
@@ -282,6 +298,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       setKaraokeFilterEnabled,
       privacyMode,
       setPrivacyMode,
+      autoSyncOnJoin,
+      setAutoSyncOnJoin,
       setVideoId, 
       colors 
     }}>

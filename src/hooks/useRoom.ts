@@ -37,7 +37,11 @@ const SYNC_HEARTBEAT_INTERVAL = 5000; // Host sends sync every 5 seconds
 const RTT_PING_INTERVAL = 10000; // Measure RTT every 10 seconds
 const RTT_SAMPLE_COUNT = 5; // Average over 5 samples
 
-export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
+export const useRoom = (
+  roomCode: string, 
+  user: User | null,
+  onUserJoin?: (userId: string) => void
+): UseRoomReturn => {
   const [users, setUsers] = useState<User[]>([]);
   const [queue, setQueue] = useState<Song[]>([]);
   const [playbackState, setPlaybackState] = useState<PlaybackState>(DEFAULT_PLAYBACK);
@@ -143,6 +147,15 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
       })
       .on('presence', { event: 'join' }, ({ newPresences }) => {
         console.log('User joined:', newPresences);
+
+        // Notify parent component about new user joining
+        const newUsers = newPresences as unknown as User[];
+        newUsers.forEach(newUser => {
+          // Don't trigger for self
+          if (newUser.id !== user?.id && onUserJoin) {
+            onUserJoin(newUser.id);
+          }
+        });
 
         // If we're the host and someone joins, proactively push our current state.
         // (Don't gate on queue length; new users still need mode/battleFormat/empty queue.)

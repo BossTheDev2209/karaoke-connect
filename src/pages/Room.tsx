@@ -35,8 +35,11 @@ import { cn } from '@/lib/utils';
 export default function Room() {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
-  // Fix: destructure setVideoId, remove currentTheme (doesn't exist)
-  const { privacyMode, setVideoId } = useTheme();
+  // Theme settings including autoSyncOnJoin
+  const { privacyMode, setVideoId, autoSyncOnJoin } = useTheme();
+  
+  // State for pending sync after song ends
+  const [pendingSyncOnSongEnd, setPendingSyncOnSongEnd] = useState(false);
   
   // Local user state (only set once on mount/entry)
   const [user] = useState<User>(() => {
@@ -82,6 +85,34 @@ export default function Room() {
   //   }
   // }, [navigate]);
 
+  // Refs for auto sync logic (to avoid circular dependency)
+  const isHostRef = useRef(false);
+  const playbackStateRef = useRef({ isPlaying: false });
+  const startSyncLockRef = useRef<(() => void) | null>(null);
+
+  // Handle user join for auto sync
+  const handleUserJoin = useCallback((userId: string) => {
+    console.log('User joined - checking auto sync settings:', autoSyncOnJoin);
+    
+    // Only host can trigger sync
+    if (!isHostRef.current) return;
+    
+    // Check if there's a current song playing
+    if (autoSyncOnJoin === 'immediate' && playbackStateRef.current.isPlaying) {
+      // Immediate sync
+      console.log('Triggering immediate sync for new user');
+      setPendingSyncOnSongEnd(false);
+      // Small delay to ensure new user is connected
+      setTimeout(() => {
+        startSyncLockRef.current?.();
+      }, 1000);
+    } else if (autoSyncOnJoin === 'after-song' && playbackStateRef.current.isPlaying) {
+      // Queue sync for after song ends
+      console.log('Queuing sync for after current song ends');
+      setPendingSyncOnSongEnd(true);
+    }
+  }, [autoSyncOnJoin]);
+
   const { 
     users, 
     queue, 
@@ -101,7 +132,16 @@ export default function Room() {
     seek, // Destructure new seek function
     networkLatency,
     clockOffset
-  } = useRoom(code || '', user);
+  } = useRoom(code || '', user, handleUserJoin);
+
+  // Keep refs in sync
+  useEffect(() => {
+    isHostRef.current = isHost;
+  }, [isHost]);
+
+  useEffect(() => {
+    playbackStateRef.current = playbackState;
+  }, [playbackState]);
 
   // Derived state
   const currentSong = useMemo(() => 
@@ -233,13 +273,28 @@ export default function Room() {
   // Auto-play next song when current ends (no looping)
   const handleVideoEnded = useCallback(() => {
     const nextIndex = playbackState.currentSongIndex + 1;
+    
+    // Check if there's a pending sync for after-song mode
+    if (pendingSyncOnSongEnd && isHost && nextIndex < queue.length) {
+      // Clear pending flag
+      setPendingSyncOnSongEnd(false);
+      // First advance to next song
+      updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
+      // Then trigger sync lock after a short delay
+      setTimeout(() => {
+        startSyncLockRef.current?.();
+      }, 500);
+      return;
+    }
+    
     if (nextIndex < queue.length) {
       updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
     } else {
       // End of queue - stop playing
       updatePlayback({ isPlaying: false });
+      setPendingSyncOnSongEnd(false); // Clear any pending if no more songs
     }
-  }, [queue.length, playbackState.currentSongIndex, updatePlayback]);
+  }, [queue.length, playbackState.currentSongIndex, updatePlayback, pendingSyncOnSongEnd, isHost]);
 
   const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable, error: playerError, clearError } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded, privacyMode);
 
@@ -256,6 +311,11 @@ export default function Room() {
     isHost,
     user?.id || ''
   );
+
+  // Store startSyncLock in ref for use in handleUserJoin callback
+  useEffect(() => {
+    startSyncLockRef.current = startSyncLock;
+  }, [startSyncLock]);
 
 
 
