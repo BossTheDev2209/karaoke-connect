@@ -46,6 +46,7 @@ export const useRoom = (
   const [queue, setQueue] = useState<Song[]>([]);
   const [playbackState, setPlaybackState] = useState<PlaybackState>(DEFAULT_PLAYBACK);
   const [isConnected, setIsConnected] = useState(false);
+  const [isHost, setIsHost] = useState(false);
   const [roomMode, setRoomMode] = useState<RoomMode>('free-sing');
   const [battleFormat, setBattleFormat] = useState<BattleFormat | undefined>();
   const [networkLatency, setNetworkLatency] = useState(0);
@@ -140,9 +141,12 @@ export const useRoom = (
           const sortedByJoinTime = [...presentUsers].sort(
             (a, b) => (a.joinedAt || 0) - (b.joinedAt || 0)
           );
-          isHostRef.current = sortedByJoinTime[0]?.id === user.id;
+          const newIsHost = sortedByJoinTime[0]?.id === user.id;
+          isHostRef.current = newIsHost;
+          setIsHost(newIsHost);
         } else {
           isHostRef.current = false;
+          setIsHost(false);
         }
       })
       .on('presence', { event: 'join' }, ({ newPresences }) => {
@@ -657,7 +661,7 @@ export const useRoom = (
     battleFormat,
     currentUser: user,
     isConnected,
-    isHost: isHostRef.current,
+    isHost,
     channel: channelRef.current,
     updatePlayback,
     updateQueue,
