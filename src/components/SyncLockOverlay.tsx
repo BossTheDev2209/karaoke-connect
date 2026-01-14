@@ -140,7 +140,7 @@ export const useSyncLock = (
   const [isSyncLockActive, setIsSyncLockActive] = useState(false);
 
   const startSyncLock = useCallback(async () => {
-    if (!channel) return;
+    if (!channel || !isHost) return;
 
     // Broadcast start
     channel.send({
