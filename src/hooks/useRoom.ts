@@ -636,22 +636,9 @@ export const useRoom = (
     }
   }, [roomMode, users.length, updateTeams]);
 
-  // Scoring logic for Team Battle
-  useEffect(() => {
-    if (roomMode !== 'team-battle') return;
-
-    const interval = setInterval(() => {
-      setUsers(prev => prev.map(u => {
-        if (u.isSpeaking && (u.audioLevel || 0) > 0.05) {
-          const points = Math.floor((u.audioLevel || 0) * 10);
-          return { ...u, score: (u.score || 0) + points };
-        }
-        return u;
-      }));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [roomMode]);
+  // Scoring for Team Battle is handled via useMicrophone's singing detection
+  // which properly detects tonal singing vs mic noise using ZCR and pitch detection.
+  // Scores are broadcast through the speaking_update event with the accumulated score.
 
   return {
     users,

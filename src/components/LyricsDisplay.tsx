@@ -20,6 +20,7 @@ interface LyricsDisplayProps {
   error: string | null;
   offset?: number;
   onOffsetChange?: (offset: number) => void;
+  onSeek?: (time: number) => void;
   areCaptionsEnabled?: boolean;
   hasCaptionsAvailable?: boolean;
   onEnableCaptions?: () => void;
@@ -94,13 +95,14 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   error,
   offset = 0,
   onOffsetChange,
+  onSeek,
   areCaptionsEnabled = false,
   hasCaptionsAvailable = false,
   onEnableCaptions,
   onDisableCaptions,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const activeLineRef = useRef<HTMLDivElement>(null);
+  const activeLineRef = useRef<HTMLButtonElement>(null);
   const loadingProgress = useLoadingProgress(isLoading);
   const hasPlainLyrics = isPlainLyrics(lyrics);
   const [showRomanization, setShowRomanization] = useState(true);
@@ -332,16 +334,26 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
             const romanization = showRomanization ? getRomanizedText(line.text) : null;
             const isActive = !hasPlainLyrics && index === currentLineIndex;
             const isPast = !hasPlainLyrics && index < currentLineIndex;
+            const isClickable = !hasPlainLyrics && onSeek && line.time !== undefined;
             
             return (
-              <div
+              <button
                 key={index}
+                type="button"
                 ref={index === currentLineIndex ? activeLineRef : null}
                 className={cn(
-                  'lyric-line transition-all duration-300',
+                  'lyric-line transition-all duration-300 w-full text-center',
                   isActive && 'active',
-                  isPast && 'past'
+                  isPast && 'past',
+                  isClickable && 'cursor-pointer hover:bg-primary/10 hover:scale-[1.02] rounded-lg px-2 py-0.5 -mx-2'
                 )}
+                onClick={() => {
+                  if (isClickable) {
+                    onSeek(line.time);
+                  }
+                }}
+                disabled={!isClickable}
+                title={isClickable ? `Jump to ${Math.floor(line.time / 60)}:${String(Math.floor(line.time % 60)).padStart(2, '0')}` : undefined}
               >
                 <div>{line.text}</div>
                 {romanization && (
@@ -352,7 +364,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
                     {romanization}
                   </div>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>

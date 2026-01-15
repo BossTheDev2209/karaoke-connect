@@ -853,6 +853,7 @@ export default function Room() {
                 error={lyricsError}
                 offset={lyricsOffset}
                 onOffsetChange={setLyricsOffset}
+                onSeek={handleSeek}
                 areCaptionsEnabled={areCaptionsEnabled}
                 hasCaptionsAvailable={hasCaptionsAvailable}
                 onEnableCaptions={enableCaptions}
