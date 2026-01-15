@@ -274,57 +274,40 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
   return (
     <div className="glass rounded-2xl p-6 bg-gradient-to-t from-background/80 to-transparent backdrop-blur-xl">
       {roomMode === 'team-battle' ? (
-        <div className="flex flex-col gap-8">
-          <div className="flex flex-col lg:flex-row items-stretch justify-between gap-6 lg:gap-0 min-h-[200px]">
-            {/* Left Team */}
-            <div className="flex-1 flex flex-col gap-6 pr-0 lg:pr-8 border-b lg:border-b-0 lg:border-r border-blue-500/20 pb-6 lg:pb-0">
-              <div className="flex items-center justify-between h-12">
-                <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Team Blue</span>
-                <div className="flex flex-col items-end">
-                  <span className="text-3xl font-black text-blue-500 leading-none">
-                    {leftTeam.reduce((acc, u) => acc + (u.score || 0), 0)}
-                  </span>
-                  <span className="text-[10px] text-blue-400/40 uppercase font-black tracking-tighter">Points</span>
-                </div>
+        <div className="flex flex-col gap-4">
+          {/* Team Battle Singers - Simplified layout without duplicate scores */}
+          <div className="flex flex-col lg:flex-row items-stretch justify-between gap-4 lg:gap-8">
+            {/* Left Team (Pink) */}
+            <div className="flex-1 flex flex-col gap-3 p-4 rounded-xl bg-gradient-to-br from-pink-500/10 to-purple-500/5 border border-pink-500/20">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-gradient-to-r from-pink-500 to-purple-500" />
+                <span className="text-xs font-black text-pink-400 uppercase tracking-widest">Team Pink</span>
               </div>
               
-              <div className="flex-1 flex items-start justify-start gap-4 flex-wrap">
+              <div className="flex items-center justify-start gap-3 flex-wrap min-h-[80px]">
                 {leftTeam.length > 0 ? (
                   leftTeam.map(renderUser)
                 ) : (
-                  <div className="w-full h-32 flex items-center justify-center border-2 border-dashed border-blue-500/10 rounded-2xl bg-blue-500/5 self-start">
-                    <p className="text-[10px] text-blue-500/30 uppercase font-bold tracking-widest">Awaiting Blue Fleet</p>
+                  <div className="w-full h-20 flex items-center justify-center border-2 border-dashed border-pink-500/20 rounded-xl bg-pink-500/5">
+                    <p className="text-[10px] text-pink-500/40 uppercase font-bold tracking-widest">Waiting...</p>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* VS Divider Container */}
-            <div className="flex flex-col items-center justify-center px-4 relative">
-              <div className="w-20 h-20 rounded-full bg-background/60 backdrop-blur-xl flex items-center justify-center border-2 border-primary shadow-[0_0_30px_rgba(var(--primary),0.2)] relative group cursor-default transition-transform hover:scale-110 z-10">
-                <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping [animation-duration:3s]" />
-                <span className="text-2xl font-black italic tracking-tighter text-primary z-10">VS</span>
-              </div>
-            </div>
-
-            {/* Right Team */}
-            <div className="flex-1 flex flex-col gap-6 pl-0 lg:pl-8 lg:border-l border-red-500/20 text-right pt-2 lg:pt-0">
-              <div className="flex items-center justify-between h-12">
-                <div className="flex flex-col items-start text-left">
-                  <span className="text-3xl font-black text-red-500 leading-none">
-                    {rightTeam.reduce((acc, u) => acc + (u.score || 0), 0)}
-                  </span>
-                  <span className="text-[10px] text-red-400/40 uppercase font-black tracking-tighter">Points</span>
-                </div>
-                <span className="text-[10px] font-black text-red-400 uppercase tracking-[0.2em]">Team Red</span>
+            {/* Right Team (Blue) */}
+            <div className="flex-1 flex flex-col gap-3 p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/5 border border-blue-500/20">
+              <div className="flex items-center justify-end gap-2">
+                <span className="text-xs font-black text-blue-400 uppercase tracking-widest">Team Blue</span>
+                <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
               </div>
               
-              <div className="flex-1 flex items-start justify-end gap-4 flex-wrap">
+              <div className="flex items-center justify-end gap-3 flex-wrap min-h-[80px]">
                 {rightTeam.length > 0 ? (
                   rightTeam.map(renderUser)
                 ) : (
-                  <div className="w-full h-32 flex items-center justify-center border-2 border-dashed border-red-500/10 rounded-2xl bg-red-500/5 self-start">
-                    <p className="text-[10px] text-red-500/30 uppercase font-bold tracking-widest">Awaiting Red Legion</p>
+                  <div className="w-full h-20 flex items-center justify-center border-2 border-dashed border-blue-500/20 rounded-xl bg-blue-500/5">
+                    <p className="text-[10px] text-blue-500/40 uppercase font-bold tracking-widest">Waiting...</p>
                   </div>
                 )}
               </div>
@@ -332,9 +315,9 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
           </div>
           
           {unassigned.length > 0 && (
-            <div className="pt-6 border-t border-white/5">
-              <p className="text-[10px] text-center text-muted-foreground uppercase tracking-[0.3em] font-bold mb-4 opacity-50">Bench / Unassigned</p>
-              <div className="flex items-end justify-center gap-6 flex-wrap">
+            <div className="pt-4 border-t border-white/5">
+              <p className="text-[10px] text-center text-muted-foreground uppercase tracking-[0.2em] font-bold mb-3 opacity-50">Bench</p>
+              <div className="flex items-end justify-center gap-4 flex-wrap">
                 {unassigned.map(renderUser)}
               </div>
             </div>

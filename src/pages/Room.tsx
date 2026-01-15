@@ -255,23 +255,23 @@ export default function Room() {
       thumbnail: rec.thumbnail
     };
     
-    // Update queue via useRoom hook (which expects Song[])
-    updateQueue([...queue, newSong]);
+    // Calculate the new song's index BEFORE updating queue
+    const newSongIndex = queue.length;
+    const newQueue = [...queue, newSong];
+    
+    // Update queue via useRoom hook
+    updateQueue(newQueue);
+    
+    // Clear recommendations immediately
+    setRecommendations([]);
 
-    // If queue was empty (length <= 1 means we are on the last song or empty)
-    // We want to ensure the player picks it up.
-    // If playback finished, we might need to explicitly play.
-    setTimeout(() => {
-      // If we are at the end, move to next
-      if (!playbackState.isPlaying && playbackState.currentSongIndex >= queue.length - 1) {
-          updatePlayback({
-            currentSongIndex: queue.length, // Determine new index
-            isPlaying: true,
-            currentTime: 0
-          });
-      }
-    }, 500);
-    setRecommendations([]); // clear recs
+    // Immediately start playing the new song
+    // Use the pre-calculated index since state update is async
+    updatePlayback({
+      currentSongIndex: newSongIndex,
+      isPlaying: true,
+      currentTime: 0
+    });
   };
 
   // State for Team Battle Winner Screen
@@ -755,10 +755,16 @@ export default function Room() {
                 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl">
                   {recommendations.map((rec) => (
-                    <div 
+                    <button 
                       key={rec.id}
-                      className="group relative aspect-video bg-black/50 rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
-                      onClick={() => addRecommendation(rec)}
+                      type="button"
+                      className="group relative aspect-video bg-black/50 rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all text-left"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('[Recommendations] Adding song to queue:', rec.title, rec.videoId);
+                        addRecommendation(rec);
+                      }}
                     >
                       <img src={rec.thumbnail} alt={rec.title} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
                       <div className="absolute inset-0 flex flex-col justify-end p-3 bg-gradient-to-t from-black/90 to-transparent">
@@ -770,7 +776,7 @@ export default function Room() {
                           <Play className="w-6 h-6 fill-current" />
                         </div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
                 
