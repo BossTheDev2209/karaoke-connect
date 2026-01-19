@@ -26,6 +26,7 @@ import { useVoteKick, VoteKickOverlay } from '@/components/VoteKick';
 import { VotingPanel } from '@/components/VotingPanel';
 import { SyncLockOverlay, useSyncLock } from '@/components/SyncLockOverlay';
 import { TeamBattleOverlay } from '@/components/TeamBattleOverlay';
+import { LyricsSelector } from '@/components/LyricsSelector';
 
 import { LogOut, Swords, Mic2, Lock, Sparkles, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -440,12 +441,49 @@ export default function Room() {
   // Get preloaded lyrics for current song
   const preloadedLyrics = currentSong ? getLyricsForSong(currentSong.id) : undefined;
 
-  const { lyrics, currentLineIndex, isLoading: lyricsLoading, error: lyricsError, offset: lyricsOffset, setOffset: setLyricsOffset } = useLyrics(
+  const { 
+    lyrics, 
+    currentLineIndex, 
+    isLoading: lyricsLoading, 
+    error: lyricsError, 
+    offset: lyricsOffset, 
+    setOffset: setLyricsOffset,
+    // NEW: Multiple matches support
+    allMatches,
+    selectedMatchIndex,
+    selectMatch,
+    source: lyricsSource,
+  } = useLyrics(
     currentSong?.artist || null,
     currentSong?.title || null,
     currentTime,
     preloadedLyrics
   );
+
+  // State for showing lyrics selector
+  const [showLyricsSelector, setShowLyricsSelector] = useState(false);
+  const [hasShownSelectorForSong, setHasShownSelectorForSong] = useState<string | null>(null);
+
+  // Show lyrics selector when song changes and there are multiple matches
+  useEffect(() => {
+    if (currentSong?.id && allMatches.length > 1 && hasShownSelectorForSong !== currentSong.id) {
+      // Only show selector once per song and if there are alternatives
+      setShowLyricsSelector(true);
+      setHasShownSelectorForSong(currentSong.id);
+    }
+  }, [currentSong?.id, allMatches.length, hasShownSelectorForSong]);
+
+  const handleLyricsConfirm = useCallback(() => {
+    setShowLyricsSelector(false);
+  }, []);
+
+  const handleLyricsSkip = useCallback(() => {
+    setShowLyricsSelector(false);
+    // Enable YouTube CC as fallback
+    if (hasCaptionsAvailable) {
+      enableCaptions();
+    }
+  }, [hasCaptionsAvailable, enableCaptions]);
 
   // Calculate if a lyric line is currently active (for Rhythm Scoring)
   const isLyricActive = useMemo(() => {
@@ -858,6 +896,9 @@ export default function Room() {
                 hasCaptionsAvailable={hasCaptionsAvailable}
                 onEnableCaptions={enableCaptions}
                 onDisableCaptions={disableCaptions}
+                source={lyricsSource}
+                hasMultipleMatches={allMatches.length > 1}
+                onChangeLyrics={() => setShowLyricsSelector(true)}
               />
             </div>
           )}
@@ -938,6 +979,19 @@ export default function Room() {
           hasVoted={hasVoted}
           onVoteYes={voteYes}
           onVoteNo={voteNo}
+        />
+      )}
+
+      {/* Lyrics Selector - Show when multiple matches available */}
+      {showLyricsSelector && allMatches.length > 1 && (
+        <LyricsSelector
+          matches={allMatches}
+          selectedIndex={selectedMatchIndex}
+          onSelect={selectMatch}
+          onConfirm={handleLyricsConfirm}
+          onSkip={handleLyricsSkip}
+          songTitle={currentSong?.title || 'Unknown Song'}
+          autoConfirmSeconds={10}
         />
       )}
     </div>

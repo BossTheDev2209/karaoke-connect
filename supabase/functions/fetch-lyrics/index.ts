@@ -1156,6 +1156,181 @@ async function searchGenius(query: string, apiKey: string): Promise<{ lyrics: st
   }
 }
 
+// ============ SIAMZONE THAI LYRICS SCRAPER ============
+
+// Search Siamzone.com for Thai lyrics
+async function searchSiamzone(query: string): Promise<Array<{ artist: string; title: string; url: string }>> {
+  console.log(`Searching Siamzone: "${query}"`);
+  
+  try {
+    const searchUrl = `https://www.siamzone.com/music/search?q=${encodeURIComponent(query)}`;
+    
+    const response = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'th-TH,th;q=0.9,en;q=0.8',
+      },
+    });
+
+    if (!response.ok) {
+      console.log('Siamzone search failed:', response.status);
+      return [];
+    }
+
+    const html = await response.text();
+    
+    // Parse search results - Siamzone uses specific HTML structure for song listings
+    const results: Array<{ artist: string; title: string; url: string }> = [];
+    
+    // Pattern to match song links in search results
+    // Format: <a href="/music/lyrics/xxxxx">Song Title</a> - Artist
+    const songMatches = html.matchAll(/<a\s+href="(\/music\/lyrics\/[^"]+)"[^>]*>([^<]+)<\/a>\s*[-–—]\s*([^<\n]+)/gi);
+    
+    for (const match of songMatches) {
+      const url = `https://www.siamzone.com${match[1]}`;
+      const title = match[2].trim();
+      const artist = match[3].trim().replace(/<[^>]+>/g, '');
+      
+      if (title && artist) {
+        results.push({ artist, title, url });
+      }
+      
+      if (results.length >= 5) break;
+    }
+    
+    // Alternate pattern for different Siamzone layout
+    if (results.length === 0) {
+      const altMatches = html.matchAll(/<div[^>]*class="[^"]*song-item[^"]*"[^>]*>[\s\S]*?<a\s+href="([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?<span[^>]*class="[^"]*artist[^"]*"[^>]*>([^<]+)<\/span>/gi);
+      
+      for (const match of altMatches) {
+        const url = match[1].startsWith('http') ? match[1] : `https://www.siamzone.com${match[1]}`;
+        const title = match[2].trim();
+        const artist = match[3].trim();
+        
+        if (title && artist) {
+          results.push({ artist, title, url });
+        }
+        
+        if (results.length >= 5) break;
+      }
+    }
+    
+    console.log(`Siamzone found ${results.length} results`);
+    return results;
+  } catch (err) {
+    console.error('Siamzone search error:', err);
+    return [];
+  }
+}
+
+// Scrape lyrics from Siamzone song page
+async function scrapeSiamzoneLyrics(url: string): Promise<string | null> {
+  console.log(`Scraping Siamzone lyrics: ${url}`);
+  
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'th-TH,th;q=0.9,en;q=0.8',
+      },
+    });
+
+    if (!response.ok) {
+      console.log('Siamzone lyrics page failed:', response.status);
+      return null;
+    }
+
+    const html = await response.text();
+    
+    // Pattern to extract lyrics - Siamzone typically has lyrics in a specific div
+    let lyricsMatch = html.match(/<div[^>]*class="[^"]*lyrics[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+    
+    if (!lyricsMatch) {
+      // Try alternate pattern
+      lyricsMatch = html.match(/<div[^>]*id="[^"]*lyrics[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+    }
+    
+    if (!lyricsMatch) {
+      // Try pre tag pattern (some sites use this)
+      lyricsMatch = html.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
+    }
+    
+    if (!lyricsMatch) {
+      console.log('Siamzone: Could not find lyrics container');
+      return null;
+    }
+    
+    const lyrics = lyricsMatch[1]
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#x27;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    
+    if (lyrics.length < 50) {
+      console.log('Siamzone: Lyrics too short');
+      return null;
+    }
+    
+    console.log(`Siamzone extracted lyrics: ${lyrics.length} chars`);
+    return lyrics;
+  } catch (err) {
+    console.error('Siamzone lyrics scrape error:', err);
+    return null;
+  }
+}
+
+// Full Siamzone search and scrape
+async function getSiamzoneLyrics(artist: string, title: string): Promise<{ lyrics: string | null; artist: string | null; title: string | null }> {
+  // Try different search queries
+  const queries = [
+    `${title} ${artist}`,
+    title,
+    containsThai(title) ? extractThai(title) : title,
+  ].filter((q, i, arr) => q && q.length >= 2 && arr.indexOf(q) === i);
+  
+  for (const query of queries) {
+    const results = await searchSiamzone(query);
+    
+    for (const result of results) {
+      // Check if this result seems to match
+      const titleSim = similarity(result.title, title);
+      const artistSim = similarity(result.artist, artist);
+      
+      if (titleSim > 0.3 || artistSim > 0.3) {
+        const lyrics = await scrapeSiamzoneLyrics(result.url);
+        if (lyrics) {
+          return {
+            lyrics,
+            artist: result.artist,
+            title: result.title,
+          };
+        }
+      }
+    }
+  }
+  
+  return { lyrics: null, artist: null, title: null };
+}
+
+// ============ LYRICS MATCH INTERFACE ============
+
+interface LyricsMatch {
+  artistName: string;
+  trackName: string;
+  syncedLyrics: string | null;
+  plainLyrics: string | null;
+  score: number;
+  source: string;
+}
+
 // Generate Thai-specific search strategies
 function generateThaiSearchStrategies(
   artist: string,
@@ -1327,6 +1502,9 @@ serve(async (req) => {
     let allResults: any[] = [];
     let foundSynced = false;
 
+    // Collect ALL matches from all sources for the selector
+    const allMatches: LyricsMatch[] = [];
+
     // LRCLIB Search
     for (const search of uniqueSearches) {
       if (!search.track || search.track.length < 2) continue;
@@ -1345,43 +1523,24 @@ serve(async (req) => {
       if (allResults.length >= 10) break;
     }
 
-    // If LRCLIB found results, use them
+    // Score and add LRCLIB results to allMatches
     if (allResults.length > 0) {
       const uniqueResults = allResults.filter((result, index, self) =>
         index === self.findIndex(r => r.id === result.id)
       );
 
       const scoredResults = uniqueResults.map(result => ({
-        ...result,
-        score: scoreResult(result, cleanedArtist, songName || cleanedTitle, title)
-      }))
-        .filter(r => r.score > 0.15) // Filter out very low scores
+        artistName: result.artistName || '',
+        trackName: result.trackName || '',
+        syncedLyrics: result.syncedLyrics || null,
+        plainLyrics: result.plainLyrics || null,
+        score: scoreResult(result, cleanedArtist, songName || cleanedTitle, title),
+        source: 'lrclib'
+      } as LyricsMatch))
+        .filter(r => r.score > 0.15)
         .sort((a, b) => b.score - a.score);
 
-      if (scoredResults.length > 0) {
-        const bestMatch = scoredResults[0];
-
-        console.log(`Found ${scoredResults.length} valid results, best match score: ${bestMatch.score.toFixed(2)}`);
-        console.log(`Best match: "${bestMatch.artistName}" - "${bestMatch.trackName}"`);
-        console.log(`Has synced: ${!!bestMatch.syncedLyrics}, Has plain: ${!!bestMatch.plainLyrics}`);
-
-        // Validate lyrics quality
-        const lyrics = bestMatch.syncedLyrics || bestMatch.plainLyrics || '';
-        if (validateLyrics(lyrics, title, artist)) {
-          return new Response(
-            JSON.stringify({
-              syncedLyrics: bestMatch.syncedLyrics || null,
-              plainLyrics: bestMatch.plainLyrics || null,
-              trackName: bestMatch.trackName,
-              artistName: bestMatch.artistName,
-              source: 'lrclib',
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        } else {
-          console.log('LRCLIB result failed validation, trying fallbacks...');
-        }
-      }
+      allMatches.push(...scoredResults.slice(0, 5));
     }
 
     // FALLBACK 1: Try Lyrics.ovh (FREE, no API key needed)
@@ -1396,7 +1555,7 @@ serve(async (req) => {
     // Add romanized artist variations for Thai
     if (containsThai(artist)) {
       const variations = getThaiArtistVariations(artist);
-      for (const v of variations.slice(0, 2)) { // Limit to first 2 variations
+      for (const v of variations.slice(0, 2)) {
         lyricsOvhQueries.push({ artist: v, track: songName });
         lyricsOvhQueries.push({ artist: v, track: firstPart });
       }
@@ -1404,10 +1563,9 @@ serve(async (req) => {
     
     // Add romanized artist variations for Japanese/Korean/Chinese
     const asianVariations = getAsianArtistVariations(artist);
-    for (const v of asianVariations.slice(0, 3)) { // Limit to first 3 variations
+    for (const v of asianVariations.slice(0, 3)) {
       lyricsOvhQueries.push({ artist: v, track: songName });
       lyricsOvhQueries.push({ artist: v, track: firstPart });
-      // Also try with romanized title
       const romanizedTitle = extractRomanized(title);
       if (romanizedTitle && romanizedTitle.length >= 2) {
         lyricsOvhQueries.push({ artist: v, track: romanizedTitle });
@@ -1419,17 +1577,23 @@ serve(async (req) => {
       
       const result = await searchLyricsOvh(query.artist, query.track);
       if (result.lyrics && validateLyrics(result.lyrics, title, artist)) {
-        console.log(`Lyrics.ovh found valid lyrics`);
-        return new Response(
-          JSON.stringify({
-            syncedLyrics: null,
-            plainLyrics: result.lyrics,
-            trackName: result.title,
-            artistName: result.artist,
-            source: 'lyrics.ovh',
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        const lyricsOvhMatch: LyricsMatch = {
+          artistName: result.artist || query.artist,
+          trackName: result.title || query.track,
+          syncedLyrics: null,
+          plainLyrics: result.lyrics,
+          score: 0.6, // Base score for Lyrics.ovh
+          source: 'lyrics.ovh'
+        };
+        
+        // Add to allMatches if not duplicate
+        if (!allMatches.some(m => 
+          similarity(m.trackName, lyricsOvhMatch.trackName) > 0.9 && 
+          similarity(m.artistName, lyricsOvhMatch.artistName) > 0.9
+        )) {
+          allMatches.push(lyricsOvhMatch);
+        }
+        break; // Only add one Lyrics.ovh result
       }
     }
 
@@ -1448,34 +1612,88 @@ serve(async (req) => {
         const geniusResult = await searchGenius(query, geniusApiKey);
         
         if (geniusResult.lyrics && validateLyrics(geniusResult.lyrics, title, artist)) {
-          console.log(`Genius found valid lyrics for: "${geniusResult.artist}" - "${geniusResult.title}"`);
-          return new Response(
-            JSON.stringify({
-              syncedLyrics: null,
-              plainLyrics: geniusResult.lyrics,
-              trackName: geniusResult.title,
-              artistName: geniusResult.artist,
-              source: 'genius',
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          const geniusMatch: LyricsMatch = {
+            artistName: geniusResult.artist || primaryArtist,
+            trackName: geniusResult.title || songName,
+            syncedLyrics: null,
+            plainLyrics: geniusResult.lyrics,
+            score: 0.55,
+            source: 'genius'
+          };
+          
+          if (!allMatches.some(m => 
+            similarity(m.trackName, geniusMatch.trackName) > 0.9 && 
+            similarity(m.artistName, geniusMatch.artistName) > 0.9
+          )) {
+            allMatches.push(geniusMatch);
+          }
+          break;
         }
       }
-      console.log('Genius also found nothing valid');
-    } else {
-      console.log('GENIUS_API_KEY not configured');
+    }
+
+    // FALLBACK 3: Try Siamzone for Thai songs
+    if (containsThai(artist) || containsThai(title)) {
+      console.log('Trying Siamzone (Thai lyrics)...');
+      
+      const siamzoneResult = await getSiamzoneLyrics(cleanedArtist, songName || cleanedTitle);
+      
+      if (siamzoneResult.lyrics && validateLyrics(siamzoneResult.lyrics, title, artist)) {
+        const siamzoneMatch: LyricsMatch = {
+          artistName: siamzoneResult.artist || cleanedArtist,
+          trackName: siamzoneResult.title || songName,
+          syncedLyrics: null,
+          plainLyrics: siamzoneResult.lyrics,
+          score: 0.7, // Higher score for Thai-specific source
+          source: 'siamzone'
+        };
+        
+        if (!allMatches.some(m => 
+          similarity(m.trackName, siamzoneMatch.trackName) > 0.9 && 
+          similarity(m.artistName, siamzoneMatch.artistName) > 0.9
+        )) {
+          allMatches.push(siamzoneMatch);
+        }
+      }
+    }
+
+    // Sort all matches by score and take top 5
+    allMatches.sort((a, b) => b.score - a.score);
+    const topMatches = allMatches.slice(0, 5);
+
+    // Return response with best match and all matches
+    if (topMatches.length > 0) {
+      const bestMatch = topMatches[0];
+      
+      console.log(`Returning ${topMatches.length} matches, best: "${bestMatch.artistName}" - "${bestMatch.trackName}" (${bestMatch.source})`);
+      
+      return new Response(
+        JSON.stringify({
+          syncedLyrics: bestMatch.syncedLyrics,
+          plainLyrics: bestMatch.plainLyrics,
+          trackName: bestMatch.trackName,
+          artistName: bestMatch.artistName,
+          source: bestMatch.source,
+          allMatches: topMatches, // NEW: Return all matches for selector
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log('No lyrics found after all strategies');
     return new Response(
-      JSON.stringify({ syncedLyrics: null, plainLyrics: null }),
+      JSON.stringify({ 
+        syncedLyrics: null, 
+        plainLyrics: null,
+        allMatches: [], // Empty array when no matches
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
     const error = err as Error;
     console.error('Error in fetch-lyrics function:', error);
     return new Response(
-      JSON.stringify({ error: error.message, syncedLyrics: null, plainLyrics: null }),
+      JSON.stringify({ error: error.message, syncedLyrics: null, plainLyrics: null, allMatches: [] }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

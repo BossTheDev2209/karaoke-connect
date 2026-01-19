@@ -1,7 +1,17 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { LyricLine } from '@/types/karaoke';
 import { supabase } from '@/integrations/supabase/client';
 import { PreloadedLyrics } from './useLyricsPreload';
+
+// New interface for lyrics match options
+export interface LyricsMatch {
+  artistName: string;
+  trackName: string;
+  syncedLyrics: string | null;
+  plainLyrics: string | null;
+  score: number;
+  source: string;
+}
 
 interface UseLyricsReturn {
   lyrics: LyricLine[];
@@ -11,6 +21,11 @@ interface UseLyricsReturn {
   offset: number;
   setOffset: (offset: number) => void;
   isSynced: boolean;
+  // NEW: Multiple matches support
+  allMatches: LyricsMatch[];
+  selectedMatchIndex: number;
+  selectMatch: (index: number) => void;
+  source: string | null;
 }
 
 export const useLyrics = (
@@ -23,13 +38,47 @@ export const useLyrics = (
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSynced, setIsSynced] = useState(false);
-  // Offset in seconds: positive = lyrics delayed (for lyrics ahead of audio)
   const [offset, setOffset] = useState(0);
+  
+  // NEW: Multiple matches state
+  const [allMatches, setAllMatches] = useState<LyricsMatch[]>([]);
+  const [selectedMatchIndex, setSelectedMatchIndex] = useState(0);
+  const [source, setSource] = useState<string | null>(null);
+
+  // Function to apply lyrics from a match
+  const applyMatch = useCallback((match: LyricsMatch) => {
+    if (match.syncedLyrics) {
+      const parsed = parseSyncedLyrics(match.syncedLyrics);
+      setLyrics(parsed);
+      setIsSynced(true);
+    } else if (match.plainLyrics) {
+      const lines = parsePlainLyrics(match.plainLyrics);
+      setLyrics(lines);
+      setIsSynced(false);
+    } else {
+      setLyrics([]);
+      setIsSynced(false);
+    }
+    setSource(match.source);
+    setError(null);
+  }, []);
+
+  // NEW: Function to select a different match
+  const selectMatch = useCallback((index: number) => {
+    if (index >= 0 && index < allMatches.length) {
+      setSelectedMatchIndex(index);
+      applyMatch(allMatches[index]);
+      setOffset(0); // Reset offset when changing lyrics
+    }
+  }, [allMatches, applyMatch]);
 
   useEffect(() => {
     if (!artist || !title) {
       setLyrics([]);
       setIsSynced(false);
+      setAllMatches([]);
+      setSelectedMatchIndex(0);
+      setSource(null);
       return;
     }
 
@@ -38,6 +87,9 @@ export const useLyrics = (
       console.log('Using preloaded lyrics for:', title);
       setLyrics(preloadedData.lyrics);
       setIsSynced(preloadedData.isSynced);
+      setAllMatches(preloadedData.allMatches || []);
+      setSelectedMatchIndex(0);
+      setSource(preloadedData.source || null);
       setError(null);
       setIsLoading(false);
       setOffset(0);
@@ -48,6 +100,9 @@ export const useLyrics = (
     if (preloadedData && preloadedData.status === 'not_found') {
       setLyrics([]);
       setIsSynced(false);
+      setAllMatches([]);
+      setSelectedMatchIndex(0);
+      setSource(null);
       setError('No lyrics found');
       setIsLoading(false);
       return;
@@ -57,6 +112,9 @@ export const useLyrics = (
     if (preloadedData && preloadedData.status === 'error') {
       setLyrics([]);
       setIsSynced(false);
+      setAllMatches([]);
+      setSelectedMatchIndex(0);
+      setSource(null);
       setError('Could not load lyrics');
       setIsLoading(false);
       return;
@@ -81,17 +139,29 @@ export const useLyrics = (
 
         if (fnError) throw fnError;
 
+        // Store all matches for the selector
+        if (data.allMatches && data.allMatches.length > 0) {
+          setAllMatches(data.allMatches);
+          setSelectedMatchIndex(0);
+        } else {
+          setAllMatches([]);
+          setSelectedMatchIndex(0);
+        }
+
         if (data.syncedLyrics) {
           const parsed = parseSyncedLyrics(data.syncedLyrics);
           setLyrics(parsed);
           setIsSynced(true);
+          setSource(data.source || null);
         } else if (data.plainLyrics) {
           const lines = parsePlainLyrics(data.plainLyrics);
           setLyrics(lines);
           setIsSynced(false);
+          setSource(data.source || null);
         } else {
           setLyrics([]);
           setIsSynced(false);
+          setSource(null);
           setError('No lyrics found');
         }
       } catch (err) {
@@ -99,6 +169,8 @@ export const useLyrics = (
         setError('Could not load lyrics');
         setLyrics([]);
         setIsSynced(false);
+        setAllMatches([]);
+        setSource(null);
       } finally {
         setIsLoading(false);
       }
@@ -124,7 +196,20 @@ export const useLyrics = (
     return -1;
   }, [lyrics, currentTime, offset]);
 
-  return { lyrics, currentLineIndex, isLoading, error, offset, setOffset, isSynced };
+  return { 
+    lyrics, 
+    currentLineIndex, 
+    isLoading, 
+    error, 
+    offset, 
+    setOffset, 
+    isSynced,
+    // NEW
+    allMatches,
+    selectedMatchIndex,
+    selectMatch,
+    source,
+  };
 };
 
 // Parse LRC format: [mm:ss.xx] lyrics text

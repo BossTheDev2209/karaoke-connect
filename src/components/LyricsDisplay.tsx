@@ -25,6 +25,10 @@ interface LyricsDisplayProps {
   hasCaptionsAvailable?: boolean;
   onEnableCaptions?: () => void;
   onDisableCaptions?: () => void;
+  // NEW: Source and multiple matches support
+  source?: string | null;
+  hasMultipleMatches?: boolean;
+  onChangeLyrics?: () => void;
 }
 
 // Simulate loading progress
@@ -100,6 +104,10 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   hasCaptionsAvailable = false,
   onEnableCaptions,
   onDisableCaptions,
+  // NEW
+  source,
+  hasMultipleMatches = false,
+  onChangeLyrics,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const activeLineRef = useRef<HTMLButtonElement>(null);
@@ -216,6 +224,30 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
     <div className="h-full flex flex-col relative overflow-hidden">
       {/* Controls bar */}
       <div className="absolute top-1 right-1 z-10 flex items-center gap-2">
+        {/* Source badge */}
+        {source && (
+          <span 
+            className="h-6 px-2 text-[10px] font-medium rounded-full bg-background/80 backdrop-blur text-muted-foreground border border-white/10 flex items-center"
+            title={`Lyrics from ${source}`}
+          >
+            via {source}
+          </span>
+        )}
+
+        {/* Change lyrics button - show when multiple matches available */}
+        {hasMultipleMatches && onChangeLyrics && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onChangeLyrics}
+            className="h-6 px-2 text-xs bg-background/80 backdrop-blur rounded-lg"
+            title="Choose different lyrics"
+          >
+            <List className="w-3 h-3 mr-1" />
+            Change
+          </Button>
+        )}
+
         {/* Romanization toggle for CJK lyrics */}
         {hasCJK && (
           <Button
