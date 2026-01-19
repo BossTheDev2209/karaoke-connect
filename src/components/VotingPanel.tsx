@@ -32,6 +32,7 @@ interface VotingPanelProps {
   currentUserId: string;
   users: User[];
   currentMode: RoomMode;
+  isHost: boolean;
   onModeChange: (mode: RoomMode, format?: BattleFormat) => void;
   activeVoteKick: VoteKickState | null;
   hasVoted: boolean;
@@ -46,6 +47,7 @@ export const VotingPanel: React.FC<VotingPanelProps> = ({
   currentUserId,
   users,
   currentMode,
+  isHost,
   onModeChange,
   activeVoteKick,
   hasVoted,
@@ -155,6 +157,7 @@ export const VotingPanel: React.FC<VotingPanelProps> = ({
               currentUserId={currentUserId}
               usersCount={users.length}
               currentMode={currentMode}
+              isHost={isHost}
               onModeChange={onModeChange}
             />
           </div>
