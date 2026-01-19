@@ -11,7 +11,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
-import { Volume2, VolumeX } from 'lucide-react';
+import { Volume2, VolumeX, ArrowLeftRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface UserAvatarItemProps {
   user: User;
@@ -30,6 +31,8 @@ interface UserAvatarItemProps {
   userVolume: number;
   onVolumeChange?: (userId: string, volume: number) => void;
   color: string;
+  isHost?: boolean;
+  onSwapTeam?: (userId: string) => void;
 }
 
 const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
@@ -49,6 +52,8 @@ const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
   userVolume,
   onVolumeChange,
   color,
+  isHost,
+  onSwapTeam,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -179,6 +184,22 @@ const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
               <p className="text-[10px] text-center text-muted-foreground italic">
                 Volume changes are saved locally to your browser.
               </p>
+              
+              {/* Team Swap Button - Host only, Team Battle mode only */}
+              {isHost && roomMode === 'team-battle' && user.team && onSwapTeam && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2"
+                  onClick={() => {
+                    onSwapTeam(user.id);
+                    setIsOpen(false);
+                  }}
+                >
+                  <ArrowLeftRight className="w-4 h-4" />
+                  Swap to {user.team === 'left' ? 'Blue' : 'Pink'} Team
+                </Button>
+              )}
             </div>
           </PopoverContent>
         </Popover>
@@ -201,6 +222,8 @@ interface UserAvatarRowProps {
   battleFormat?: BattleFormat;
   userVolumes?: Record<string, number>;
   onVolumeChange?: (userId: string, volume: number) => void;
+  isHost?: boolean;
+  onSwapTeam?: (userId: string) => void;
 }
 
 export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({ 
@@ -217,6 +240,8 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
   battleFormat,
   userVolumes = {},
   onVolumeChange,
+  isHost = false,
+  onSwapTeam,
 }) => {
   // Sort to put current user first
   const sortedUsers = [...users].sort((a, b) => {
@@ -268,6 +293,8 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
       onStartVoteKick={onStartVoteKick}
       userVolume={userVolumes[user.id] ?? 100}
       onVolumeChange={onVolumeChange}
+      isHost={isHost}
+      onSwapTeam={onSwapTeam}
     />
   );
 

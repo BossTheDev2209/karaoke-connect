@@ -99,6 +99,10 @@ export type RealtimePayload = {
     | 'mode_vote_cast'
     | 'mode_update'
     | 'team_update'
+    | 'team_swap'
+    | 'match_start'
+    | 'match_end'
+    | 'format_selected'
     | 'rtt_ping'
     | 'rtt_pong'
     | 'sync_heartbeat';

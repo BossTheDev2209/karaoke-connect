@@ -17,6 +17,9 @@ interface UseRoomReturn {
   updateMicStatus: (isMicEnabled: boolean) => void;
   updateMode: (mode: RoomMode, battleFormat?: BattleFormat) => void;
   updateTeams: (userTeams: Record<string, 'left' | 'right'>) => void;
+  swapUserTeam: (userId: string) => void;
+  broadcastMatchStart: () => void;
+  broadcastMatchEnd: () => void;
   roomMode: RoomMode;
   battleFormat?: BattleFormat;
   requestSync: () => void;
@@ -231,6 +234,33 @@ export const useRoom = (
             const { mode, battleFormat } = data.payload as { mode: RoomMode; battleFormat?: BattleFormat };
             setRoomMode(mode);
             setBattleFormat(battleFormat);
+            // Reset scores when switching to team battle
+            if (mode === 'team-battle') {
+              setUsers(prev => prev.map(u => ({ ...u, score: 0 })));
+            }
+            break;
+          }
+          case 'match_start': {
+            // Reset all user scores for new match
+            console.log('Match started - resetting scores');
+            setUsers(prev => prev.map(u => ({ ...u, score: 0 })));
+            break;
+          }
+          case 'match_end': {
+            // Just log for now - could save to DB in future
+            console.log('Match ended');
+            break;
+          }
+          case 'team_swap': {
+            const { userId, newTeam } = data.payload as { userId: string; newTeam: 'left' | 'right' };
+            setUsers(prev => prev.map(u => 
+              u.id === userId ? { ...u, team: newTeam } : u
+            ));
+            break;
+          }
+          case 'format_selected': {
+            const { format } = data.payload as { format: BattleFormat };
+            setBattleFormat(format);
             break;
           }
           case 'team_update': {
@@ -622,6 +652,45 @@ export const useRoom = (
     });
   }, []);
 
+  // Swap a single user's team (host only)
+  const swapUserTeam = useCallback((userId: string) => {
+    setUsers(prev => {
+      const user = prev.find(u => u.id === userId);
+      if (!user) return prev;
+      const newTeam = user.team === 'left' ? 'right' : 'left';
+      // Broadcast the swap
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'room_event',
+        payload: { type: 'team_swap', payload: { userId, newTeam } },
+      });
+      return prev.map(u => u.id === userId ? { ...u, team: newTeam } : u);
+    });
+  }, []);
+
+  // Broadcast match start (resets scores on all clients)
+  const broadcastMatchStart = useCallback(() => {
+    if (!isHostRef.current) return;
+    // Local reset
+    setUsers(prev => prev.map(u => ({ ...u, score: 0 })));
+    // Broadcast to others
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'room_event',
+      payload: { type: 'match_start', payload: {} },
+    });
+  }, []);
+
+  // Broadcast match end
+  const broadcastMatchEnd = useCallback(() => {
+    if (!isHostRef.current) return;
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'room_event',
+      payload: { type: 'match_end', payload: {} },
+    });
+  }, []);
+
   // Auto-assign teams when switching to team-battle (only host to prevent race conditions)
   useEffect(() => {
     if (roomMode === 'team-battle' && users.length > 0 && isHostRef.current) {
@@ -656,6 +725,9 @@ export const useRoom = (
     updateMicStatus,
     updateMode,
     updateTeams,
+    swapUserTeam,
+    broadcastMatchStart,
+    broadcastMatchEnd,
     requestSync,
     seek,
     networkLatency,
