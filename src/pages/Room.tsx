@@ -133,8 +133,11 @@ export default function Room() {
     updateMicStatus,
     updateMode,
     updateTeams,
+    swapUserTeam,
+    broadcastMatchStart,
+    broadcastMatchEnd,
     requestSync,
-    seek, // Destructure new seek function
+    seek,
     networkLatency,
     clockOffset
   } = useRoom(code || '', user, handleUserJoin);
@@ -691,6 +694,7 @@ export default function Room() {
             currentUserId={user.id}
             users={users}
             currentMode={roomMode}
+            isHost={isHost}
             onModeChange={updateMode}
             activeVoteKick={activeVoteKick}
             hasVoted={hasVoted}

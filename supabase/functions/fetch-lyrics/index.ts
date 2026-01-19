@@ -1403,6 +1403,87 @@ function generateThaiSearchStrategies(
   return strategies;
 }
 
+// Generate Japanese/Korean/Chinese search strategies
+function generateAsianSearchStrategies(
+  artist: string,
+  title: string,
+  cleanedArtist: string,
+  cleanedTitle: string
+): Array<{ track: string; artist: string | undefined }> {
+  const strategies: Array<{ track: string; artist: string | undefined }> = [];
+  
+  const hasJapanese = containsJapanese(artist) || containsJapanese(title);
+  const hasKorean = containsKorean(artist) || containsKorean(title);
+  const hasChinese = containsChinese(artist) || containsChinese(title);
+  
+  if (!hasJapanese && !hasKorean && !hasChinese) {
+    return strategies;
+  }
+  
+  console.log('Asian content detected (JP/KR/CN), adding Asian-specific strategies');
+  
+  // Extract native and romanized parts
+  const nativeTitle = extractJapanese(title) || extractKorean(title) || extractChinese(title) || '';
+  const romanizedTitle = extractRomanized(title);
+  const nativeArtist = extractJapanese(artist) || extractKorean(artist) || extractChinese(artist) || '';
+  const romanizedArtist = extractRomanized(artist);
+  
+  // Get artist variations from mappings
+  const artistVariations: string[] = [];
+  if (hasJapanese) artistVariations.push(...getJapaneseArtistVariations(artist));
+  if (hasKorean) artistVariations.push(...getKoreanArtistVariations(artist));
+  if (hasChinese) artistVariations.push(...getChineseArtistVariations(artist));
+  
+  // Strategy: Native title + native artist
+  if (nativeTitle && nativeTitle.length >= 2) {
+    if (nativeArtist && nativeArtist.length >= 2) {
+      strategies.push({ track: nativeTitle, artist: nativeArtist });
+    }
+    // Native title + romanized artist
+    if (romanizedArtist && romanizedArtist.length >= 2 && romanizedArtist !== nativeArtist) {
+      strategies.push({ track: nativeTitle, artist: romanizedArtist });
+    }
+    // Native title only
+    strategies.push({ track: nativeTitle, artist: undefined });
+  }
+  
+  // Strategy: Romanized title + romanized artist
+  if (romanizedTitle && romanizedTitle.length >= 3) {
+    if (romanizedArtist && romanizedArtist.length >= 2) {
+      strategies.push({ track: romanizedTitle, artist: romanizedArtist });
+    }
+    // Romanized title + native artist
+    if (nativeArtist && nativeArtist.length >= 2) {
+      strategies.push({ track: romanizedTitle, artist: nativeArtist });
+    }
+    strategies.push({ track: romanizedTitle, artist: undefined });
+  }
+  
+  // Look for English title in parentheses
+  const englishInParens = title.match(/\(([A-Za-z][^)]*)\)/);
+  if (englishInParens) {
+    const englishTitle = englishInParens[1].trim();
+    if (englishTitle.length >= 3) {
+      if (romanizedArtist && romanizedArtist.length >= 2) {
+        strategies.push({ track: englishTitle, artist: romanizedArtist });
+      }
+      strategies.push({ track: englishTitle, artist: undefined });
+    }
+  }
+  
+  // Try with artist mapping variations
+  for (const variation of artistVariations.slice(0, 3)) {
+    if (nativeTitle && nativeTitle.length >= 2) {
+      strategies.push({ track: nativeTitle, artist: variation });
+    }
+    if (romanizedTitle && romanizedTitle.length >= 3) {
+      strategies.push({ track: romanizedTitle, artist: variation });
+    }
+  }
+  
+  return strategies;
+}
+
 // IMPROVED: Validate that lyrics look reasonable for the query
 function validateLyrics(lyrics: string, queryTitle: string, queryArtist: string): boolean {
   if (!lyrics || lyrics.length < 50) {

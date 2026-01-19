@@ -2,9 +2,10 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { RoomMode, BattleFormat, RealtimePayload } from '@/types/karaoke';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/button';
-import { Swords, Mic2, Users2, Check } from 'lucide-react';
+import { Swords, Mic2, Check } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { BattleFormatModal } from './BattleFormatModal';
 
 interface ModeVoteState {
   mode: RoomMode;
@@ -17,6 +18,7 @@ interface ModeVotingProps {
   currentUserId: string;
   usersCount: number;
   currentMode: RoomMode;
+  isHost: boolean;
   onModeChange: (mode: RoomMode, format?: BattleFormat) => void;
 }
 
@@ -25,10 +27,13 @@ export const ModeVoting: React.FC<ModeVotingProps> = ({
   currentUserId,
   usersCount,
   currentMode,
+  isHost,
   onModeChange,
 }) => {
   const [activeVote, setActiveVote] = useState<ModeVoteState | null>(null);
   const [hasVoted, setHasVoted] = useState(false);
+  const [showFormatModal, setShowFormatModal] = useState(false);
+  const [waitingForFormat, setWaitingForFormat] = useState(false);
 
   useEffect(() => {
     if (!channel) return;
@@ -53,14 +58,35 @@ export const ModeVoting: React.FC<ModeVotingProps> = ({
           // Check if majority reached
           const required = Math.floor(usersCount / 2) + 1;
           if (newVotes.length >= required) {
-            onModeChange(prev.mode, prev.format);
-            toast({
-              title: "Vote Passed",
-              description: `Room switched to ${prev.mode}!`,
-            });
+            // Vote passed!
+            if (prev.mode === 'team-battle') {
+              // For team battle, host needs to select format
+              if (isHost) {
+                setShowFormatModal(true);
+              } else {
+                setWaitingForFormat(true);
+              }
+            } else {
+              // Free sing - switch immediately
+              onModeChange(prev.mode);
+              toast({
+                title: "Vote Passed",
+                description: `Room switched to Free Sing!`,
+              });
+            }
             return null;
           }
           return { ...prev, votes: newVotes };
+        });
+      }
+
+      if (payload.type === 'format_selected') {
+        const { format } = payload.payload as { format: BattleFormat };
+        setWaitingForFormat(false);
+        onModeChange('team-battle', format);
+        toast({
+          title: "Team Battle Started",
+          description: `Format: ${format === '1v1' ? '1v1' : format === '2v2' ? '2v2' : format === '3v3' ? '3v3' : 'All-out War'}`,
         });
       }
     };
@@ -69,12 +95,17 @@ export const ModeVoting: React.FC<ModeVotingProps> = ({
     return () => {
       // Listener removal is handled by channel cleanup if managed centrally
     };
-  }, [channel, currentUserId, usersCount, onModeChange]);
+  }, [channel, currentUserId, usersCount, onModeChange, isHost]);
 
-  const startVote = (mode: RoomMode, format?: BattleFormat) => {
+  const startVote = (mode: RoomMode) => {
     if (!channel || usersCount < 2) {
       if (usersCount < 2) {
-        onModeChange(mode, format); // Single user can switch instantly
+        // Single user can switch instantly
+        if (mode === 'team-battle') {
+          setShowFormatModal(true);
+        } else {
+          onModeChange(mode);
+        }
         return;
       }
       return;
@@ -82,7 +113,6 @@ export const ModeVoting: React.FC<ModeVotingProps> = ({
 
     const voteData: ModeVoteState = {
       mode,
-      format,
       votes: [currentUserId],
     };
 
@@ -103,9 +133,38 @@ export const ModeVoting: React.FC<ModeVotingProps> = ({
     });
   };
 
+  const handleFormatSelect = (format: BattleFormat | 'all-out') => {
+    // Convert 'all-out' to a format based on user count
+    const actualFormat: BattleFormat = format === 'all-out' 
+      ? `${Math.ceil(usersCount / 2)}v${Math.ceil(usersCount / 2)}` as BattleFormat
+      : format;
+    
+    // Broadcast the format selection
+    channel?.send({
+      type: 'broadcast',
+      event: 'room_event',
+      payload: { type: 'format_selected', payload: { format: actualFormat } },
+    });
+    
+    // Apply locally
+    onModeChange('team-battle', actualFormat);
+    setShowFormatModal(false);
+    toast({
+      title: "Team Battle Started",
+      description: `Format: ${format === 'all-out' ? 'All-out War' : format}`,
+    });
+  };
+
   return (
     <div className="flex flex-col gap-4">
-      {activeVote ? (
+      {waitingForFormat ? (
+        <div className="glass p-4 rounded-xl border-2 border-primary/50 animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="animate-spin w-5 h-5 border-2 border-primary border-t-transparent rounded-full" />
+            <p className="text-sm text-muted-foreground">Waiting for host to select format...</p>
+          </div>
+        </div>
+      ) : activeVote ? (
         <div className="glass p-4 rounded-xl border-2 border-primary/50 animate-in fade-in slide-in-from-bottom-4">
           <p className="text-sm font-semibold mb-2">Vote: {activeVote.mode === 'team-battle' ? 'Team Battle' : 'Free Sing'}</p>
           <div className="flex items-center gap-3">
@@ -137,7 +196,7 @@ export const ModeVoting: React.FC<ModeVotingProps> = ({
           <Button
             variant={currentMode === 'team-battle' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => startVote('team-battle', '1v1')}
+            onClick={() => startVote('team-battle')}
             className="flex-1"
           >
             <Swords className="w-4 h-4 mr-2" />
@@ -145,6 +204,13 @@ export const ModeVoting: React.FC<ModeVotingProps> = ({
           </Button>
         </div>
       )}
+
+      <BattleFormatModal
+        isOpen={showFormatModal}
+        onClose={() => setShowFormatModal(false)}
+        onSelectFormat={handleFormatSelect}
+        usersCount={usersCount}
+      />
     </div>
   );
 };
