@@ -29,9 +29,15 @@ interface UseRoomReturn {
 }
 
 const DEFAULT_PLAYBACK: PlaybackState = {
+  // New sync system fields
+  status: 'idle',
+  videoId: null,
+  startAtRoomTime: null,
+  seekOffset: 0,
+  currentSongIndex: 0,
+  // Legacy fields (for backward compatibility)
   isPlaying: false,
   currentTime: 0,
-  currentSongIndex: 0,
   lastUpdate: Date.now(),
 };
 

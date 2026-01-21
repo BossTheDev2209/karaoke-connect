@@ -25,11 +25,10 @@ import { DustFallEffect } from '@/components/effects/SingerEffects';
 import { useAudioReactive } from '@/hooks/useAudioReactive';
 import { useVoteKick, VoteKickOverlay } from '@/components/VoteKick';
 import { VotingPanel } from '@/components/VotingPanel';
-import { SyncLockOverlay, useSyncLock } from '@/components/SyncLockOverlay';
 import { TeamBattleOverlay } from '@/components/TeamBattleOverlay';
 import { LyricsSelector } from '@/components/LyricsSelector';
 
-import { LogOut, Swords, Mic2, Lock, Sparkles, Play } from 'lucide-react';
+import { LogOut, Swords, Mic2, Sparkles, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -189,6 +188,9 @@ export default function Room() {
     }, 300);
   }, []);
 
+  // Ref for syncV2 to break circular dependency with handleVideoEnded
+  const syncV2Ref = useRef<{ prepareSong: (index: number) => void } | null>(null);
+
   // When the current video changes (often driven by remote sync), suppress transient player events
   useEffect(() => {
     if (!currentSong?.videoId) return;
@@ -270,13 +272,14 @@ export default function Room() {
     // Clear recommendations immediately
     setRecommendations([]);
 
-    // Immediately start playing the new song
-    // Use the pre-calculated index since state update is async
-    updatePlayback({
-      currentSongIndex: newSongIndex,
-      isPlaying: true,
-      currentTime: 0
-    });
+    // Use the new sync system to prepare and start the song
+    // This triggers the ready check flow for synchronized playback
+    if (isHost) {
+      // Small delay to allow queue update to propagate
+      setTimeout(() => {
+        syncV2Ref.current?.prepareSong(newSongIndex);
+      }, 100);
+    }
   };
 
   // State for Team Battle Winner Screen
@@ -297,27 +300,16 @@ export default function Room() {
 
     const nextIndex = playbackState.currentSongIndex + 1;
     
-    // Check if there's a pending sync for after-song mode
-    if (pendingSyncOnSongEnd && isHost && nextIndex < queue.length) {
-      // Clear pending flag
-      setPendingSyncOnSongEnd(false);
-      // First advance to next song
-      updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
-      // Then trigger sync lock after a short delay
-      setTimeout(() => {
-        startSyncLockRef.current?.();
-      }, 500);
-      return;
-    }
-    
     if (nextIndex < queue.length) {
-      updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
+      // Use the new sync system for synchronized start
+      if (isHost) {
+        syncV2Ref.current?.prepareSong(nextIndex);
+      }
     } else {
       // End of queue - stop playing
-      updatePlayback({ isPlaying: false });
-      setPendingSyncOnSongEnd(false); // Clear any pending if no more songs
+      updatePlayback({ isPlaying: false, status: 'idle' });
     }
-  }, [queue.length, playbackState.currentSongIndex, updatePlayback, pendingSyncOnSongEnd, isHost, roomMode]);
+  }, [queue.length, playbackState.currentSongIndex, updatePlayback, isHost, roomMode]);
 
   const handleNextRound = useCallback(() => {
      setShowWinnerScreen(false);
@@ -325,12 +317,14 @@ export default function Room() {
      // Advance to next song
      const nextIndex = playbackState.currentSongIndex + 1;
      if (nextIndex < queue.length) {
-       updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
-       // Optional: Reset scores here if we had a reset capability
+       // Use the new sync system for synchronized start
+       if (isHost) {
+         syncV2Ref.current?.prepareSong(nextIndex);
+       }
      } else {
-       updatePlayback({ isPlaying: false });
+       updatePlayback({ isPlaying: false, status: 'idle' });
      }
-  }, [playbackState.currentSongIndex, queue.length, updatePlayback]);
+  }, [playbackState.currentSongIndex, queue.length, updatePlayback, isHost]);
 
   const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable, error: playerError, clearError, cueVideo, getCurrentTime: getPlayerTime } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded, privacyMode);
 
@@ -348,25 +342,10 @@ export default function Room() {
     isPlayerReady: isReady,
   });
 
-  // Sync lock for synchronized playback start
-  const handleSyncLockComplete = useCallback(() => {
-    // Reset playback to start of current song and play
-    seekTo(0);
-    play();
-    updatePlayback({ isPlaying: true, currentTime: 0 });
-  }, [seekTo, play, updatePlayback]);
-
-  const { isSyncLockActive, startSyncLock } = useSyncLock(
-    channel,
-    isHost,
-    user?.id || ''
-  );
-
-  // Store startSyncLock in ref for use in handleUserJoin callback
+  // Sync the ref for use in callbacks defined before syncV2
   useEffect(() => {
-    startSyncLockRef.current = startSyncLock;
-  }, [startSyncLock]);
-
+    syncV2Ref.current = syncV2;
+  }, [syncV2]);
 
 
   const lastSeekTimeRef = useRef<number>(0);
@@ -633,15 +612,6 @@ export default function Room() {
       {/* Celebration effects */}
       {celebrationEnabled && <CelebrationOverlay theme={celebration} />}
       
-      {/* Sync Lock Overlay */}
-      <SyncLockOverlay
-        channel={channel}
-        isHost={isHost}
-        currentUserId={user.id}
-        onSyncStart={() => {}}
-        onCountdownComplete={handleSyncLockComplete}
-      />
-      
       {/* Floating reactions */}
       
       {/* Dust fall effect when singing EXTRA loudly (Level 2) */}
@@ -686,22 +656,6 @@ export default function Room() {
             {roomMode === 'team-battle' ? 'Team Battle' : 'Free Sing'}
           </div>
 
-
-          {/* Sync Lock Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={startSyncLock}
-            disabled={isSyncLockActive || !currentSong}
-            className={cn(
-              "gap-1.5",
-              isSyncLockActive && "animate-pulse"
-            )}
-            title="Start synchronized playback with 3-2-1 countdown"
-          >
-            <Lock className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Sync Lock</span>
-          </Button>
 
           {/* Unified Voting Panel */}
           <VotingPanel
