@@ -42,11 +42,29 @@ export interface LyricLine {
   romanization?: string;
 }
 
+// Playback status for the new sync system
+export type PlaybackStatus = 'idle' | 'preparing' | 'ready' | 'playing' | 'paused' | 'buffering';
+
 export interface PlaybackState {
-  isPlaying: boolean;
-  currentTime: number;
+  /** Current playback status */
+  status: PlaybackStatus;
+  /** Current video ID being played */
+  videoId: string | null;
+  /** Room time (ms) when the song started playing (for sync calculation) */
+  startAtRoomTime: number | null;
+  /** Offset in seconds for pause/resume and seek operations */
+  seekOffset: number;
+  /** Index in the queue */
   currentSongIndex: number;
-  lastUpdate: number;
+  /** Legacy: for backward compatibility during migration */
+  isPlaying?: boolean;
+  currentTime?: number;
+  lastUpdate?: number;
+}
+
+/** Track which users have their player ready */
+export interface PlayerReadyStates {
+  [userId: string]: boolean;
 }
 
 export interface Room {
@@ -85,6 +103,17 @@ export interface VoteKick {
 
 export type RealtimePayload = {
   type: 
+    // New sync system events
+    | 'prepare_song'        // Host tells everyone to load video
+    | 'player_ready'        // Client signals player is ready
+    | 'all_ready'           // Host confirms all players ready
+    | 'start_song'          // Host sends synchronized start time
+    | 'pause_song'          // Pause with current seekOffset
+    | 'resume_song'         // Resume with new startAtRoomTime
+    | 'seek_song'           // Seek to specific time
+    | 'end_song'            // Song ended
+    | 'buffering_report'    // Client reports buffering issue
+    // Legacy (kept for backward compat during migration)
     | 'playback_update' 
     | 'queue_update' 
     | 'speaking_update' 
@@ -105,6 +134,7 @@ export type RealtimePayload = {
     | 'format_selected'
     | 'rtt_ping'
     | 'rtt_pong'
-    | 'sync_heartbeat';
+    | 'sync_heartbeat'
+    | 'reaction';
   payload: unknown;
 };

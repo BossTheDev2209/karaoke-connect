@@ -33,6 +33,7 @@ interface UserAvatarItemProps {
   color: string;
   isHost?: boolean;
   onSwapTeam?: (userId: string) => void;
+  activeReaction: string | null;
 }
 
 const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
@@ -54,6 +55,7 @@ const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
   color,
   isHost,
   onSwapTeam,
+  activeReaction,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -67,26 +69,9 @@ const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
   const isNormalLoud = userAudioLevel > 0.25;
   const isExtraLoud = userAudioLevel > 0.50;
   
-  // Dynamic scale: base 1.0, +0.15 if loud, +0.20 more if extra loud, +audio level bonus
-  // DISABLED if Popover is open to prevent wobbling
-  let dynamicScale = 1;
-  let translateY = 0;
-  
-  if (!isOpen && isMainSinger) {
-    if (isExtraLoud) {
-      // Level 2: Extra loud - massive scale with spotlight
-      dynamicScale = 1.35 + (userAudioLevel * 0.15);
-      translateY = -20 - (userAudioLevel * 10);
-    } else if (isNormalLoud) {
-      // Level 1: Normal loud - moderate scale up
-      dynamicScale = 1.15 + ((userAudioLevel - 0.15) * 0.4);
-      translateY = -8 - (userAudioLevel * 8);
-    } else if (userAudioLevel > 0.08) {
-      // Light speaking - subtle scale
-      dynamicScale = 1.05 + (userAudioLevel * 0.3);
-      translateY = -4;
-    }
-  }
+  // Discord-style: No jumping/scaling, just static
+  const dynamicScale = 1;
+  const translateY = 0;
 
   // If popover is open, we can still subtly bounce for rhythm but avoid heavy transforms
   // or just stay static. Static is safest for UI interaction.
@@ -101,7 +86,8 @@ const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
     )}
     style={{
       transform: `scale(${dynamicScale}) translateY(${translateY}px)`,
-      transition: 'transform 0.08s ease-out',
+      transition: 'transform 0.12s cubic-bezier(0.2, 0.8, 0.2, 1)', // Smoother spring-like ease
+      willChange: 'transform',
     }}
     >
       {/* Music notes floating effect for loud singing */}
@@ -116,6 +102,15 @@ const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
             onStartVote={onStartVoteKick}
             disabled={voteKickDisabled}
           />
+        </div>
+      )}
+
+      {/* Zoom-style active reaction badge */}
+      {activeReaction && (
+        <div className="absolute -top-3 -left-3 z-50 animate-in zoom-in fade-in duration-300">
+          <div className="text-4xl filter drop-shadow-md animate-bounce-subtle">
+            {activeReaction}
+          </div>
         </div>
       )}
 
@@ -141,15 +136,29 @@ const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
       )}>
         <Popover open={isOpen} onOpenChange={setIsOpen}>
           <PopoverTrigger asChild>
-            <button className="outline-none focus:ring-2 focus:ring-primary rounded-full transition-transform active:scale-95">
-              <UserAvatar
-                user={user}
-                size="lg"
-                showName
-                isMainSinger={isMainSinger}
-                audioLevel={userAudioLevel}
-                isExtraLoud={isExtraLoud}
+            <button className="relative outline-none focus:ring-2 focus:ring-primary rounded-full transition-transform active:scale-95">
+              {/* Discord-style Speaking Ring */}
+              <div 
+                className={cn(
+                  "absolute -inset-1 rounded-full border-2 border-green-500 z-0 transition-opacity duration-150",
+                  user.isSpeaking ? "opacity-100" : "opacity-0"
+                )}
+                style={{
+                  transform: 'scale(1)',
+                  boxShadow: user.isSpeaking ? `0 0 ${10 + userAudioLevel * 15}px rgba(34, 197, 94, 0.6)` : 'none'
+                }}
               />
+              
+              <div className="relative z-10">
+                <UserAvatar
+                  user={user}
+                  size="lg"
+                  showName
+                  isMainSinger={isMainSinger}
+                  audioLevel={userAudioLevel}
+                  isExtraLoud={isExtraLoud}
+                />
+              </div>
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-64 p-4 glass backdrop-blur-xl border-primary/20" side="top">
@@ -224,6 +233,7 @@ interface UserAvatarRowProps {
   onVolumeChange?: (userId: string, volume: number) => void;
   isHost?: boolean;
   onSwapTeam?: (userId: string) => void;
+  activeReactions?: Map<string, string>;
 }
 
 export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({ 
@@ -242,6 +252,7 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
   onVolumeChange,
   isHost = false,
   onSwapTeam,
+  activeReactions = new Map(),
 }) => {
   // Sort to put current user first
   const sortedUsers = [...users].sort((a, b) => {
@@ -295,6 +306,7 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
       onVolumeChange={onVolumeChange}
       isHost={isHost}
       onSwapTeam={onSwapTeam}
+      activeReaction={activeReactions.get(user.id) || null}
     />
   );
 

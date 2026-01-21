@@ -10,6 +10,7 @@ interface YouTubePlayer {
   mute: () => void;
   unMute: () => void;
   loadVideoById: (videoId: string) => void;
+  cueVideoById: (videoId: string) => void;
   destroy: () => void;
   getPlayerState: () => number;
   // Caption methods
@@ -28,6 +29,10 @@ interface UseYouTubePlayerReturn {
   play: () => void;
   pause: () => void;
   seekTo: (seconds: number) => void;
+  /** Cue video without auto-playing (for ready check) */
+  cueVideo: (videoId: string) => void;
+  /** Get current video time (for sync) */
+  getCurrentTime: () => number;
   setVolume: (volume: number) => void;
   mute: () => void;
   unmute: () => void;
@@ -355,6 +360,39 @@ export const useYouTubePlayer = (
     }
   }, []);
 
+  // Cue video without auto-playing (for ready check system)
+  const cueVideo = useCallback((videoId: string) => {
+    if (!playerRef.current || !isPlayerReady.current) return;
+    
+    if (currentVideoIdRef.current !== videoId) {
+      currentVideoIdRef.current = videoId;
+      endedHandledRef.current = false;
+      setHasEnded(false);
+      setCurrentTime(0);
+      setAreCaptionsEnabled(false);
+      setHasCaptionsAvailable(false);
+      
+      // Use cueVideoById instead of loadVideoById to prevent auto-play
+      if ((playerRef.current as any).cueVideoById) {
+        (playerRef.current as any).cueVideoById(videoId);
+      } else {
+        // Fallback: load and immediately pause
+        playerRef.current.loadVideoById(videoId);
+        setTimeout(() => {
+          playerRef.current?.pauseVideo();
+        }, 100);
+      }
+    }
+  }, []);
+
+  // Get current video time (wrapper for sync system)
+  const getCurrentTimeValue = useCallback(() => {
+    if (playerRef.current && isPlayerReady.current) {
+      return playerRef.current.getCurrentTime();
+    }
+    return currentTime;
+  }, [currentTime]);
+
   const setVolume = useCallback((volume: number) => {
     if (playerRef.current && isPlayerReady.current) {
       playerRef.current.setVolume(volume);
@@ -429,5 +467,7 @@ export const useYouTubePlayer = (
     hasCaptionsAvailable,
     error,
     clearError,
+    cueVideo,
+    getCurrentTime: getCurrentTimeValue,
   };
 };

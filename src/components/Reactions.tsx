@@ -76,54 +76,78 @@ export const useReactions = (
   channel: any | null,
   userId: string
 ) => {
+  // Floating reactions (visual particles)
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
+  // Persistent Zoom-style reactions (badge on avatar)
+  const [activeReactions, setActiveReactions] = useState<Map<string, string>>(new Map());
 
   const sendReaction = useCallback((emoji: string) => {
     if (!channel) return;
 
-    const reaction: FloatingReaction = {
-      id: `${Date.now()}-${Math.random()}`,
-      emoji,
-      x: 30 + Math.random() * 40,
-      userId,
-    };
-
-    // Broadcast to others
+    // 1. Broadcast to others
     channel.send({
       type: 'broadcast',
       event: 'reaction',
-      payload: reaction,
+      payload: {
+        id: `${Date.now()}-${Math.random()}`,
+        emoji,
+        userId,
+      },
     });
 
-    // Show locally
-    setReactions((prev) => [...prev, reaction]);
+    // 2. Show locally (Instant feedback)
+    handleNewReaction(userId, emoji);
 
-    // Remove after animation
-    setTimeout(() => {
-      setReactions((prev) => prev.filter((r) => r.id !== reaction.id));
-    }, 3000);
   }, [channel, userId]);
+
+  // Common handler for both local and remote reactions
+  const handleNewReaction = (reactorId: string, emoji: string) => {
+    // A. Add to floating particles (transient)
+    const newParticle: FloatingReaction = {
+      id: `${Date.now()}-${Math.random()}`,
+      emoji,
+      x: 30 + Math.random() * 40, // Random X for global float (legacy support)
+      userId: reactorId,
+    };
+
+    setReactions((prev) => [...prev, newParticle]);
+    setTimeout(() => {
+      setReactions((prev) => prev.filter((r) => r.id !== newParticle.id));
+    }, 3000);
+
+    // B. Set active persistent reaction (Zoom style)
+    setActiveReactions((prev) => {
+      const next = new Map(prev);
+      next.set(reactorId, emoji);
+      return next;
+    });
+
+    // Clear active reaction after 5 seconds (Zoom behavior)
+    setTimeout(() => {
+      setActiveReactions((prev) => {
+        const next = new Map(prev);
+        // Only remove if it's still the same emoji (hasn't been overwritten)
+        if (next.get(reactorId) === emoji) {
+          next.delete(reactorId);
+        }
+        return next;
+      });
+    }, 5000);
+  };
 
   useEffect(() => {
     if (!channel) return;
 
-    const handleReaction = (payload: { payload: FloatingReaction }) => {
-      const reaction = payload.payload;
-      if (reaction.userId === userId) return; // Skip own reactions
-
-      setReactions((prev) => [...prev, reaction]);
-
-      setTimeout(() => {
-        setReactions((prev) => prev.filter((r) => r.id !== reaction.id));
-      }, 3000);
+    const handleReaction = (payload: { payload: { id: string; emoji: string; userId: string } }) => {
+      const { userId: reactorId, emoji } = payload.payload;
+      if (reactorId === userId) return; // Skip own reactions (already handled)
+      handleNewReaction(reactorId, emoji);
     };
 
     channel.on('broadcast', { event: 'reaction' }, handleReaction);
-
-    // No cleanup needed - channel cleanup is handled by useRoom
   }, [channel, userId]);
 
-  return { reactions, sendReaction };
+  return { reactions, activeReactions, sendReaction };
 };
 
 // Hook to manage light stick waving

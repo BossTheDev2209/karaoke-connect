@@ -6,6 +6,7 @@ import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
 import { useLyrics } from '@/hooks/useLyrics';
 import { useLyricsPreload } from '@/hooks/useLyricsPreload';
 import { useMicrophone } from '@/hooks/useMicrophone';
+import { useSyncV2 } from '@/hooks/useSyncV2';
 
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -90,7 +91,7 @@ export default function Room() {
 
   // Refs for auto sync logic (to avoid circular dependency)
   const isHostRef = useRef(false);
-  const playbackStateRef = useRef({ isPlaying: false });
+  const playbackStateRef = useRef<{ isPlaying?: boolean }>({ isPlaying: false });
   const startSyncLockRef = useRef<(() => void) | null>(null);
 
   // Handle user join for auto sync
@@ -331,7 +332,21 @@ export default function Room() {
      }
   }, [playbackState.currentSongIndex, queue.length, updatePlayback]);
 
-  const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable, error: playerError, clearError } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded, privacyMode);
+  const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable, error: playerError, clearError, cueVideo, getCurrentTime: getPlayerTime } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded, privacyMode);
+
+  // NEW: Timeline-based sync system (V2)
+  const syncV2 = useSyncV2({
+    channel,
+    userId: user?.id || null,
+    isHost,
+    queue,
+    onSeekRequired: seekTo,
+    onPlayRequired: play,
+    onPauseRequired: pause,
+    onCueVideo: cueVideo,
+    getCurrentVideoTime: getPlayerTime,
+    isPlayerReady: isReady,
+  });
 
   // Sync lock for synchronized playback start
   const handleSyncLockComplete = useCallback(() => {
@@ -776,6 +791,46 @@ export default function Room() {
                   <div className="mt-1 text-[10px] uppercase tracking-[0.3em] text-muted-foreground text-center">
                     seconds
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Ready Check Overlay (SyncV2) */}
+            {(syncV2.playbackState.status === 'preparing' || syncV2.playbackState.status === 'ready') && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg z-20">
+                <div className="text-center space-y-4 p-6">
+                  <div className="animate-pulse">
+                    <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto">
+                      <Play className="w-8 h-8 text-primary" />
+                    </div>
+                  </div>
+                  <div className="text-xl font-semibold">Waiting for players...</div>
+                  <div className="flex flex-wrap justify-center gap-2 max-w-xs">
+                    {users.map(u => (
+                      <div 
+                        key={u.id}
+                        className={cn(
+                          "px-3 py-1 rounded-full text-sm flex items-center gap-2",
+                          syncV2.playerReadyStates[u.id] 
+                            ? "bg-green-500/20 text-green-400 border border-green-500/30" 
+                            : "bg-muted text-muted-foreground border border-border"
+                        )}
+                      >
+                        {syncV2.playerReadyStates[u.id] && <span className="text-green-400">✓</span>}
+                        {u.nickname}
+                      </div>
+                    ))}
+                  </div>
+                  {isHost && (
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      onClick={() => syncV2.forceStart()}
+                      className="mt-2"
+                    >
+                      Start Now
+                    </Button>
+                  )}
                 </div>
               </div>
             )}

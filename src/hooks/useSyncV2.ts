@@ -1,0 +1,576 @@
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { RealtimeChannel } from '@supabase/supabase-js';
+import { PlaybackState, PlaybackStatus, PlayerReadyStates, Song } from '@/types/karaoke';
+import { useServerTime } from './useServerTime';
+
+/**
+ * New Sync System (V2) - Timeline-based synchronization
+ * 
+ * Key differences from V1:
+ * 1. Uses server time offset (via useServerTime) for consistent room clock
+ * 2. Ready Check: Song won't start until all players report ready
+ * 3. startAtRoomTime: Stores WHEN song started, not current position
+ * 4. Continuous correction via Web Worker (background-safe)
+ */
+
+// Default playback state with new structure
+const DEFAULT_PLAYBACK: PlaybackState = {
+  status: 'idle',
+  videoId: null,
+  startAtRoomTime: null,
+  seekOffset: 0,
+  currentSongIndex: 0,
+  // Legacy compat
+  isPlaying: false,
+  currentTime: 0,
+  lastUpdate: Date.now(),
+};
+
+// How long to wait for all players to be ready before force-starting
+const READY_CHECK_TIMEOUT_MS = 10000;
+
+// Sync correction threshold (seconds)
+const SYNC_DRIFT_THRESHOLD = 0.5;
+
+interface UseSyncV2Options {
+  channel: RealtimeChannel | null;
+  userId: string | null;
+  isHost: boolean;
+  queue: Song[];
+  onSeekRequired: (time: number) => void;
+  onPlayRequired: () => void;
+  onPauseRequired: () => void;
+  onCueVideo: (videoId: string) => void;
+  getCurrentVideoTime: () => number;
+  isPlayerReady: boolean;
+}
+
+interface UseSyncV2Return {
+  playbackState: PlaybackState;
+  playerReadyStates: PlayerReadyStates;
+  /** Calculate current target time based on room clock */
+  getTargetTime: () => number;
+  /** Host: Prepare a song (triggers ready check) */
+  prepareSong: (songIndex: number) => void;
+  /** Host: Force start even if not all ready */
+  forceStart: () => void;
+  /** Host/Any: Pause playback */
+  pause: () => void;
+  /** Host/Any: Resume playback */
+  resume: () => void;
+  /** Host/Any: Seek to time */
+  seek: (time: number) => void;
+  /** Host: End current song */
+  endSong: () => void;
+  /** Report buffering status */
+  reportBuffering: (isBuffering: boolean) => void;
+}
+
+export function useSyncV2({
+  channel,
+  userId,
+  isHost,
+  queue,
+  onSeekRequired,
+  onPlayRequired,
+  onPauseRequired,
+  onCueVideo,
+  getCurrentVideoTime,
+  isPlayerReady,
+}: UseSyncV2Options): UseSyncV2Return {
+  // Server time for synchronization
+  const { getRoomTime, isCalibrated } = useServerTime();
+  
+  // Core state
+  const [playbackState, setPlaybackState] = useState<PlaybackState>(DEFAULT_PLAYBACK);
+  const [playerReadyStates, setPlayerReadyStates] = useState<PlayerReadyStates>({});
+  
+  // Refs for latest values in callbacks
+  const playbackRef = useRef<PlaybackState>(DEFAULT_PLAYBACK);
+  const isHostRef = useRef(isHost);
+  const readyCheckTimeoutRef = useRef<number | null>(null);
+  
+  // Sync refs
+  playbackRef.current = playbackState;
+  isHostRef.current = isHost;
+
+  /**
+   * Calculate the target video time based on room clock.
+   * targetTime = (roomTime - startAtRoomTime) / 1000 + seekOffset
+   */
+  const getTargetTime = useCallback(() => {
+    const state = playbackRef.current;
+    if (state.status !== 'playing' || !state.startAtRoomTime) {
+      return state.seekOffset || 0;
+    }
+    const roomTime = getRoomTime();
+    const elapsedMs = roomTime - state.startAtRoomTime;
+    return Math.max(0, elapsedMs / 1000 + state.seekOffset);
+  }, [getRoomTime]);
+
+  /**
+   * Host: Prepare a song for synchronized playback.
+   * This triggers the ready check flow.
+   */
+  const prepareSong = useCallback((songIndex: number) => {
+    if (!channel || !isHostRef.current) return;
+    
+    const song = queue[songIndex];
+    if (!song) return;
+    
+    console.log('[SyncV2] Preparing song:', song.title);
+    
+    // Update local state
+    const newState: PlaybackState = {
+      ...DEFAULT_PLAYBACK,
+      status: 'preparing',
+      videoId: song.videoId,
+      currentSongIndex: songIndex,
+    };
+    setPlaybackState(newState);
+    playbackRef.current = newState;
+    
+    // Clear ready states
+    setPlayerReadyStates({});
+    
+    // Broadcast prepare command
+    channel.send({
+      type: 'broadcast',
+      event: 'room_event',
+      payload: {
+        type: 'prepare_song',
+        payload: {
+          videoId: song.videoId,
+          songIndex,
+          hostId: userId,
+        },
+      },
+    });
+    
+    // Set timeout for ready check
+    if (readyCheckTimeoutRef.current) {
+      clearTimeout(readyCheckTimeoutRef.current);
+    }
+    readyCheckTimeoutRef.current = window.setTimeout(() => {
+      console.log('[SyncV2] Ready check timeout - force starting');
+      forceStart();
+    }, READY_CHECK_TIMEOUT_MS);
+  }, [channel, userId, queue]);
+
+  /**
+   * Host: Start the song with synchronized timing.
+   * Calculates startAtRoomTime based on current room clock.
+   */
+  const startSongInternal = useCallback((delayMs: number = 2000) => {
+    if (!channel || !isHostRef.current) return;
+    
+    const state = playbackRef.current;
+    if (!state.videoId) return;
+    
+    // Clear ready check timeout
+    if (readyCheckTimeoutRef.current) {
+      clearTimeout(readyCheckTimeoutRef.current);
+      readyCheckTimeoutRef.current = null;
+    }
+    
+    const roomTime = getRoomTime();
+    const startAtRoomTime = roomTime + delayMs; // Start in delayMs milliseconds
+    
+    console.log(`[SyncV2] Starting song in ${delayMs}ms (roomTime=${roomTime}, startAt=${startAtRoomTime})`);
+    
+    const newState: PlaybackState = {
+      ...state,
+      status: 'playing',
+      startAtRoomTime,
+      seekOffset: 0,
+      isPlaying: true, // Legacy compat
+      currentTime: 0,
+      lastUpdate: Date.now(),
+    };
+    
+    setPlaybackState(newState);
+    playbackRef.current = newState;
+    
+    // Broadcast start command
+    channel.send({
+      type: 'broadcast',
+      event: 'room_event',
+      payload: {
+        type: 'start_song',
+        payload: {
+          videoId: state.videoId,
+          startAtRoomTime,
+          seekOffset: 0,
+        },
+      },
+    });
+  }, [channel, getRoomTime]);
+
+  /**
+   * Force start (skip ready check).
+   */
+  const forceStart = useCallback(() => {
+    startSongInternal(1000); // 1 second countdown
+  }, [startSongInternal]);
+
+  /**
+   * Pause playback.
+   */
+  const pause = useCallback(() => {
+    if (!channel) return;
+    
+    const currentTime = getCurrentVideoTime();
+    console.log(`[SyncV2] Pausing at ${currentTime}s`);
+    
+    const newState: PlaybackState = {
+      ...playbackRef.current,
+      status: 'paused',
+      seekOffset: currentTime,
+      startAtRoomTime: null,
+      isPlaying: false,
+      currentTime,
+      lastUpdate: Date.now(),
+    };
+    
+    setPlaybackState(newState);
+    playbackRef.current = newState;
+    
+    channel.send({
+      type: 'broadcast',
+      event: 'room_event',
+      payload: {
+        type: 'pause_song',
+        payload: {
+          seekOffset: currentTime,
+        },
+      },
+    });
+  }, [channel, getCurrentVideoTime]);
+
+  /**
+   * Resume playback from paused state.
+   */
+  const resume = useCallback(() => {
+    if (!channel) return;
+    
+    const state = playbackRef.current;
+    const roomTime = getRoomTime();
+    const startAtRoomTime = roomTime + 1000; // 1 second to sync
+    
+    console.log(`[SyncV2] Resuming from ${state.seekOffset}s`);
+    
+    const newState: PlaybackState = {
+      ...state,
+      status: 'playing',
+      startAtRoomTime,
+      isPlaying: true,
+      lastUpdate: Date.now(),
+    };
+    
+    setPlaybackState(newState);
+    playbackRef.current = newState;
+    
+    channel.send({
+      type: 'broadcast',
+      event: 'room_event',
+      payload: {
+        type: 'resume_song',
+        payload: {
+          startAtRoomTime,
+          seekOffset: state.seekOffset,
+        },
+      },
+    });
+  }, [channel, getRoomTime]);
+
+  /**
+   * Seek to specific time.
+   */
+  const seek = useCallback((time: number) => {
+    if (!channel) return;
+    
+    const state = playbackRef.current;
+    const roomTime = getRoomTime();
+    
+    console.log(`[SyncV2] Seeking to ${time}s`);
+    
+    // Calculate new startAtRoomTime so that getTargetTime() returns `time`
+    // targetTime = (roomTime - startAt) / 1000 + seekOffset
+    // Rearranging: startAt = roomTime - (targetTime - seekOffset) * 1000
+    const newState: PlaybackState = {
+      ...state,
+      seekOffset: time,
+      startAtRoomTime: state.status === 'playing' ? roomTime : null,
+      currentTime: time,
+      lastUpdate: Date.now(),
+    };
+    
+    setPlaybackState(newState);
+    playbackRef.current = newState;
+    
+    channel.send({
+      type: 'broadcast',
+      event: 'room_event',
+      payload: {
+        type: 'seek_song',
+        payload: {
+          seekOffset: time,
+          startAtRoomTime: newState.startAtRoomTime,
+          roomTime,
+        },
+      },
+    });
+    
+    // Apply locally immediately
+    onSeekRequired(time);
+  }, [channel, getRoomTime, onSeekRequired]);
+
+  /**
+   * End current song.
+   */
+  const endSong = useCallback(() => {
+    if (!channel) return;
+    
+    console.log('[SyncV2] Ending song');
+    
+    const newState: PlaybackState = {
+      ...DEFAULT_PLAYBACK,
+      currentSongIndex: playbackRef.current.currentSongIndex,
+    };
+    
+    setPlaybackState(newState);
+    playbackRef.current = newState;
+    
+    channel.send({
+      type: 'broadcast',
+      event: 'room_event',
+      payload: {
+        type: 'end_song',
+        payload: {},
+      },
+    });
+  }, [channel]);
+
+  /**
+   * Report buffering status.
+   */
+  const reportBuffering = useCallback((isBuffering: boolean) => {
+    if (!channel || !userId) return;
+    
+    channel.send({
+      type: 'broadcast',
+      event: 'room_event',
+      payload: {
+        type: 'buffering_report',
+        payload: {
+          userId,
+          isBuffering,
+          timestamp: getRoomTime(),
+        },
+      },
+    });
+  }, [channel, userId, getRoomTime]);
+
+  // Handle incoming sync events
+  useEffect(() => {
+    if (!channel) return;
+    
+    const handleSyncEvent = ({ payload }: { payload: any }) => {
+      const data = payload;
+      
+      switch (data.type) {
+        case 'prepare_song': {
+          const { videoId, songIndex } = data.payload;
+          console.log('[SyncV2] Received prepare_song:', videoId);
+          
+          setPlaybackState(prev => ({
+            ...prev,
+            status: 'preparing',
+            videoId,
+            currentSongIndex: songIndex,
+          }));
+          
+          // Cue the video
+          onCueVideo(videoId);
+          break;
+        }
+        
+        case 'player_ready': {
+          const { readyUserId } = data.payload;
+          console.log('[SyncV2] Player ready:', readyUserId);
+          
+          setPlayerReadyStates(prev => ({
+            ...prev,
+            [readyUserId]: true,
+          }));
+          break;
+        }
+        
+        case 'start_song': {
+          const { videoId, startAtRoomTime, seekOffset } = data.payload;
+          console.log('[SyncV2] Received start_song:', { videoId, startAtRoomTime, seekOffset });
+          
+          setPlaybackState({
+            status: 'playing',
+            videoId,
+            startAtRoomTime,
+            seekOffset: seekOffset || 0,
+            currentSongIndex: playbackRef.current.currentSongIndex,
+            isPlaying: true,
+            currentTime: seekOffset || 0,
+            lastUpdate: Date.now(),
+          });
+          break;
+        }
+        
+        case 'pause_song': {
+          const { seekOffset } = data.payload;
+          console.log('[SyncV2] Received pause_song at:', seekOffset);
+          
+          setPlaybackState(prev => ({
+            ...prev,
+            status: 'paused',
+            seekOffset,
+            startAtRoomTime: null,
+            isPlaying: false,
+            currentTime: seekOffset,
+            lastUpdate: Date.now(),
+          }));
+          
+          onPauseRequired();
+          break;
+        }
+        
+        case 'resume_song': {
+          const { startAtRoomTime, seekOffset } = data.payload;
+          console.log('[SyncV2] Received resume_song:', { startAtRoomTime, seekOffset });
+          
+          setPlaybackState(prev => ({
+            ...prev,
+            status: 'playing',
+            startAtRoomTime,
+            seekOffset,
+            isPlaying: true,
+            lastUpdate: Date.now(),
+          }));
+          break;
+        }
+        
+        case 'seek_song': {
+          const { seekOffset, startAtRoomTime } = data.payload;
+          console.log('[SyncV2] Received seek_song:', seekOffset);
+          
+          setPlaybackState(prev => ({
+            ...prev,
+            seekOffset,
+            startAtRoomTime,
+            currentTime: seekOffset,
+            lastUpdate: Date.now(),
+          }));
+          
+          onSeekRequired(seekOffset);
+          break;
+        }
+        
+        case 'end_song': {
+          console.log('[SyncV2] Received end_song');
+          setPlaybackState(prev => ({
+            ...DEFAULT_PLAYBACK,
+            currentSongIndex: prev.currentSongIndex,
+          }));
+          break;
+        }
+      }
+    };
+    
+    // Listen for room events
+    // Note: The channel's lifecycle is managed by useRoom, so we don't unsubscribe here
+    channel.on('broadcast', { event: 'room_event' }, handleSyncEvent);
+  }, [channel, onCueVideo, onPauseRequired, onSeekRequired]);
+
+  // When player becomes ready, broadcast it
+  useEffect(() => {
+    if (!channel || !userId || !isPlayerReady) return;
+    
+    const state = playbackRef.current;
+    if (state.status !== 'preparing') return;
+    
+    console.log('[SyncV2] Broadcasting player_ready');
+    
+    channel.send({
+      type: 'broadcast',
+      event: 'room_event',
+      payload: {
+        type: 'player_ready',
+        payload: {
+          readyUserId: userId,
+        },
+      },
+    });
+    
+    // Update own state
+    setPlaybackState(prev => ({
+      ...prev,
+      status: 'ready',
+    }));
+  }, [channel, userId, isPlayerReady]);
+
+  // Sync correction loop (runs every 500ms)
+  useEffect(() => {
+    if (!isCalibrated) return;
+    
+    const correctionInterval = setInterval(() => {
+      const state = playbackRef.current;
+      if (state.status !== 'playing') return;
+      
+      const targetTime = getTargetTime();
+      const currentTime = getCurrentVideoTime();
+      const drift = Math.abs(targetTime - currentTime);
+      
+      if (drift > SYNC_DRIFT_THRESHOLD) {
+        console.log(`[SyncV2] Drift correction: ${drift.toFixed(2)}s (target=${targetTime.toFixed(2)}, current=${currentTime.toFixed(2)})`);
+        onSeekRequired(targetTime);
+      }
+    }, 500);
+    
+    return () => clearInterval(correctionInterval);
+  }, [isCalibrated, getTargetTime, getCurrentVideoTime, onSeekRequired]);
+
+  // Start video when state changes to playing
+  useEffect(() => {
+    const state = playbackState;
+    if (state.status !== 'playing' || !state.startAtRoomTime) return;
+    
+    // Calculate when to start
+    const roomTime = getRoomTime();
+    const delayMs = state.startAtRoomTime - roomTime;
+    
+    if (delayMs > 0) {
+      console.log(`[SyncV2] Scheduling playback in ${delayMs}ms`);
+      const timer = setTimeout(() => {
+        onSeekRequired(state.seekOffset);
+        onPlayRequired();
+      }, delayMs);
+      return () => clearTimeout(timer);
+    } else {
+      // Already past start time - seek to correct position and play
+      const targetTime = getTargetTime();
+      console.log(`[SyncV2] Starting immediately at ${targetTime.toFixed(2)}s`);
+      onSeekRequired(targetTime);
+      onPlayRequired();
+    }
+  }, [playbackState.status, playbackState.startAtRoomTime, getRoomTime, getTargetTime, onSeekRequired, onPlayRequired]);
+
+  return {
+    playbackState,
+    playerReadyStates,
+    getTargetTime,
+    prepareSong,
+    forceStart,
+    pause,
+    resume,
+    seek,
+    endSong,
+    reportBuffering,
+  };
+}
