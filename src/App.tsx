@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import Index from "./pages/Index";
 import Room from "./pages/Room";
+import JoinRoom from "./pages/JoinRoom";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,6 +21,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/room/:code" element={<Room />} />
+            <Route path="/join/:code" element={<JoinRoom />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

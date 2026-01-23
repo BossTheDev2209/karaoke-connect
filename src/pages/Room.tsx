@@ -44,17 +44,23 @@ export default function Room() {
   // State for pending sync after song ends
   const [pendingSyncOnSongEnd, setPendingSyncOnSongEnd] = useState(false);
   
-  // Local user state (only set once on mount/entry)
-  const [user] = useState<User>(() => {
+  // Check if user has a saved profile, if not redirect to join page
+  const [user] = useState<User | null>(() => {
     const saved = sessionStorage.getItem('karaoke_user') || localStorage.getItem('karaoke_user');
-    return saved ? JSON.parse(saved) : {
-      id: crypto.randomUUID(),
-      nickname: `User ${Math.floor(Math.random() * 1000)}`,
-      avatarId: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Date.now()}`,
-      isHost: false,
-      score: 0
-    };
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    // No saved user - will redirect to join page
+    return null;
   });
+  
+  // Redirect to join page if no saved profile
+  useEffect(() => {
+    if (!user && code) {
+      console.log('[Room] No user profile found, redirecting to join page');
+      navigate(`/join/${code}`, { replace: true });
+    }
+  }, [user, code, navigate]);
   const [volume, setVolume] = useState(80);
   const [celebration] = useState(getCurrentCelebration());
   const [celebrationEnabled, setCelebrationEnabled] = useState(true);

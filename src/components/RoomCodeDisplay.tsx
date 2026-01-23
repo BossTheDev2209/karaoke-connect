@@ -17,8 +17,8 @@ interface RoomCodeDisplayProps {
 export const RoomCodeDisplay: React.FC<RoomCodeDisplayProps> = ({ code }) => {
   const [copied, setCopied] = useState(false);
   
-  // Generate the join URL for the QR code
-  const joinUrl = `${window.location.origin}/room/${code}`;
+  // Generate the join URL for the QR code - uses /join/ route for profile setup
+  const joinUrl = `${window.location.origin}/join/${code}`;
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(code);
