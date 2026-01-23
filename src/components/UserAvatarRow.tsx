@@ -5,6 +5,7 @@ import { LightStick, LIGHTSTICK_COLORS } from './effects/LightStick';
 import { VoteKickButton } from './VoteKick';
 import { MusicNotesEffect } from './effects/SingerEffects';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/contexts/ThemeContext';
 import {
   Popover,
   PopoverContent,
@@ -34,6 +35,7 @@ interface UserAvatarItemProps {
   isHost?: boolean;
   onSwapTeam?: (userId: string) => void;
   activeReaction: string | null;
+  partyMode: boolean;
 }
 
 const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
@@ -56,14 +58,15 @@ const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
   isHost,
   onSwapTeam,
   activeReaction,
+  partyMode,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const isMainSinger = user.id === activeMainSingerId;
   const userAudioLevel = user.audioLevel || 0;
   
-  // Cheerleader effect: jump if member of other team is singing
-  const isCheerleader = roomMode === 'team-battle' && activeTeam && user.team !== activeTeam && activeMainSingerId;
+  // Cheerleader effect: jump if member of other team is singing (only in party mode)
+  const isCheerleader = partyMode && roomMode === 'team-battle' && activeTeam && user.team !== activeTeam && activeMainSingerId;
 
   // Two-level sing react - LOWERED THRESHOLDS for more responsive feedback:
   const isNormalLoud = userAudioLevel > 0.25;
@@ -82,7 +85,7 @@ const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
       isMainSinger && isExtraLoud && "z-30",
       isMainSinger && !isExtraLoud && "z-20",
       !isMainSinger && "z-10",
-      !isOpen && isCheerleader && "animate-bounce" // Disable cheerleading bounce if open too
+      !isOpen && isCheerleader && "animate-bounce" // Only bounce in party mode
     )}
     style={{
       transform: `scale(${dynamicScale}) translateY(${translateY}px)`,
@@ -90,8 +93,8 @@ const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
       willChange: 'transform',
     }}
     >
-      {/* Music notes floating effect for loud singing */}
-      <MusicNotesEffect isActive={isMainSinger && user.isSpeaking && isNormalLoud} audioLevel={userAudioLevel} />
+      {/* Music notes floating effect for loud singing (only in party mode) */}
+      {partyMode && <MusicNotesEffect isActive={isMainSinger && user.isSpeaking && isNormalLoud} audioLevel={userAudioLevel} />}
 
       {/* Vote kick button - Hide when setting volume to avoid clutter */}
       {!isOpen && onStartVoteKick && usersCount >= 3 && (
@@ -114,8 +117,8 @@ const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
         </div>
       )}
 
-      {/* Light stick on left side - synced to BPM */}
-      {isWaving && (
+      {/* Light stick on left side - synced to BPM (only in party mode) */}
+      {partyMode && isWaving && (
         <div className="relative -mr-2 z-10">
           <LightStick
             color={color}
@@ -132,7 +135,7 @@ const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
       
       <div className={cn(
         'transition-transform duration-300',
-        !isOpen && (isWaving || isCheerleader) && 'animate-bounce-subtle'
+        partyMode && !isOpen && (isWaving || isCheerleader) && 'animate-bounce-subtle'
       )}>
         <Popover open={isOpen} onOpenChange={setIsOpen}>
           <PopoverTrigger asChild>
@@ -254,6 +257,7 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
   onSwapTeam,
   activeReactions = new Map(),
 }) => {
+  const { partyMode } = useTheme();
   // Sort to put current user first
   const sortedUsers = [...users].sort((a, b) => {
     if (a.id === currentUserId) return -1;
@@ -307,6 +311,7 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
       isHost={isHost}
       onSwapTeam={onSwapTeam}
       activeReaction={activeReactions.get(user.id) || null}
+      partyMode={partyMode}
     />
   );
 

@@ -276,22 +276,17 @@ export const RemoteControl: React.FC<RemoteControlProps> = ({
       {isExpanded && (
         <div className="flex-1 min-h-0">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-3 h-8">
+            <TabsList className="grid w-full grid-cols-2 h-8">
               <TabsTrigger value="playback" className="text-xs gap-1">
                 <Zap className="w-3 h-3" />
                 Sync
               </TabsTrigger>
-              <TabsTrigger value="queue" className="text-xs gap-1">
-                <ListMusic className="w-3 h-3" />
-                Queue
-              </TabsTrigger>
-              {roomMode === 'team-battle' && (
+              {roomMode === 'team-battle' ? (
                 <TabsTrigger value="battle" className="text-xs gap-1">
                   <Swords className="w-3 h-3" />
                   Battle
                 </TabsTrigger>
-              )}
-              {roomMode !== 'team-battle' && (
+              ) : (
                 <TabsTrigger value="users" className="text-xs gap-1">
                   <Users className="w-3 h-3" />
                   Users
@@ -332,48 +327,6 @@ export const RemoteControl: React.FC<RemoteControlProps> = ({
                   Emergency Resync
                 </Button>
               )}
-            </TabsContent>
-
-            {/* Queue Tab */}
-            <TabsContent value="queue" className="flex-1 mt-3 min-h-0">
-              <ScrollArea className="h-[120px]">
-                <div className="space-y-1 pr-2">
-                  {queue.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-4">
-                      No songs in queue
-                    </p>
-                  ) : (
-                    queue.map((song, index) => (
-                      <div
-                        key={song.id}
-                        className={cn(
-                          "flex items-center gap-2 p-2 rounded-lg text-xs cursor-pointer transition-colors",
-                          index === currentSongIndex 
-                            ? "bg-primary/20 border border-primary/30" 
-                            : "hover:bg-muted/50"
-                        )}
-                        onClick={() => isHost && onSelectSong?.(index)}
-                      >
-                        <span className="text-muted-foreground w-4">{index + 1}</span>
-                        <img 
-                          src={song.thumbnail} 
-                          alt="" 
-                          className="w-8 h-6 object-cover rounded"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="truncate font-medium">{song.title}</p>
-                          <p className="truncate text-muted-foreground text-[10px]">{song.artist}</p>
-                        </div>
-                        {index === currentSongIndex && (
-                          <Badge variant="default" className="text-[8px] px-1.5">
-                            {isPlaying ? 'Playing' : 'Current'}
-                          </Badge>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </ScrollArea>
             </TabsContent>
 
             {/* Battle Tab */}

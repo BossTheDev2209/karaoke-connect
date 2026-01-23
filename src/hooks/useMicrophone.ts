@@ -717,7 +717,12 @@ export const useMicrophone = (
           echoCancellation: echoCancellation,
           noiseSuppression: noiseSuppression,
           autoGainControl: autoGainControl,
-        },
+          // Vendor specific constraints for Chrome/Android to force mode
+          googEchoCancellation: echoCancellation,
+          googAutoGainControl: autoGainControl,
+          googNoiseSuppression: noiseSuppression,
+          googHighpassFilter: echoCancellation,
+        } as MediaTrackConstraints,
       };
       
       console.log('[Mic] Requesting microphone with constraints:', constraints);

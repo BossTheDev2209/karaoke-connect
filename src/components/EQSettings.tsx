@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Share2, Save, Undo2, Sliders, Mic, Headphones, Activity } from 'lucide-react';
+import { Share2, Save, Undo2, Sliders, Mic, Headphones, Activity, AlertTriangle, ChevronDown, ChevronUp, Settings2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 export const EQ_BANDS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
@@ -76,6 +76,7 @@ export const EQSettings: React.FC<EQSettingsProps> = ({
     initialSettings || EQ_PRESETS["Flat"]
   );
   const [activePreset, setActivePreset] = useState<string>("Custom");
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const handleBandChange = (index: number, value: number) => {
     const newSettings = [...settings];
@@ -111,6 +112,26 @@ export const EQSettings: React.FC<EQSettingsProps> = ({
   // Convert threshold to a more user-friendly percentage (0-100)
   const sensitivityPercent = Math.round((1 - (threshold - 0.01) / 0.29) * 100);
 
+  const setAudioMode = (mode: 'speaker' | 'headphone') => {
+    if (mode === 'speaker') {
+      onEchoCancellationChange?.(true);
+      onNoiseSuppressionChange?.(true); 
+      onAutoGainControlChange?.(true);
+    } else {
+      onEchoCancellationChange?.(false);
+      // Optional: Ask user preferences, but for HQ defaults:
+      onNoiseSuppressionChange?.(false); 
+      onAutoGainControlChange?.(false);
+      
+      toast({
+        title: "High Quality Mode Active",
+        description: "Echo cancellation OFF. Headphones are REQUIRED to prevent feedback loops!",
+      });
+    }
+  };
+
+  const isHeadphoneMode = !echoCancellation && !noiseSuppression && !autoGainControl;
+
   return (
     <div className="space-y-6 p-1">
       {/* Input Processing Section */}
@@ -121,67 +142,126 @@ export const EQSettings: React.FC<EQSettingsProps> = ({
         </div>
         
         <div className="space-y-4">
-            {/* Gain */}
-            <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                    <Label className="text-xs font-medium">Pre-Amp Gain</Label>
-                    <span className="text-xs font-mono text-indigo-400 font-bold">
-                        {micGain > 0 ? '+' : ''}{Math.round(micGain)}dB
-                    </span>
+            {/* Audio Mode Selector */}
+            <div className="grid grid-cols-2 gap-2 bg-background/40 p-1 rounded-lg border border-border/50">
+              <Button
+                variant={!isHeadphoneMode ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setAudioMode('speaker')}
+                className={!isHeadphoneMode ? "bg-indigo-500 text-white hover:bg-indigo-600" : "hover:bg-indigo-500/10"}
+              >
+                <div className="flex flex-col items-center gap-1 py-1">
+                   <div className="flex items-center gap-1.5">
+                     <Mic className="w-3.5 h-3.5" />
+                     <span>Speaker Mode</span>
+                   </div>
+                   <span className="text-[9px] opacity-80 font-normal">Safe (AEC On)</span>
                 </div>
-                <Slider
-                    value={[micGain]}
-                    min={-12}
-                    max={24}
-                    step={0.5}
-                    onValueChange={([val]) => onMicGainChange?.(val)}
-                    className="py-1"
-                />
+              </Button>
+              <Button
+                variant={isHeadphoneMode ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setAudioMode('headphone')}
+                className={isHeadphoneMode ? "bg-pink-500 text-white hover:bg-pink-600" : "hover:bg-pink-500/10"}
+              >
+                <div className="flex flex-col items-center gap-1 py-1">
+                   <div className="flex items-center gap-1.5">
+                     <Headphones className="w-3.5 h-3.5" />
+                     <span>Studio Mode</span>
+                   </div>
+                   <span className="text-[9px] opacity-80 font-normal">HQ (Headphones Only)</span>
+                </div>
+              </Button>
             </div>
-
-            {/* Toggles */}
-            <div className="flex flex-col gap-3 pt-2">
-                <div className="flex items-center justify-between">
-                    <Label className="text-xs flex flex-col gap-0.5 pointer-events-none">
-                        <span className="font-medium">Noise Suppression</span>
-                        <span className="text-[9px] text-muted-foreground">Reduce background noise details</span>
-                    </Label>
-                    <Switch checked={noiseSuppression} onCheckedChange={onNoiseSuppressionChange} />
-                </div>
-                <div className="flex items-center justify-between">
-                    <Label className="text-xs flex flex-col gap-0.5 pointer-events-none">
-                        <span className="font-medium">Echo Cancellation</span>
-                        <span className="text-[9px] text-muted-foreground">Prevent speaker feedback</span>
-                    </Label>
-                    <Switch checked={echoCancellation} onCheckedChange={onEchoCancellationChange} />
-                </div>
-                 <div className="flex items-center justify-between">
-                    <Label className="text-xs flex flex-col gap-0.5 pointer-events-none">
-                        <span className="font-medium">Auto Gain Control</span>
-                        <span className="text-[9px] text-muted-foreground">Auto-level volume (disable for dynamics)</span>
-                    </Label>
-                    <Switch checked={autoGainControl} onCheckedChange={onAutoGainControlChange} />
-                </div>
-            </div>
-
-             {/* Compressor/Limiter */}
-            <div className="space-y-2 pt-3 border-t border-indigo-500/10">
-                <div className="flex justify-between items-center">
-                    <Label className="text-xs font-medium">Limiter Threshold</Label>
-                    <span className="text-xs font-mono text-indigo-400 font-bold">{compressorThreshold}dB</span>
-                </div>
-                <Slider
-                    value={[compressorThreshold]}
-                    min={-60}
-                    max={0}
-                    step={1}
-                    onValueChange={([val]) => onCompressorThresholdChange?.(val)}
-                    className="py-1"
-                />
-                 <p className="text-[9px] text-muted-foreground leading-tight">
-                    Prevents distortion when singing loud. Lower value = more compression.
+            
+            {isHeadphoneMode && (
+              <div className="flex items-start gap-2 p-2 rounded bg-yellow-500/10 text-yellow-600 border border-yellow-500/20">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                <p className="text-[10px] leading-tight font-medium">
+                  Studio Mode forces High Quality audio by disabling Echo Cancellation.
+                  <span className="font-bold block mt-0.5">HEADPHONES REQUIRED to avoid feedback!</span>
                 </p>
-            </div>
+              </div>
+            )}
+
+            {/* Advanced Settings Toggle */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="w-full flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-foreground border border-dashed border-border/50 mt-2"
+            >
+              <Settings2 className="w-3.5 h-3.5" />
+              {showAdvanced ? 'Hide' : 'Show'} Advanced Controls
+              {showAdvanced ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </Button>
+
+            {/* Advanced Controls (Collapsible) */}
+            {showAdvanced && (
+              <div className="space-y-4 pt-3 mt-2 border-t border-indigo-500/10 animate-in fade-in slide-in-from-top-2 duration-200">
+                {/* Gain */}
+                <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                        <Label className="text-xs font-medium">Pre-Amp Gain</Label>
+                        <span className="text-xs font-mono text-indigo-400 font-bold">
+                            {micGain > 0 ? '+' : ''}{Math.round(micGain)}dB
+                        </span>
+                    </div>
+                    <Slider
+                        value={[micGain]}
+                        min={-12}
+                        max={24}
+                        step={0.5}
+                        onValueChange={([val]) => onMicGainChange?.(val)}
+                        className="py-1"
+                    />
+                </div>
+
+                {/* Toggles */}
+                <div className="flex flex-col gap-3 pt-2">
+                    <div className="flex items-center justify-between">
+                        <Label className="text-xs flex flex-col gap-0.5 pointer-events-none">
+                            <span className="font-medium">Noise Suppression</span>
+                            <span className="text-[9px] text-muted-foreground">Reduce background noise</span>
+                        </Label>
+                        <Switch checked={noiseSuppression} onCheckedChange={onNoiseSuppressionChange} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <Label className="text-xs flex flex-col gap-0.5 pointer-events-none">
+                            <span className="font-medium">Echo Cancellation</span>
+                            <span className="text-[9px] text-muted-foreground">Prevent speaker feedback</span>
+                        </Label>
+                        <Switch checked={echoCancellation} onCheckedChange={onEchoCancellationChange} />
+                    </div>
+                     <div className="flex items-center justify-between">
+                        <Label className="text-xs flex flex-col gap-0.5 pointer-events-none">
+                            <span className="font-medium">Auto Gain Control</span>
+                            <span className="text-[9px] text-muted-foreground">Auto-level volume</span>
+                        </Label>
+                        <Switch checked={autoGainControl} onCheckedChange={onAutoGainControlChange} />
+                    </div>
+                </div>
+
+                 {/* Compressor/Limiter */}
+                <div className="space-y-2 pt-3 border-t border-indigo-500/10">
+                    <div className="flex justify-between items-center">
+                        <Label className="text-xs font-medium">Limiter Threshold</Label>
+                        <span className="text-xs font-mono text-indigo-400 font-bold">{compressorThreshold}dB</span>
+                    </div>
+                    <Slider
+                        value={[compressorThreshold]}
+                        min={-60}
+                        max={0}
+                        step={1}
+                        onValueChange={([val]) => onCompressorThresholdChange?.(val)}
+                        className="py-1"
+                    />
+                     <p className="text-[9px] text-muted-foreground leading-tight">
+                        Prevents distortion when singing loud.
+                    </p>
+                </div>
+              </div>
+            )}
         </div>
       </div>
 

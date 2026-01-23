@@ -17,14 +17,13 @@ import { SongQueue } from '@/components/SongQueue';
 import { SongSearch } from '@/components/SongSearch';
 import { UserAvatarRow } from '@/components/UserAvatarRow';
 import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
-import { RoomSettings } from '@/components/RoomSettings';
+import { RoomMenu } from '@/components/RoomMenu';
 import { CelebrationOverlay, getCurrentCelebration } from '@/components/effects/CelebrationOverlay';
 import { ReactionBar, FloatingReactions, useReactions, useWaving } from '@/components/Reactions';
 import { SingReactOverlay } from '@/components/effects/SingReactOverlay';
 import { DustFallEffect } from '@/components/effects/SingerEffects';
 import { useAudioReactive } from '@/hooks/useAudioReactive';
 import { useVoteKick, VoteKickOverlay } from '@/components/VoteKick';
-import { VotingPanel } from '@/components/VotingPanel';
 import { TeamBattleOverlay } from '@/components/TeamBattleOverlay';
 import { LyricsSelector } from '@/components/LyricsSelector';
 import { MobileRoomLayout } from '@/components/MobileRoomLayout';
@@ -637,7 +636,7 @@ export default function Room() {
             onModeChange: updateMode,
             activeVoteKick,
             hasVoted,
-            onStartVoteKick: startVoteKick,
+            onStartVoteKick: handleVoteKick,
             onVoteYes: voteYes,
             onVoteNo: voteNo,
             voteKickDisabled: !!activeVoteKick
@@ -725,8 +724,9 @@ export default function Room() {
           </div>
 
 
-          {/* Unified Voting Panel */}
-          <VotingPanel
+          {/* Unified Room Menu (replaces VotingPanel & RoomSettings) */}
+          <RoomMenu
+            // Voting Props
             channel={channel}
             currentUserId={user.id}
             users={users}
@@ -735,13 +735,12 @@ export default function Room() {
             onModeChange={updateMode}
             activeVoteKick={activeVoteKick}
             hasVoted={hasVoted}
-            onStartVoteKick={startVoteKick}
+            onStartVoteKick={handleVoteKick}
             onVoteYes={voteYes}
             onVoteNo={voteNo}
             voteKickDisabled={!!activeVoteKick}
-          />
-
-          <RoomSettings 
+            
+            // Settings Props
             celebrationEnabled={celebrationEnabled} 
             onCelebrationToggle={setCelebrationEnabled}
             eqSettings={eqSettings}

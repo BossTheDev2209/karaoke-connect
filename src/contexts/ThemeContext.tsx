@@ -24,6 +24,8 @@ interface ThemeContextValue {
   setAutoSyncOnJoin: (mode: AutoSyncMode) => void;
   hideLyricsWhenNotFound: boolean;
   setHideLyricsWhenNotFound: (hide: boolean) => void;
+  partyMode: boolean;
+  setPartyMode: (enabled: boolean) => void;
   setVideoId: (videoId: string | null) => void;
   colors: ThemeColors;
 }
@@ -192,6 +194,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [privacyMode, setPrivacyModeState] = useState<boolean>(true); // Default ON for privacy
   const [autoSyncOnJoin, setAutoSyncOnJoinState] = useState<AutoSyncMode>('off');
   const [hideLyricsWhenNotFound, setHideLyricsWhenNotFoundState] = useState<boolean>(false);
+  const [partyMode, setPartyModeState] = useState<boolean>(true); // Default ON for fun party experience
   const [videoId, setVideoId] = useState<string | null>(null);
   const [autoColors, setAutoColors] = useState<ThemeColors | null>(null);
   const extractionRef = useRef<string | null>(null);
@@ -244,6 +247,13 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     } catch {}
   }, []);
 
+  const setPartyMode = useCallback((enabled: boolean) => {
+    setPartyModeState(enabled);
+    try {
+      localStorage.setItem('karaoke_party_mode', enabled ? 'true' : 'false');
+    } catch {}
+  }, []);
+
   // Load saved preset on mount
   useEffect(() => {
     try {
@@ -275,6 +285,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       const savedHideLyrics = localStorage.getItem('karaoke_hide_lyrics_missing');
       if (savedHideLyrics !== null) {
         setHideLyricsWhenNotFoundState(savedHideLyrics === 'true');
+      }
+
+      const savedPartyMode = localStorage.getItem('karaoke_party_mode');
+      if (savedPartyMode !== null) {
+        setPartyModeState(savedPartyMode === 'true');
       }
     } catch {}
   }, []);
@@ -317,6 +332,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       setAutoSyncOnJoin,
       hideLyricsWhenNotFound,
       setHideLyricsWhenNotFound,
+      partyMode,
+      setPartyMode,
       setVideoId, 
       colors 
     }}>

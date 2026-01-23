@@ -8,12 +8,11 @@ import { cn } from '@/lib/utils';
 import { SongSearch } from '@/components/SongSearch';
 import { SongQueue } from '@/components/SongQueue';
 import { ReactionBar } from '@/components/Reactions';
-import { VotingPanel } from '@/components/VotingPanel';
+import { RoomMenu } from '@/components/RoomMenu';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { LyricsDisplay } from '@/components/LyricsDisplay';
 import { Badge } from '@/components/ui/badge';
-import { RoomSettings } from '@/components/RoomSettings';
 
 interface MobileRoomLayoutProps {
   user: User;
@@ -134,8 +133,8 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
 
                 <div className="space-y-4 flex-1">
                   <div className="space-y-2">
-                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Audio Settings</h4>
-                    <RoomSettings {...settingsProps} />
+                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Room Menu</h4>
+                    <RoomMenu {...settingsProps} {...votingProps} defaultTab="audio" />
                   </div>
                   
                   <div className="space-y-2">
@@ -163,15 +162,27 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
         </div>
       </header>
 
-      {/* 2. Main Content Area */}
+      {/* 2. Persistent Video Player Area (Moved out of Tabs for persistence) */}
+      <div 
+        ref={youtubePlayerRef}
+        id="youtube-player"
+        className={cn(
+          "transition-all duration-300 bg-black overflow-hidden shadow-lg",
+          (showVideo && activeTab === 'remote') 
+            ? "w-full aspect-video relative opacity-100" 
+            : "absolute top-0 left-0 w-px h-px opacity-0 pointer-events-none"
+        )}
+      />
+
+      {/* 3. Main Content Area */}
       <div className="flex-1 overflow-hidden relative">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
           
           {/* TAB: REMOTE (Main Player) */}
-          <TabsContent value="remote" className="h-full flex flex-col m-0 p-4 data-[state=active]:flex">
+          <TabsContent value="remote" className="flex-1 flex flex-col m-0 p-4 data-[state=active]:flex overflow-hidden">
             
             {/* Current Song Info */}
-            <div className="text-center mb-4 space-y-1">
+            <div className="text-center mb-4 space-y-1 shrink-0">
               {currentSong ? (
                 <>
                   <h2 className="text-xl font-bold truncate px-4 leading-tight">{currentSong.title}</h2>
@@ -185,17 +196,6 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
               )}
             </div>
 
-            {/* Video Container (Conditional) */}
-            <div className={cn(
-              "w-full aspect-video rounded-xl overflow-hidden bg-black shadow-lg mb-4 transition-all duration-300",
-              showVideo ? "flex" : "hidden"
-            )}>
-              {/* This is where we'll teleport the YouTube player div if needed */}
-              <div id="mobile-video-placeholder" className="w-full h-full flex items-center justify-center text-white/50 bg-black">
-                Video Player
-              </div>
-            </div>
-
             {/* Lyrics Area (Scrollable) */}
             <div className="flex-1 min-h-0 bg-secondary/10 rounded-2xl p-4 mb-4 relative overflow-hidden backdrop-blur-sm border border-white/5">
               <ScrollArea className="h-full">
@@ -204,7 +204,7 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
             </div>
 
             {/* Progress Bar */}
-            <div className="mb-4 px-1">
+            <div className="mb-4 px-1 shrink-0">
               <Slider
                 value={[currentTime]}
                 max={duration || 100}
@@ -219,7 +219,7 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
             </div>
 
             {/* Playback Controls */}
-            <div className="flex items-center justify-center gap-6 mb-4">
+            <div className="flex items-center justify-center gap-6 mb-4 shrink-0">
               <Button variant="ghost" size="icon" onClick={onPrevious} className="text-muted-foreground">
                 <SkipBack className="w-6 h-6" />
               </Button>
@@ -244,8 +244,8 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
 
 
           {/* TAB: QUEUE (Search & List) */}
-          <TabsContent value="queue" className="h-full flex flex-col m-0 p-0 data-[state=active]:flex">
-            <div className="p-4 border-b bg-muted/20">
+          <TabsContent value="queue" className="flex-1 flex flex-col m-0 p-0 data-[state=active]:flex overflow-hidden">
+            <div className="p-4 border-b bg-muted/20 shrink-0">
               <SongSearch onAddSong={onAddSong} userId={user.id} compact />
             </div>
             <ScrollArea className="flex-1 p-4">
@@ -261,26 +261,27 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
 
 
           {/* TAB: SOCIAL (Reactions & Users) */}
-          <TabsContent value="social" className="h-full flex flex-col m-0 p-4 data-[state=active]:flex">
-            <div className="space-y-6">
+          <TabsContent value="social" className="flex-1 flex flex-col m-0 p-4 data-[state=active]:flex overflow-hidden">
+            <ScrollArea className="flex-1 h-full"> 
+             <div className="space-y-6 pb-4">
               {/* Reactions Grid */}
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Reactions</h3>
                 <ReactionBar {...reactionProps} layout="grid" />
               </div>
 
-              {/* Voting Panel */}
-              <div className="space-y-2">
-                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Votes & Actions</h3>
-                 <VotingPanel {...votingProps} />
+              {/* Quick tip - Menu is in header */}
+              <div className="text-center py-3 px-4 rounded-lg bg-muted/20 border border-dashed border-border">
+                <p className="text-xs text-muted-foreground">
+                  💡 Settings, voting & more in the <span className="font-semibold text-primary">Menu ☰</span> button above
+                </p>
               </div>
 
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                   Users ({users.length})
                 </h3>
-                <ScrollArea className="h-48 rounded-lg border bg-card/50">
-                   <div className="p-2 space-y-1">
+                <div className="p-2 space-y-1 rounded-lg border bg-card/50">
                      {users.map(u => (
                        <div key={u.id} className="flex items-center gap-2 p-2 rounded hover:bg-white/5">
                          <div className={cn(
@@ -292,14 +293,14 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
                        </div>
                      ))}
                    </div>
-                </ScrollArea>
               </div>
-            </div>
+             </div>
+            </ScrollArea>
           </TabsContent>
 
 
-          {/* 3. Bottom Navigation Bar */}
-          <TabsList className="grid grid-cols-3 h-16 rounded-none border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          {/* 4. Bottom Navigation Bar */}
+          <TabsList className="grid grid-cols-3 h-16 shrink-0 rounded-none border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <TabsTrigger 
               value="remote" 
               className="flex flex-col gap-1 h-full rounded-none data-[state=active]:bg-transparent data-[state=active]:text-primary border-t-2 border-transparent data-[state=active]:border-primary transition-all"
@@ -324,17 +325,6 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
           </TabsList>
         </Tabs>
       </div>
-
-      {/* Hidden YouTube Container (we need it mounted for audio) */}
-      <div 
-        ref={youtubePlayerRef}
-        id="youtube-player"
-        className={cn(
-          "absolute top-0 left-0 w-px h-px opacity-0 pointer-events-none",
-          // If user wants to see video, we'd theoretically move it, 
-          // but for now we keep it hidden to save layout complexity
-        )} 
-      />
     </div>
   );
 };
