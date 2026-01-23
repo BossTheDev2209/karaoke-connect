@@ -29,7 +29,7 @@ import { LyricsSelector } from '@/components/LyricsSelector';
 import { MobileRoomLayout } from '@/components/MobileRoomLayout';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 
-import { LogOut, Swords, Mic2, Sparkles, Play } from 'lucide-react';
+import { LogOut, Swords, Mic2, Sparkles, Play, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -683,8 +683,13 @@ export default function Room() {
       
       {/* Dust fall effect when singing EXTRA loudly (Level 2) */}
       <DustFallEffect isActive={isExtraLoudSinging && isPlaying} intensity={maxUserAudioLevel} />
-      {/* Header */}
-      <header className="flex flex-wrap gap-2 items-center justify-between">
+      {/* Header - Host gets amber accent */}
+      <header className={cn(
+        "flex flex-wrap gap-2 items-center justify-between rounded-xl px-4 py-2 transition-all",
+        isHost 
+          ? "bg-gradient-to-r from-amber-950/40 via-background to-background border border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.1)]" 
+          : "bg-background/50"
+      )}>
         <RoomCodeDisplay code={code} />
         <div className="flex items-center gap-2">
           {/* Connection indicator */}
@@ -773,18 +778,30 @@ export default function Room() {
 
       {/* Main content - Video takes priority */}
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3">
-        {/* Queue panel */}
-        <div className="lg:col-span-3 card-karaoke overflow-hidden flex flex-col order-3 lg:order-1">
-          <h3 className="font-semibold mb-3 text-primary">Queue</h3>
-          <div className="mb-3">
+        {/* Queue panel - Different for Host vs Member */}
+        <div className={cn(
+          "lg:col-span-3 card-karaoke overflow-hidden flex flex-col order-3 lg:order-1",
+          isHost && "border-amber-500/20 bg-gradient-to-b from-amber-950/20 to-transparent"
+        )}>
+          <div className="flex items-center gap-2 mb-3">
+            {isHost ? (
+              <>
+                <Crown className="w-4 h-4 text-amber-400" />
+                <h3 className="font-bold text-amber-400">Your Queue</h3>
+              </>
+            ) : (
+              <h3 className="font-semibold text-muted-foreground">Room Queue</h3>
+            )}
+          </div>
+          <div className={cn("mb-3", !isHost && "opacity-70")}>
             <SongSearch onAddSong={handleAddSong} userId={user.id} />
           </div>
           <div className="flex-1 overflow-y-auto">
             <SongQueue 
               queue={queue} 
               currentIndex={playbackState.currentSongIndex} 
-              onRemove={handleRemoveSong} 
-              onSelect={handleSelectSong}
+              onRemove={isHost ? handleRemoveSong : undefined} 
+              onSelect={isHost ? handleSelectSong : undefined}
               getLyricStatus={getStatusForSong}
             />
           </div>
@@ -984,8 +1001,11 @@ export default function Room() {
           )}
         </div>
 
-        {/* Controls panel */}
-        <div className="lg:col-span-3 card-karaoke flex flex-col order-2 lg:order-3">
+        {/* Controls panel - Host gets special styling */}
+        <div className={cn(
+          "lg:col-span-3 card-karaoke flex flex-col order-2 lg:order-3",
+          isHost && "border-amber-500/20 !p-0 overflow-hidden"
+        )}>
           <RemoteControl
             isPlaying={isPlaying}
             isMuted={isMuted}

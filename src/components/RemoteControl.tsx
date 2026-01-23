@@ -157,17 +157,55 @@ export const RemoteControl: React.FC<RemoteControlProps> = ({
   const rightScore = rightTeam.reduce((sum, u) => sum + (u.score || 0), 0);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Current Song Info - Always visible */}
+    <div className={cn(
+      "flex flex-col h-full rounded-xl transition-all",
+      isHost 
+        ? "bg-gradient-to-b from-amber-950/30 via-background to-background border-2 border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]" 
+        : "bg-background"
+    )}>
+      {/* Header - Different for Host vs Member */}
+      <div className={cn(
+        "px-3 py-2 rounded-t-lg mb-2",
+        isHost 
+          ? "bg-gradient-to-r from-amber-500/20 via-amber-500/10 to-transparent border-b border-amber-500/30" 
+          : "border-b border-border"
+      )}>
+        {isHost ? (
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-amber-500/20">
+              <Crown className="w-4 h-4 text-amber-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-amber-400 tracking-wide">DJ CONTROL</h3>
+              <p className="text-[10px] text-amber-400/60">You're running the show</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-muted">
+              <Volume2 className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground">Now Playing</h3>
+              <p className="text-[10px] text-muted-foreground/60">Enjoy the music</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Current Song Info */}
       {currentSong && (
-        <div className="mb-3">
-          <p className="font-medium truncate text-sm">{currentSong.title}</p>
+        <div className="mb-3 px-3">
+          <p className={cn(
+            "font-medium truncate text-sm",
+            isHost && "text-amber-100"
+          )}>{currentSong.title}</p>
           <p className="text-xs text-muted-foreground truncate">{currentSong.artist}</p>
         </div>
       )}
 
       {/* Progress bar - Always visible */}
-      <div className="space-y-1 mb-4">
+      <div className="space-y-1 mb-4 px-3">
         <Slider
           value={[isSeeking ? seekValue : currentTime]}
           max={duration || 100}
@@ -175,7 +213,10 @@ export const RemoteControl: React.FC<RemoteControlProps> = ({
           onPointerDown={handleSeekStart}
           onValueChange={handleSeekChange}
           onValueCommit={handleSeekEnd}
-          className="cursor-pointer"
+          className={cn(
+            "cursor-pointer",
+            isHost && "[&_[role=slider]]:bg-amber-500 [&_.bg-primary]:bg-amber-500"
+          )}
         />
         <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
           <span>{formatTime(isSeeking ? seekValue : currentTime)}</span>
@@ -184,7 +225,7 @@ export const RemoteControl: React.FC<RemoteControlProps> = ({
       </div>
 
       {/* Main playback controls - Always visible */}
-      <div className="flex items-center justify-center gap-2 mb-4">
+      <div className="flex items-center justify-center gap-2 mb-4 px-3">
         {/* Mic toggle */}
         <TooltipProvider>
           <Tooltip>
@@ -207,21 +248,28 @@ export const RemoteControl: React.FC<RemoteControlProps> = ({
           </Tooltip>
         </TooltipProvider>
 
-        {/* Previous */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onPrevious}
-          disabled={!canGoPrevious}
-          className="rounded-full h-9 w-9"
-        >
-          <SkipBack className="w-4 h-4" />
-        </Button>
+        {/* Previous - Host only for full control */}
+        {isHost && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onPrevious}
+            disabled={!canGoPrevious}
+            className="rounded-full h-9 w-9"
+          >
+            <SkipBack className="w-4 h-4" />
+          </Button>
+        )}
 
-        {/* Play/Pause - Main button */}
+        {/* Play/Pause - Main button with host styling */}
         <Button
           onClick={handleSmartPlayPause}
-          className="btn-neon w-14 h-14 rounded-full flex items-center justify-center shadow-lg"
+          className={cn(
+            "w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all",
+            isHost 
+              ? "bg-gradient-to-br from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-black shadow-amber-500/30" 
+              : "btn-neon"
+          )}
         >
           {isPlaying ? (
             <Pause className="w-6 h-6" />
@@ -230,16 +278,18 @@ export const RemoteControl: React.FC<RemoteControlProps> = ({
           )}
         </Button>
 
-        {/* Next */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onNext}
-          disabled={!canGoNext}
-          className="rounded-full h-9 w-9"
-        >
-          <SkipForward className="w-4 h-4" />
-        </Button>
+        {/* Next - Host only for full control */}
+        {isHost && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onNext}
+            disabled={!canGoNext}
+            className="rounded-full h-9 w-9"
+          >
+            <SkipForward className="w-4 h-4" />
+          </Button>
+        )}
 
         {/* Volume */}
         <div className="flex items-center gap-1">
@@ -261,20 +311,27 @@ export const RemoteControl: React.FC<RemoteControlProps> = ({
         </div>
       </div>
 
-      {/* Expandable section for host/advanced features */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-foreground mb-2"
-      >
-        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-        {isHost ? 'Host Controls' : 'More Options'}
-        {isHost && <Crown className="w-3 h-3 text-amber-400" />}
-      </Button>
+      {/* Expandable section - Host gets full controls, Members get minimal */}
+      {isHost ? (
+        <>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className={cn(
+              "w-full flex items-center justify-center gap-2 text-xs mb-2 mx-3 transition-all",
+              isExpanded 
+                ? "bg-amber-500/10 text-amber-400 border border-amber-500/30" 
+                : "text-amber-400/60 hover:text-amber-400 border border-transparent hover:border-amber-500/20"
+            )}
+          >
+            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+            Host Controls
+            <Crown className="w-3 h-3 text-amber-400" />
+          </Button>
 
-      {isExpanded && (
-        <div className="flex-1 min-h-0">
+          {isExpanded && (
+            <div className="flex-1 min-h-0 px-3">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
             <TabsList className="grid w-full grid-cols-2 h-8">
               <TabsTrigger value="playback" className="text-xs gap-1">
@@ -409,6 +466,21 @@ export const RemoteControl: React.FC<RemoteControlProps> = ({
               </ScrollArea>
             </TabsContent>
           </Tabs>
+        </div>
+          )}
+        </>
+      ) : (
+        /* Member View - Simple sync option only */
+        <div className="px-3 mt-2 pt-2 border-t border-border">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onSync}
+            className="w-full text-xs text-muted-foreground hover:text-foreground gap-2"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Request Sync
+          </Button>
         </div>
       )}
     </div>
