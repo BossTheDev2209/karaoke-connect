@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { PlaybackState, PlaybackStatus, PlayerReadyStates, Song } from '@/types/karaoke';
 import { useServerTime } from './useServerTime';
@@ -6,11 +6,12 @@ import { useServerTime } from './useServerTime';
 /**
  * New Sync System (V2) - Timeline-based synchronization
  * 
- * Key differences from V1:
+ * Key features:
  * 1. Uses server time offset (via useServerTime) for consistent room clock
  * 2. Ready Check: Song won't start until all players report ready
  * 3. startAtRoomTime: Stores WHEN song started, not current position
- * 4. Continuous correction via Web Worker (background-safe)
+ * 4. Web Worker for background-safe drift correction (not throttled in background tabs)
+ * 5. Single source of truth - no legacy sync conflicts
  */
 
 // Default playback state with new structure
@@ -29,8 +30,9 @@ const DEFAULT_PLAYBACK: PlaybackState = {
 // How long to wait for all players to be ready before force-starting
 const READY_CHECK_TIMEOUT_MS = 10000;
 
-// Sync correction threshold (seconds)
-const SYNC_DRIFT_THRESHOLD = 0.5;
+// Sync correction thresholds (seconds)
+const SYNC_DRIFT_THRESHOLD = 0.5; // Seek if drift > 0.5s
+const SYNC_CORRECTION_INTERVAL_MS = 500; // Check every 500ms
 
 interface UseSyncV2Options {
   channel: RealtimeChannel | null;
@@ -64,6 +66,10 @@ interface UseSyncV2Return {
   endSong: () => void;
   /** Report buffering status */
   reportBuffering: (isBuffering: boolean) => void;
+  /** Server time offset for external use */
+  serverTimeOffset: number;
+  /** Whether server time is calibrated */
+  isTimeCalibrated: boolean;
 }
 
 export function useSyncV2({
@@ -78,8 +84,8 @@ export function useSyncV2({
   getCurrentVideoTime,
   isPlayerReady,
 }: UseSyncV2Options): UseSyncV2Return {
-  // Server time for synchronization
-  const { getRoomTime, isCalibrated } = useServerTime();
+  // Server time for synchronization - SINGLE SOURCE OF TRUTH
+  const { getRoomTime, isCalibrated, offset: serverTimeOffset } = useServerTime();
   
   // Core state
   const [playbackState, setPlaybackState] = useState<PlaybackState>(DEFAULT_PLAYBACK);
@@ -89,16 +95,75 @@ export function useSyncV2({
   const playbackRef = useRef<PlaybackState>(DEFAULT_PLAYBACK);
   const isHostRef = useRef(isHost);
   const readyCheckTimeoutRef = useRef<number | null>(null);
+  const workerRef = useRef<Worker | null>(null);
   
   // Sync refs
   playbackRef.current = playbackState;
   isHostRef.current = isHost;
 
   /**
-   * Calculate the target video time based on room clock.
-   * targetTime = (roomTime - startAtRoomTime) / 1000 + seekOffset
+   * Initialize Web Worker for background-safe timing
    */
-  const getTargetTime = useCallback(() => {
+  useEffect(() => {
+    // Create worker from the syncTimer.worker.ts file
+    workerRef.current = new Worker(
+      new URL('../workers/syncTimer.worker.ts', import.meta.url),
+      { type: 'module' }
+    );
+    
+    workerRef.current.onmessage = (event) => {
+      const { type } = event.data;
+      
+      if (type === 'tick') {
+        // Worker tick - perform drift correction
+        const state = playbackRef.current;
+        if (state.status !== 'playing') return;
+        
+        const targetTime = getTargetTimeInternal();
+        const currentTime = getCurrentVideoTime();
+        const drift = Math.abs(targetTime - currentTime);
+        
+        if (drift > SYNC_DRIFT_THRESHOLD) {
+          console.log(`[SyncV2] Drift correction: ${drift.toFixed(2)}s (target=${targetTime.toFixed(2)}, current=${currentTime.toFixed(2)})`);
+          onSeekRequired(targetTime);
+        }
+      } else if (type === 'ready') {
+        console.log('[SyncV2] Worker ready');
+      }
+    };
+    
+    workerRef.current.onerror = (error) => {
+      console.error('[SyncV2] Worker error:', error);
+    };
+    
+    return () => {
+      workerRef.current?.postMessage({ type: 'stop' });
+      workerRef.current?.terminate();
+      workerRef.current = null;
+    };
+  }, [getCurrentVideoTime, onSeekRequired]);
+
+  /**
+   * Start/stop worker based on playback state
+   */
+  useEffect(() => {
+    if (!workerRef.current || !isCalibrated) return;
+    
+    if (playbackState.status === 'playing') {
+      workerRef.current.postMessage({ 
+        type: 'start', 
+        intervalMs: SYNC_CORRECTION_INTERVAL_MS 
+      });
+    } else {
+      workerRef.current.postMessage({ type: 'stop' });
+    }
+  }, [playbackState.status, isCalibrated]);
+
+  /**
+   * Calculate the target video time based on room clock.
+   * Internal version that doesn't depend on getRoomTime callback
+   */
+  const getTargetTimeInternal = useCallback(() => {
     const state = playbackRef.current;
     if (state.status !== 'playing' || !state.startAtRoomTime) {
       return state.seekOffset || 0;
@@ -107,6 +172,13 @@ export function useSyncV2({
     const elapsedMs = roomTime - state.startAtRoomTime;
     return Math.max(0, elapsedMs / 1000 + state.seekOffset);
   }, [getRoomTime]);
+
+  /**
+   * Public version of getTargetTime
+   */
+  const getTargetTime = useCallback(() => {
+    return getTargetTimeInternal();
+  }, [getTargetTimeInternal]);
 
   /**
    * Host: Prepare a song for synchronized playback.
@@ -295,8 +367,6 @@ export function useSyncV2({
     console.log(`[SyncV2] Seeking to ${time}s`);
     
     // Calculate new startAtRoomTime so that getTargetTime() returns `time`
-    // targetTime = (roomTime - startAt) / 1000 + seekOffset
-    // Rearranging: startAt = roomTime - (targetTime - seekOffset) * 1000
     const newState: PlaybackState = {
       ...state,
       seekOffset: time,
@@ -480,12 +550,37 @@ export function useSyncV2({
           }));
           break;
         }
+        
+        // Handle force_sync from host control panel
+        case 'force_sync': {
+          const { currentTime, timestamp, roomTime } = data.payload;
+          console.log('[SyncV2] Force sync received:', { currentTime, roomTime });
+          
+          // Re-sync using the room time reference
+          if (roomTime && playbackRef.current.status === 'playing') {
+            setPlaybackState(prev => ({
+              ...prev,
+              startAtRoomTime: roomTime,
+              seekOffset: currentTime,
+              currentTime,
+              lastUpdate: Date.now(),
+            }));
+          }
+          onSeekRequired(currentTime);
+          break;
+        }
       }
     };
     
     // Listen for room events
-    // Note: The channel's lifecycle is managed by useRoom, so we don't unsubscribe here
-    channel.on('broadcast', { event: 'room_event' }, handleSyncEvent);
+    // Note: Channel cleanup is handled by useRoom, so we just add the listener
+    const subscription = channel.on('broadcast', { event: 'room_event' }, handleSyncEvent);
+    
+    // Return cleanup - we need to unsubscribe by creating a new channel state
+    // Since Supabase doesn't have .off(), we rely on useRoom's cleanup
+    return () => {
+      // Cleanup handled by useRoom when channel is destroyed
+    };
   }, [channel, onCueVideo, onPauseRequired, onSeekRequired]);
 
   // When player becomes ready, broadcast it
@@ -514,27 +609,6 @@ export function useSyncV2({
       status: 'ready',
     }));
   }, [channel, userId, isPlayerReady]);
-
-  // Sync correction loop (runs every 500ms)
-  useEffect(() => {
-    if (!isCalibrated) return;
-    
-    const correctionInterval = setInterval(() => {
-      const state = playbackRef.current;
-      if (state.status !== 'playing') return;
-      
-      const targetTime = getTargetTime();
-      const currentTime = getCurrentVideoTime();
-      const drift = Math.abs(targetTime - currentTime);
-      
-      if (drift > SYNC_DRIFT_THRESHOLD) {
-        console.log(`[SyncV2] Drift correction: ${drift.toFixed(2)}s (target=${targetTime.toFixed(2)}, current=${currentTime.toFixed(2)})`);
-        onSeekRequired(targetTime);
-      }
-    }, 500);
-    
-    return () => clearInterval(correctionInterval);
-  }, [isCalibrated, getTargetTime, getCurrentVideoTime, onSeekRequired]);
 
   // Start video when state changes to playing
   useEffect(() => {
@@ -572,5 +646,7 @@ export function useSyncV2({
     seek,
     endSong,
     reportBuffering,
+    serverTimeOffset,
+    isTimeCalibrated: isCalibrated,
   };
 }

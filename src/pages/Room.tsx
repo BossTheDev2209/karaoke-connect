@@ -139,7 +139,7 @@ export default function Room() {
     requestSync,
     seek,
     networkLatency,
-    clockOffset
+    // NOTE: clockOffset removed - useSyncV2 uses serverTimeOffset from useServerTime instead
   } = useRoom(code || '', user, handleUserJoin);
 
   // Keep refs in sync
@@ -348,71 +348,8 @@ export default function Room() {
   }, [syncV2]);
 
 
-  const lastSeekTimeRef = useRef<number>(0);
-
-  // Simplified Sync Logic
-  useEffect(() => {
-    if (!isReady || !currentSong) return;
-
-    const now = Date.now();
-    const baseTime = playbackState.currentTime || 0;
-    const lastUpdate = playbackState.lastUpdate || now;
-    
-    // Sanity check: lastUpdate should be reasonable
-    const elapsedSinceUpdate = now - lastUpdate;
-    if (elapsedSinceUpdate < 0 || elapsedSinceUpdate > 3600000) return;
-    
-    const elapsed = playbackState.isPlaying ? elapsedSinceUpdate / 1000 : 0;
-    
-    // Apply clock offset compensation
-    // Cap the offset to reasonable bounds (max 5 seconds)
-    const clampedOffset = Math.max(-5000, Math.min(5000, clockOffset));
-    const offsetCompensation = clampedOffset / 1000;
-    
-    const targetTime = baseTime + elapsed + offsetCompensation;
-
-    // Sanity check: targetTime should be within video duration bounds
-    if (!Number.isFinite(targetTime) || targetTime < 0 || (duration > 0 && targetTime > duration + 5)) {
-      return;
-    }
-
-    // 1. Playback State Sync
-    if (playbackState.isPlaying && !isPlaying) {
-      markApplyingRemote();
-      play();
-    } else if (!playbackState.isPlaying && isPlaying) {
-      markApplyingRemote();
-      pause();
-    }
-
-    // 2. Time Sync
-    const drift = Math.abs(targetTime - currentTime);
-    const SEEK_COOLDOWN = 2000;
-    const timeSinceLastSeek = now - lastSeekTimeRef.current;
-
-    // Only seek if drift is significant (> 1.5s) to avoid stuttering
-    // And respect cooldown
-    if (drift > 1.5 && timeSinceLastSeek > SEEK_COOLDOWN) {
-      console.log(`[Sync] Correcting drift: ${drift.toFixed(2)}s`);
-      markApplyingRemote();
-      seekTo(targetTime);
-      lastSeekTimeRef.current = now;
-    }
-  }, [
-    isReady,
-    currentSong?.videoId,
-    playbackState.isPlaying,
-    playbackState.currentTime,
-    playbackState.lastUpdate,
-    currentTime,
-    duration,
-    isPlaying,
-    play,
-    pause,
-    seekTo,
-    markApplyingRemote,
-    clockOffset,
-  ]);
+  // NOTE: Legacy sync logic removed - useSyncV2 now handles ALL synchronization
+  // via server time offset (useServerTime) and Web Worker for background-safe correction
 
   // Audio reactive for light sticks (enabled if Room is playing, even if local audio is buffering/blocked)
   // This ensures visuals are active immediately after refresh
