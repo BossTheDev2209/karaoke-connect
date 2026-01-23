@@ -41,10 +41,10 @@ const DEFAULT_PLAYBACK: PlaybackState = {
   lastUpdate: Date.now(),
 };
 
-// Sync constants
-const SYNC_HEARTBEAT_INTERVAL = 5000; // Host sends sync every 5 seconds
+// RTT constants (for latency display only - not used for sync)
 const RTT_PING_INTERVAL = 10000; // Measure RTT every 10 seconds
 const RTT_SAMPLE_COUNT = 5; // Average over 5 samples
+// NOTE: sync_heartbeat removed - useSyncV2 handles all synchronization via useServerTime
 
 export const useRoom = (
   roomCode: string, 
@@ -65,10 +65,9 @@ export const useRoom = (
   const isHostRef = useRef(false);
   const hasSyncedRef = useRef(false);
 
-  // RTT measurement state
+  // RTT measurement state (for latency display only)
   const rttSamplesRef = useRef<number[]>([]);
   const pendingPingsRef = useRef<Map<string, number>>(new Map());
-  const heartbeatIntervalRef = useRef<number | null>(null);
   const rttIntervalRef = useRef<number | null>(null);
 
   // Store latest state in refs for sync responses
@@ -427,10 +426,6 @@ export const useRoom = (
       channelRef.current = null;
       isHostRef.current = false;
       hasSyncedRef.current = false;
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current);
-        heartbeatIntervalRef.current = null;
-      }
       if (rttIntervalRef.current) {
         clearInterval(rttIntervalRef.current);
         rttIntervalRef.current = null;
@@ -438,42 +433,8 @@ export const useRoom = (
     };
   }, [roomCode, user, getEffectivePlaybackForSync]);
 
-  // Host: Send sync heartbeats periodically
-  useEffect(() => {
-    if (!isConnected) return;
-    
-    // Clear any existing interval
-    if (heartbeatIntervalRef.current) {
-      clearInterval(heartbeatIntervalRef.current);
-      heartbeatIntervalRef.current = null;
-    }
-
-    // Only host sends heartbeats
-    if (isHostRef.current) {
-      heartbeatIntervalRef.current = window.setInterval(() => {
-        if (channelRef.current && isHostRef.current) {
-          channelRef.current.send({
-            type: 'broadcast',
-            event: 'room_event',
-            payload: {
-              type: 'sync_heartbeat',
-              payload: {
-                playbackState: getEffectivePlaybackForSync(0),
-                serverTime: Date.now(),
-              },
-            },
-          });
-        }
-      }, SYNC_HEARTBEAT_INTERVAL);
-    }
-
-    return () => {
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current);
-        heartbeatIntervalRef.current = null;
-      }
-    };
-  }, [isConnected, getEffectivePlaybackForSync]);
+  // NOTE: Heartbeat sync removed - useSyncV2 now handles all synchronization
+  // using useServerTime for clock offset and Web Worker for drift correction
 
   // Non-host: Measure RTT periodically
   useEffect(() => {
