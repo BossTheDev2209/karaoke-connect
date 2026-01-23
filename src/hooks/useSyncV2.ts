@@ -52,8 +52,8 @@ interface UseSyncV2Return {
   playerReadyStates: PlayerReadyStates;
   /** Calculate current target time based on room clock */
   getTargetTime: () => number;
-  /** Host: Prepare a song (triggers ready check) */
-  prepareSong: (songIndex: number) => void;
+  /** Host: Prepare a song (triggers ready check). Pass song directly to avoid stale queue lookups. */
+  prepareSong: (songIndex: number, song?: Song) => void;
   /** Host: Force start even if not all ready */
   forceStart: () => void;
   /** Host/Any: Pause playback */
@@ -200,14 +200,20 @@ export function useSyncV2({
   /**
    * Host: Prepare a song for synchronized playback.
    * This triggers the ready check flow.
+   * @param songIndex - Index of the song in the queue
+   * @param directSong - Optional: Pass the song directly to avoid stale queue lookups
    */
-  const prepareSong = useCallback((songIndex: number) => {
+  const prepareSong = useCallback((songIndex: number, directSong?: Song) => {
     if (!channel || !isHostRef.current) return;
     
-    const song = queue[songIndex];
-    if (!song) return;
+    // Use the directly passed song if available, otherwise lookup from queue
+    const song = directSong || queue[songIndex];
+    if (!song) {
+      console.warn('[SyncV2] prepareSong: No song found at index', songIndex);
+      return;
+    }
     
-    console.log('[SyncV2] Preparing song:', song.title);
+    console.log('[SyncV2] Preparing song:', song.title, 'at index:', songIndex);
     
     // Update local state
     const newState: PlaybackState = {
@@ -232,6 +238,9 @@ export function useSyncV2({
           videoId: song.videoId,
           songIndex,
           hostId: userId,
+          // Include song metadata for lyrics lookup on receiving side
+          title: song.title,
+          artist: song.artist,
         },
       },
     });
