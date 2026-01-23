@@ -10,11 +10,12 @@ import { useTheme } from '@/contexts/ThemeContext';
 interface SongSearchProps {
   onAddSong: (song: Song) => void;
   userId: string;
+  compact?: boolean;
 }
 
 type SearchTab = 'songs' | 'artists';
 
-export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => {
+export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compact = false }) => {
   const { karaokeFilterEnabled } = useTheme();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<YouTubeSearchResult[]>([]);

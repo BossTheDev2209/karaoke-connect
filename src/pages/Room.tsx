@@ -27,6 +27,8 @@ import { useVoteKick, VoteKickOverlay } from '@/components/VoteKick';
 import { VotingPanel } from '@/components/VotingPanel';
 import { TeamBattleOverlay } from '@/components/TeamBattleOverlay';
 import { LyricsSelector } from '@/components/LyricsSelector';
+import { MobileRoomLayout } from '@/components/MobileRoomLayout';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 import { LogOut, Swords, Mic2, Sparkles, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -548,7 +550,130 @@ export default function Room() {
     navigate('/');
   };
 
+  // Check for mobile layout
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const youtubePlayerRef = useRef<HTMLDivElement>(null);
+  
+  const handleVoteKick = useCallback((userId: string) => {
+    const targetUser = users.find(u => u.id === userId);
+    if (targetUser) {
+      startVoteKick(targetUser);
+    }
+  }, [users, startVoteKick]);
+
   if (!user || !code) return null;
+
+  // Render mobile layout if on small screen
+  if (isMobile) {
+    return (
+      <>
+        {/* Celebration effects & Dust - Global */}
+        {celebrationEnabled && <CelebrationOverlay theme={celebration} />}
+        <DustFallEffect isActive={isExtraLoudSinging && isPlaying} intensity={maxUserAudioLevel} />
+        
+        <MobileRoomLayout 
+          user={user}
+          users={users}
+          queue={queue}
+          playbackState={playbackState}
+          roomMode={roomMode}
+          isHost={isHost}
+          isConnected={isConnected}
+          currentSong={currentSong || undefined}
+          // Actions
+          onPlayPause={handlePlayPause}
+          onNext={handleNext}
+          onPrevious={handlePrevious}
+          onSeek={handleSeek}
+          onAddSong={handleAddSong}
+          onRemoveSong={handleRemoveSong}
+          onSelectSong={handleSelectSong}
+          onVoteKick={handleVoteKick}
+          onLeave={handleLeave}
+          // Mic & Audio
+          isMicEnabled={isMicEnabled}
+          onMicToggle={handleMicToggle}
+          volume={volume}
+          onVolumeChange={handleVolumeChange}
+          eqSettings={eqSettings}
+          onEqChange={handleEqChange}
+          // Refs/Props
+          youtubePlayerRef={youtubePlayerRef}
+          currentTime={currentTime}
+          duration={duration}
+          
+          lyricsProps={{
+            lyrics,
+            currentLineIndex,
+            isLoading: lyricsLoading,
+            error: lyricsError,
+            offset: lyricsOffset,
+            onOffsetChange: setLyricsOffset,
+            onLyricsConfirm: handleLyricsConfirm,
+            onLyricsSkip: handleLyricsSkip,
+            showSelector: showLyricsSelector,
+            allMatches,
+            selectedMatchIndex,
+            onSelectMatch: selectMatch,
+            source: lyricsSource
+          }}
+          
+          reactionProps={{
+            channel, 
+            userId: user.id,
+            reactions,
+            onReaction: sendReaction,
+            onWave: toggleWaving,
+            isWaving,
+            wavingUsers
+          }}
+          
+          votingProps={{
+            channel,
+            currentUserId: user.id,
+            users,
+            currentMode: roomMode,
+            isHost,
+            onModeChange: updateMode,
+            activeVoteKick,
+            hasVoted,
+            onStartVoteKick: startVoteKick,
+            onVoteYes: voteYes,
+            onVoteNo: voteNo,
+            voteKickDisabled: !!activeVoteKick
+          }}
+          
+          settingsProps={{
+            celebrationEnabled,
+            onCelebrationToggle: setCelebrationEnabled,
+            eqSettings,
+            onEqChange: handleEqChange,
+            threshold,
+            onThresholdChange: setThreshold,
+            isMonitorEnabled,
+            onMonitorEnabledChange: setMonitorEnabled,
+            monitorVolume,
+            onMonitorVolumeChange: setMonitorVolume,
+            noiseSuppression,
+            onNoiseSuppressionChange: setNoiseSuppression,
+            echoCancellation,
+            onEchoCancellationChange: setEchoCancellation,
+            autoGainControl,
+            onAutoGainControlChange: setAutoGainControl,
+            micGain,
+            onMicGainChange: setMicGain,
+            compressorThreshold,
+            onCompressorThresholdChange: setCompressorThreshold,
+            compressorRatio,
+            onCompressorRatioChange: setCompressorRatio
+          }}
+        />
+        
+        {/* Floating SingReactOverlay for mobile - optional/hidden but needed for logic? */}
+        {/* Actually MobileRoomLayout handles video and overlays internally or hides them */}
+      </>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col p-4 gap-3 overflow-hidden">

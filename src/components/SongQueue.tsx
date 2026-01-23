@@ -17,6 +17,7 @@ interface SongQueueProps {
   onRemove: (songId: string) => void;
   onSelect: (index: number) => void;
   getLyricStatus?: (songId: string) => LyricStatus;
+  isCompact?: boolean;
 }
 
 const LyricStatusIcon: React.FC<{ status: LyricStatus }> = ({ status }) => {
@@ -96,6 +97,7 @@ export const SongQueue: React.FC<SongQueueProps> = ({
   onRemove,
   onSelect,
   getLyricStatus,
+  isCompact = false,
 }) => {
   if (queue.length === 0) {
     return (
