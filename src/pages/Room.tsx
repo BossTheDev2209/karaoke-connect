@@ -196,7 +196,7 @@ export default function Room() {
   }, []);
 
   // Ref for syncV2 to break circular dependency with handleVideoEnded
-  const syncV2Ref = useRef<{ prepareSong: (index: number, song?: Song) => void } | null>(null);
+  const syncV2Ref = useRef<{ prepareSong: (index: number) => void } | null>(null);
 
   // When the current video changes (often driven by remote sync), suppress transient player events
   useEffect(() => {
@@ -280,12 +280,11 @@ export default function Room() {
     setRecommendations([]);
 
     // Use the new sync system to prepare and start the song
-    // Pass the song directly to avoid stale queue lookup issues
+    // This triggers the ready check flow for synchronized playback
     if (isHost) {
-      // Small delay to allow queue update to propagate to other users
+      // Small delay to allow queue update to propagate
       setTimeout(() => {
-        // Pass newSong directly since queue state may not have updated yet in useSyncV2
-        syncV2Ref.current?.prepareSong(newSongIndex, newSong);
+        syncV2Ref.current?.prepareSong(newSongIndex);
       }, 100);
     }
   };
