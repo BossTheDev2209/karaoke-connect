@@ -12,7 +12,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/integrations/supabase/client';
 
 import { LyricsDisplay } from '@/components/LyricsDisplay';
-import { PlayerControls } from '@/components/PlayerControls';
+import { RemoteControl } from '@/components/RemoteControl';
 import { SongQueue } from '@/components/SongQueue';
 import { SongSearch } from '@/components/SongSearch';
 import { UserAvatarRow } from '@/components/UserAvatarRow';
@@ -919,14 +919,7 @@ export default function Room() {
 
         {/* Controls panel */}
         <div className="lg:col-span-3 card-karaoke flex flex-col order-2 lg:order-3">
-          <h3 className="font-semibold mb-4 text-primary">Now Playing</h3>
-          {currentSong && (
-            <div className="mb-4">
-              <p className="font-medium truncate">{currentSong.title}</p>
-              <p className="text-sm text-muted-foreground truncate">{currentSong.artist}</p>
-            </div>
-          )}
-          <PlayerControls
+          <RemoteControl
             isPlaying={isPlaying}
             isMuted={isMuted}
             volume={volume}
@@ -944,9 +937,21 @@ export default function Room() {
             onMicToggle={handleMicToggle}
             onSync={requestSync}
             isHost={isHost}
+            users={users}
+            queue={queue}
+            currentSongIndex={playbackState.currentSongIndex}
+            roomMode={roomMode}
+            battleFormat={battleFormat}
+            onForceSync={requestSync}
+            onSmartPlay={handlePlayPause}
+            onSmartPause={handlePlayPause}
+            onHostSeek={handleSeek}
+            onRemoveSong={handleRemoveSong}
+            onSelectSong={handleSelectSong}
+            currentSong={currentSong}
+            networkLatency={networkLatency}
           />
 
-          
           {/* Reactions */}
           <div className="mt-auto pt-4">
             <ReactionBar onReact={sendReaction} isWaving={isWaving} onWaveToggle={toggleWaving} />
