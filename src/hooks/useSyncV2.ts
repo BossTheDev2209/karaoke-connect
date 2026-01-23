@@ -100,6 +100,17 @@ export function useSyncV2({
   // Sync refs
   playbackRef.current = playbackState;
   isHostRef.current = isHost;
+  
+  // Refs for worker callbacks to avoid stale closures
+  const getTargetTimeRef = useRef<() => number>(() => 0);
+  const getCurrentVideoTimeRef = useRef(getCurrentVideoTime);
+  const onSeekRequiredRef = useRef(onSeekRequired);
+  
+  // Keep callback refs updated
+  useEffect(() => {
+    getCurrentVideoTimeRef.current = getCurrentVideoTime;
+    onSeekRequiredRef.current = onSeekRequired;
+  }, [getCurrentVideoTime, onSeekRequired]);
 
   /**
    * Initialize Web Worker for background-safe timing
@@ -116,16 +127,17 @@ export function useSyncV2({
       
       if (type === 'tick') {
         // Worker tick - perform drift correction
+        // Use refs to avoid stale closure issues
         const state = playbackRef.current;
         if (state.status !== 'playing') return;
         
-        const targetTime = getTargetTimeInternal();
-        const currentTime = getCurrentVideoTime();
+        const targetTime = getTargetTimeRef.current();
+        const currentTime = getCurrentVideoTimeRef.current();
         const drift = Math.abs(targetTime - currentTime);
         
         if (drift > SYNC_DRIFT_THRESHOLD) {
           console.log(`[SyncV2] Drift correction: ${drift.toFixed(2)}s (target=${targetTime.toFixed(2)}, current=${currentTime.toFixed(2)})`);
-          onSeekRequired(targetTime);
+          onSeekRequiredRef.current(targetTime);
         }
       } else if (type === 'ready') {
         console.log('[SyncV2] Worker ready');
@@ -141,7 +153,7 @@ export function useSyncV2({
       workerRef.current?.terminate();
       workerRef.current = null;
     };
-  }, [getCurrentVideoTime, onSeekRequired]);
+  }, []); // Empty deps - worker created once, uses refs for latest values
 
   /**
    * Start/stop worker based on playback state
@@ -172,6 +184,11 @@ export function useSyncV2({
     const elapsedMs = roomTime - state.startAtRoomTime;
     return Math.max(0, elapsedMs / 1000 + state.seekOffset);
   }, [getRoomTime]);
+  
+  // Keep getTargetTimeRef updated for worker callbacks
+  useEffect(() => {
+    getTargetTimeRef.current = getTargetTimeInternal;
+  }, [getTargetTimeInternal]);
 
   /**
    * Public version of getTargetTime

@@ -25,6 +25,7 @@ interface UseServerTimeReturn {
 
 const CALIBRATION_INTERVAL_MS = 30000; // 30 seconds
 const CALIBRATION_SAMPLES = 3; // Take 3 samples and use median
+const MAX_CALIBRATION_FAILURES = 3; // Fallback to local time after 3 failures
 
 export function useServerTime(): UseServerTimeReturn {
   const [offset, setOffset] = useState(0);
@@ -32,6 +33,7 @@ export function useServerTime(): UseServerTimeReturn {
   const [lastRtt, setLastRtt] = useState(0);
   
   const calibrationIntervalRef = useRef<number | null>(null);
+  const calibrationFailuresRef = useRef(0);
 
   /**
    * Perform a single time measurement.
@@ -79,9 +81,20 @@ export function useServerTime(): UseServerTimeReturn {
     }
     
     if (samples.length === 0) {
-      console.warn('[ServerTime] All calibration samples failed');
+      calibrationFailuresRef.current += 1;
+      console.warn(`[ServerTime] Calibration failed (attempt ${calibrationFailuresRef.current}/${MAX_CALIBRATION_FAILURES})`);
+      
+      // After MAX_CALIBRATION_FAILURES, fall back to local time
+      if (calibrationFailuresRef.current >= MAX_CALIBRATION_FAILURES) {
+        console.warn('[ServerTime] Falling back to local time (offset=0)');
+        setOffset(0);
+        setIsCalibrated(true); // Allow sync to proceed with local time
+      }
       return;
     }
+    
+    // Reset failure counter on success
+    calibrationFailuresRef.current = 0;
     
     // Use median offset (most robust to outliers)
     samples.sort((a, b) => a.offset - b.offset);

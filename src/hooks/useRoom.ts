@@ -96,14 +96,27 @@ export const useRoom = (
     return samples.reduce((a, b) => a + b, 0) / samples.length;
   }, []);
 
-  // When sending a full sync, compute an "effective" currentTime for joiners
-  // based on the last known time + elapsed since lastUpdate, plus estimated latency compensation.
+  // When sending a full sync, compute an "effective" PlaybackState for joiners.
+  // For SyncV2 timeline-based sync, we need to include startAtRoomTime properly.
   const getEffectivePlaybackForSync = useCallback((targetLatency: number = 0): PlaybackState => {
     const base = playbackRef.current;
     const now = Date.now();
     const elapsed = base.isPlaying ? Math.max(0, (now - (base.lastUpdate || now)) / 1000) : 0;
     // Add half the target's latency to compensate for network delay
     const latencyCompensation = targetLatency / 2000; // Convert ms to seconds, use half for one-way
+    
+    // For SyncV2: if we have a startAtRoomTime, just pass it through
+    // The joining client will calculate their own target time from it
+    if (base.startAtRoomTime) {
+      return {
+        ...base,
+        // Don't modify startAtRoomTime - it's the anchor point
+        currentTime: (base.currentTime || 0) + elapsed + latencyCompensation,
+        lastUpdate: now,
+      };
+    }
+    
+    // Legacy fallback
     return {
       ...base,
       currentTime: (base.currentTime || 0) + elapsed + latencyCompensation,
@@ -218,19 +231,19 @@ export const useRoom = (
             break;
           }
           case 'seek_event': {
-            const { time, timestamp, seekerId } = data.payload as { time: number; timestamp: number; seekerId: string };
+            const { time, timestamp, seekerId, roomTime } = data.payload as { time: number; timestamp: number; seekerId: string; roomTime?: number };
             // Ignore own seeks
             if (seekerId === user?.id) break;
             
+            // SyncV2 handles seeks via its own seek_song event
+            // This legacy handler now just updates currentTime for UI feedback
             setPlaybackState(prev => {
-              // Create new state with adjusted timestamp
               const newState = {
                 ...prev,
                 currentTime: time,
-                lastUpdate: Date.now() + clockOffsetRef.current // Convert to Server/Host time reference
+                // Use provided roomTime if available, else use timestamp from payload
+                lastUpdate: roomTime || timestamp || Date.now(),
               };
-              // Only apply if newer (though seeks are usually intentional overrides)
-              if (newState.lastUpdate < prev.lastUpdate) return prev;
               return newState;
             });
             break;
@@ -377,28 +390,8 @@ export const useRoom = (
             }
             break;
           }
-          // Sync heartbeat from host
-          case 'sync_heartbeat': {
-            if (!isHostRef.current) {
-              const heartbeatData = data.payload as {
-                playbackState: PlaybackState;
-                serverTime: number;
-              };
-              // Update clock offset
-              const localTime = Date.now();
-              const offset = heartbeatData.serverTime - localTime;
-              setClockOffset(prev => (prev + offset) / 2); // Smooth the offset
-              
-              // Update playback state for continuous sync - but prevent race conditions
-              setPlaybackState(prev => {
-                // If the heartbeat state is older than our last update (unlikely from host, but possible via clock skew/reordering)
-                // Actually, just trust host, but monotonic time is safer
-                if (heartbeatData.playbackState.lastUpdate < prev.lastUpdate) return prev;
-                return heartbeatData.playbackState;
-              });
-            }
-            break;
-          }
+          // NOTE: sync_heartbeat handler removed - SyncV2 now handles all sync via useServerTime
+          // Legacy clients sending sync_heartbeat will be ignored
         }
       })
       .subscribe(async (status) => {
@@ -407,8 +400,14 @@ export const useRoom = (
           setIsConnected(true);
           
           // Request sync after joining with a small delay
+          // Also request if we were previously synced but need to catch up (e.g., after reconnect)
           setTimeout(() => {
-            if (!hasSyncedRef.current) {
+            const shouldRequestSync = !hasSyncedRef.current || 
+              (playbackRef.current.isPlaying && !playbackRef.current.startAtRoomTime);
+            
+            if (shouldRequestSync) {
+              console.log('[Room] Requesting sync (first join or reconnect)');
+              hasSyncedRef.current = false; // Reset to accept new sync
               channel.send({
                 type: 'broadcast',
                 event: 'room_event',
