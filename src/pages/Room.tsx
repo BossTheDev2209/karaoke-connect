@@ -513,6 +513,14 @@ export default function Room() {
     seek(time);   // Robust broadcast
   };
 
+  // Force sync all users to current playback position
+  const handleForceSync = useCallback(() => {
+    if (!isHost) return;
+    const currentPos = getPlayerTime();
+    console.log('[Room] Force syncing all users to:', currentPos);
+    syncV2.seek(currentPos);
+  }, [isHost, getPlayerTime, syncV2]);
+
   const handleNext = () => {
     if (playbackState.currentSongIndex < queue.length - 1) {
       const nextIndex = playbackState.currentSongIndex + 1;
@@ -1029,7 +1037,7 @@ export default function Room() {
             currentSongIndex={playbackState.currentSongIndex}
             roomMode={roomMode}
             battleFormat={battleFormat}
-            onForceSync={requestSync}
+            onForceSync={handleForceSync}
             onSmartPlay={handlePlayPause}
             onSmartPause={handlePlayPause}
             onHostSeek={handleSeek}
