@@ -150,7 +150,7 @@ export const RemoteControl: React.FC<RemoteControlProps> = ({
       "flex flex-col h-full rounded-xl transition-all",
       isHost 
         ? "bg-gradient-to-b from-amber-950/30 via-background to-background border-2 border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]" 
-        : "bg-background"
+        : "bg-card border border-border shadow-md"
     )}>
       {/* Header - Different for Host vs Member */}
       <div className={cn(

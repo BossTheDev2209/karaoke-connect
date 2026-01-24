@@ -839,7 +839,7 @@ export default function Room() {
         "flex flex-wrap gap-2 items-center justify-between rounded-xl px-4 py-2 transition-all",
         isHost 
           ? "bg-gradient-to-r from-amber-950/40 via-background to-background border border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.1)]" 
-          : "bg-background/50"
+          : "bg-gradient-to-r from-primary/10 via-background to-background border border-border/50 shadow-sm"
       )}>
         <RoomCodeDisplay code={code} />
         <div className="flex items-center gap-2">
@@ -1163,11 +1163,8 @@ export default function Room() {
           )}
         </div>
 
-        {/* Controls panel - Host gets special styling */}
-        <div className={cn(
-          "lg:col-span-3 card-karaoke flex flex-col order-2 lg:order-3",
-          isHost && "border-amber-500/20 !p-0 overflow-hidden"
-        )}>
+        {/* Controls panel */}
+        <div className="lg:col-span-3 flex flex-col order-2 lg:order-3 h-full">
           <RemoteControl
             isPlaying={isPlaying}
             isMuted={isMuted}
