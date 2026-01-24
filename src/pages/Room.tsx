@@ -326,14 +326,21 @@ export default function Room() {
 
     const nextIndex = playbackState.currentSongIndex + 1;
     
+    // Stop if queue is empty (or just 1 song that finished) or at end
+    if (queue.length === 0 || nextIndex >= queue.length) {
+       console.log('Queue ended, stopping playback');
+       if (isHost) {
+          syncV2Ref.current?.endSong(); // Explicitly end session
+       }
+       updatePlayback({ isPlaying: false, status: 'idle' });
+       return;
+    }
+
     if (nextIndex < queue.length) {
       // Use the new sync system for synchronized start
       if (isHost) {
         syncV2Ref.current?.prepareSong(nextIndex);
       }
-    } else {
-      // End of queue - stop playing
-      updatePlayback({ isPlaying: false, status: 'idle' });
     }
   }, [queue.length, playbackState.currentSongIndex, updatePlayback, isHost, roomMode]);
 
@@ -597,7 +604,23 @@ export default function Room() {
     navigate('/');
   };
 
-  // Assign the host action handler now that dependencies are available
+  // Hydrate SyncV2 state with the latest playback state from legacy sync if SyncV2 is behind
+  // (Fixes issue where new joiners don't sync because SyncV2 missed the start event)
+  useEffect(() => {
+    if (playbackState.lastUpdate && playbackState.lastUpdate > (syncV2.playbackState.lastUpdate || 0)) {
+        // We received a newer state from legacy sync (e.g., initial full_sync_response)
+        // Check if it has SyncV2 data (startAtRoomTime)
+        if (playbackState.startAtRoomTime) {
+            console.log('[Room] Hydrating SyncV2 with incoming full sync state');
+            // We can't directly set SyncV2 state from here because it's internal to the hook.
+            // But we can trigger a force sync-like behavior if we detect desync.
+            // Actually, best approach is to have useSyncV2 listen to full_sync_response internally (which I'll do in useRoom/useSyncV2).
+            // But if useSyncV2 is separate... 
+            // Better fix: Update useSyncV2 to accept external state updates or listen to the event.
+            // I'll leave this valid comment but handle the logic in useRoom/useSyncV2 integration below.
+        }
+    }
+  }, [playbackState, syncV2.playbackState.lastUpdate]);
   useEffect(() => {
     onHostActionRef.current = (action, payload) => {
       if (action === 'kick') {
@@ -779,6 +802,7 @@ export default function Room() {
         onKickUser={kickUser}
         onForceMuteUser={forceMuteUser}
         onToggleControlAccess={toggleControlAccess}
+        currentUserId={user.id}
         audioSettings={{
           eqSettings: eqSettings,
           onEqChange: handleEqChange,

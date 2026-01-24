@@ -54,6 +54,8 @@ interface HostControlPanelProps {
   // Mic
   isMicEnabled: boolean;
   onMicToggle: () => void;
+  // Current user
+  currentUserId: string;
   // Audio settings props
   audioSettings?: {
     eqSettings: number[];
@@ -106,6 +108,7 @@ export const HostControlPanel: React.FC<HostControlPanelProps> = ({
   onMuteToggle,
   isMicEnabled,
   onMicToggle,
+  currentUserId,
   audioSettings,
   onKickUser,
   onForceMuteUser,
@@ -286,38 +289,44 @@ export const HostControlPanel: React.FC<HostControlPanelProps> = ({
               
               <div className="flex items-center gap-1">
                 {/* Control Access Toggle */}
-                <Button
-                    variant={user.hasControlAccess ? "default" : "ghost"}
-                    size="icon"
-                    className="h-8 w-8 rounded-full"
-                    onClick={() => onToggleControlAccess(user.id)}
-                    title={user.hasControlAccess ? "Revoke Control Access" : "Grant Control Access"}
-                >
-                    <Music className={cn("w-4 h-4", user.hasControlAccess && "text-white")} />
-                </Button>
+                {user.id !== currentUserId && (
+                  <Button
+                      variant={user.hasControlAccess ? "default" : "ghost"}
+                      size="icon"
+                      className="h-8 w-8 rounded-full"
+                      onClick={() => onToggleControlAccess(user.id)}
+                      title={user.hasControlAccess ? "Revoke Control Access" : "Grant Control Access"}
+                  >
+                      <Music className={cn("w-4 h-4", user.hasControlAccess && "text-white")} />
+                  </Button>
+                )}
 
                 {/* Force Mute */}
-                <Button
-                    variant="ghost" 
-                    size="icon"
-                    className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive"
-                    onClick={() => onForceMuteUser(user.id)}
-                    disabled={!user.isMicEnabled}
-                    title="Force Mute"
-                >
-                    <Mic className={cn("w-4 h-4", !user.isMicEnabled && "opacity-30")} />
-                </Button>
+                {user.id !== currentUserId && (
+                  <Button
+                      variant="ghost" 
+                      size="icon"
+                      className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => onForceMuteUser(user.id)}
+                      disabled={!user.isMicEnabled}
+                      title="Force Mute"
+                  >
+                      <Mic className={cn("w-4 h-4", !user.isMicEnabled && "opacity-30")} />
+                  </Button>
+                )}
 
                 {/* Kick */}
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-full hover:bg-destructive hover:text-destructive-foreground"
-                    onClick={() => onKickUser(user.id)}
-                    title="Kick User"
-                >
-                    <LogOut className="w-4 h-4" />
-                </Button>
+                {user.id !== currentUserId && (
+                  <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full hover:bg-destructive hover:text-destructive-foreground"
+                      onClick={() => onKickUser(user.id)}
+                      title="Kick User"
+                  >
+                      <LogOut className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
 
               {user.audioLevel !== undefined && user.audioLevel > 0 && (
