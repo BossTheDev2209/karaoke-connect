@@ -193,18 +193,20 @@ export const RemoteControl: React.FC<RemoteControlProps> = ({
         </div>
       )}
 
-      {/* Progress bar - Always visible */}
+      {/* Progress bar - Host can seek, Members view only */}
       <div className="space-y-1 mb-4 px-3">
         <Slider
           value={[isSeeking ? seekValue : currentTime]}
           max={duration || 100}
           step={0.1}
-          onPointerDown={handleSeekStart}
-          onValueChange={handleSeekChange}
-          onValueCommit={handleSeekEnd}
+          onPointerDown={isHost ? handleSeekStart : undefined}
+          onValueChange={isHost ? handleSeekChange : undefined}
+          onValueCommit={isHost ? handleSeekEnd : undefined}
+          disabled={!isHost}
           className={cn(
-            "cursor-pointer",
-            isHost && "[&_[role=slider]]:bg-amber-500 [&_.bg-primary]:bg-amber-500"
+            isHost 
+              ? "cursor-pointer [&_[role=slider]]:bg-amber-500 [&_.bg-primary]:bg-amber-500" 
+              : "cursor-default opacity-70 [&_[role=slider]]:hidden"
           )}
         />
         <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
@@ -250,22 +252,33 @@ export const RemoteControl: React.FC<RemoteControlProps> = ({
           </Button>
         )}
 
-        {/* Play/Pause - Main button with host styling */}
-        <Button
-          onClick={handleSmartPlayPause}
-          className={cn(
-            "w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all",
-            isHost 
-              ? "bg-gradient-to-br from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-black shadow-amber-500/30" 
-              : "btn-neon"
-          )}
-        >
-          {isPlaying ? (
-            <Pause className="w-6 h-6" />
-          ) : (
-            <Play className="w-6 h-6 ml-0.5" />
-          )}
-        </Button>
+        {/* Play/Pause - Host only for control */}
+        {isHost ? (
+          <Button
+            onClick={handleSmartPlayPause}
+            className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all bg-gradient-to-br from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700 text-black shadow-amber-500/30"
+          >
+            {isPlaying ? (
+              <Pause className="w-6 h-6" />
+            ) : (
+              <Play className="w-6 h-6 ml-0.5" />
+            )}
+          </Button>
+        ) : (
+          /* Member - Status indicator only (no control) */
+          <div className={cn(
+            "w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all",
+            isPlaying 
+              ? "border-primary bg-primary/10 text-primary" 
+              : "border-muted bg-muted/20 text-muted-foreground"
+          )}>
+            {isPlaying ? (
+              <Play className="w-5 h-5" />
+            ) : (
+              <Pause className="w-5 h-5" />
+            )}
+          </div>
+        )}
 
         {/* Next - Host only for full control */}
         {isHost && (
@@ -280,7 +293,7 @@ export const RemoteControl: React.FC<RemoteControlProps> = ({
           </Button>
         )}
 
-        {/* Volume */}
+        {/* Volume - Everyone can control their own volume */}
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
