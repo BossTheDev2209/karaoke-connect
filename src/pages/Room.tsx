@@ -28,8 +28,9 @@ import { TeamBattleOverlay } from '@/components/TeamBattleOverlay';
 import { LyricsSelector } from '@/components/LyricsSelector';
 import { MobileRoomLayout } from '@/components/MobileRoomLayout';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { HostControlPanel } from '@/components/HostControlPanel';
 
-import { LogOut, Swords, Mic2, Sparkles, Play, Crown } from 'lucide-react';
+import { LogOut, Swords, Mic2, Sparkles, Play, Crown, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -65,6 +66,7 @@ export default function Room() {
   const [volume, setVolume] = useState(80);
   const [celebration] = useState(getCurrentCelebration());
   const [celebrationEnabled, setCelebrationEnabled] = useState(true);
+  const [showHostControlPanel, setShowHostControlPanel] = useState(false);
   const [userVolumes, setUserVolumes] = useState<Record<string, number>>(() => {
     const saved = localStorage.getItem('karaoke_user_volumes');
     return saved ? JSON.parse(saved) : {};
@@ -687,6 +689,48 @@ export default function Room() {
       {/* Celebration effects */}
       {celebrationEnabled && <CelebrationOverlay theme={celebration} />}
       
+      {/* Host Control Panel (Modrinth-style popup) */}
+      <HostControlPanel
+        isOpen={showHostControlPanel}
+        onClose={() => setShowHostControlPanel(false)}
+        isPlaying={isPlaying}
+        currentTime={currentTime}
+        duration={duration}
+        currentSong={currentSong}
+        canGoPrevious={playbackState.currentSongIndex > 0}
+        canGoNext={playbackState.currentSongIndex < queue.length - 1}
+        onPlayPause={handlePlayPause}
+        onNext={handleNext}
+        onPrevious={handlePrevious}
+        onSeek={handleSeek}
+        networkLatency={networkLatency}
+        onSync={requestSync}
+        onForceSync={handleForceSync}
+        users={users}
+        volume={volume}
+        isMuted={isMuted}
+        onVolumeChange={handleVolumeChange}
+        onMuteToggle={isMuted ? unmute : mute}
+        isMicEnabled={isMicEnabled}
+        onMicToggle={handleMicToggle}
+        audioSettings={{
+          eqSettings: eqSettings,
+          onEqChange: handleEqChange,
+          noiseSuppression: noiseSuppression,
+          onNoiseSuppressionChange: setNoiseSuppression,
+          echoCancellation: echoCancellation,
+          onEchoCancellationChange: setEchoCancellation,
+          autoGainControl: autoGainControl,
+          onAutoGainControlChange: setAutoGainControl,
+          micGain: micGain,
+          onMicGainChange: setMicGain,
+          compressorThreshold: compressorThreshold,
+          onCompressorThresholdChange: setCompressorThreshold,
+          compressorRatio: compressorRatio,
+          onCompressorRatioChange: setCompressorRatio,
+        }}
+      />
+
       {/* Floating reactions */}
       
       {/* Dust fall effect when singing EXTRA loudly (Level 2) */}
@@ -736,7 +780,18 @@ export default function Room() {
             {roomMode === 'team-battle' ? 'Team Battle' : 'Free Sing'}
           </div>
 
-
+          {/* Host Control Panel Button (Host only) */}
+          {isHost && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowHostControlPanel(true)}
+              className="gap-2 border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-500/50 text-amber-400"
+            >
+              <Settings2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Host Controls</span>
+            </Button>
+          )}
           {/* Unified Room Menu (replaces VotingPanel & RoomSettings) */}
           <RoomMenu
             // Voting Props
