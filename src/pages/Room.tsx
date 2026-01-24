@@ -102,6 +102,13 @@ export default function Room() {
   const playbackStateRef = useRef<{ isPlaying?: boolean }>({ isPlaying: false });
   const startSyncLockRef = useRef<(() => void) | null>(null);
 
+  // Ref for handling host actions (mute/kick) to avoid circular dependencies with useMicrophone
+  const onHostActionRef = useRef<((action: 'mute' | 'kick' | 'control_access', payload?: any) => void) | null>(null);
+
+  const handleHostAction = useCallback((action: 'mute' | 'kick' | 'control_access', payload?: any) => {
+    onHostActionRef.current?.(action, payload);
+  }, []);
+
   // Handle user join for auto sync
   const handleUserJoin = useCallback((joinedUser: User) => {
     console.log('User joined - checking auto sync settings:', autoSyncOnJoin);
@@ -149,7 +156,10 @@ export default function Room() {
     seek,
     networkLatency,
     // NOTE: clockOffset removed - useSyncV2 uses serverTimeOffset from useServerTime instead
-  } = useRoom(code || '', user, handleUserJoin);
+    kickUser,
+    forceMuteUser,
+    toggleControlAccess,
+  } = useRoom(code || '', user, handleUserJoin, handleHostAction);
 
   // Keep refs in sync
   useEffect(() => {
@@ -165,6 +175,13 @@ export default function Room() {
     queue[playbackState.currentSongIndex], 
     [queue, playbackState.currentSongIndex]
   );
+  
+  // Check if user has music control permissions
+  const canControl = useMemo(() => {
+    if (isHost) return true;
+    const currentUserData = users.find(u => u.id === user?.id);
+    return !!currentUserData?.hasControlAccess;
+  }, [isHost, users, user?.id]);
   
   // Update theme context with current video ID for auto-theme
   useEffect(() => {
@@ -501,7 +518,7 @@ export default function Room() {
   }, [toggleMic, eqSettings, updateMicStatus, isMicEnabled]);
 
   const handlePlayPause = () => {
-    if (isHost) {
+    if (canControl) {
       if (isPlaying) {
         syncV2.pause();
       } else {
@@ -517,7 +534,7 @@ export default function Room() {
   };
 
   const handleSeek = (time: number) => {
-    if (isHost) {
+    if (canControl) {
       syncV2.seek(time);
     } else {
       seekTo(time); // Instant local feedback
@@ -535,7 +552,7 @@ export default function Room() {
   const handleNext = () => {
     if (playbackState.currentSongIndex < queue.length - 1) {
       const nextIndex = playbackState.currentSongIndex + 1;
-      if (isHost) {
+      if (canControl) {
         syncV2.prepareSong(nextIndex);
       } else {
         updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
@@ -546,7 +563,7 @@ export default function Room() {
   const handlePrevious = () => {
     if (playbackState.currentSongIndex > 0) {
       const prevIndex = playbackState.currentSongIndex - 1;
-      if (isHost) {
+      if (canControl) {
         syncV2.prepareSong(prevIndex);
       } else {
         updatePlayback({ currentSongIndex: prevIndex, currentTime: 0, isPlaying: true });
@@ -563,7 +580,7 @@ export default function Room() {
   };
 
   const handleSelectSong = (index: number) => {
-    if (isHost) {
+    if (canControl) {
       syncV2.prepareSong(index);
     } else {
       updatePlayback({ currentSongIndex: index, currentTime: 0, isPlaying: true });
@@ -579,6 +596,31 @@ export default function Room() {
     sessionStorage.removeItem('karaoke_user');
     navigate('/');
   };
+
+  // Assign the host action handler now that dependencies are available
+  useEffect(() => {
+    onHostActionRef.current = (action, payload) => {
+      if (action === 'kick') {
+        toast.error('You have been kicked from the room.');
+        handleLeave();
+      } else if (action === 'mute') {
+        if (isMicEnabled) {
+             toast.warning('Your microphone was muted by the host.');
+             // We need to force disable. toggleMic toggles.
+             // But if isMicEnabled check is true, toggleMic() will disable.
+             // We pass current settings to ensure we don't reset EQ
+             toggleMic(eqSettings);
+        }
+      } else if (action === 'control_access') {
+          const { hasControlAccess } = payload || {};
+          if (hasControlAccess) {
+              toast.success('You have been granted control access!');
+          } else {
+              toast.info('Your control access has been revoked.');
+          }
+      }
+    };
+  }, [handleLeave, isMicEnabled, toggleMic, eqSettings]);
 
   // Check for mobile layout
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -734,6 +776,9 @@ export default function Room() {
         onMuteToggle={isMuted ? unmute : mute}
         isMicEnabled={isMicEnabled}
         onMicToggle={handleMicToggle}
+        onKickUser={kickUser}
+        onForceMuteUser={forceMuteUser}
+        onToggleControlAccess={toggleControlAccess}
         audioSettings={{
           eqSettings: eqSettings,
           onEqChange: handleEqChange,
@@ -1107,7 +1152,7 @@ export default function Room() {
             onMuteToggle={isMuted ? unmute : mute}
             onMicToggle={handleMicToggle}
             onSync={requestSync}
-            isHost={isHost}
+            isHost={canControl}
             users={users}
             queue={queue}
             currentSongIndex={playbackState.currentSongIndex}

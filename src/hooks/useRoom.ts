@@ -26,6 +26,9 @@ interface UseRoomReturn {
   seek: (time: number) => void;
   networkLatency: number;
   clockOffset: number;
+  kickUser: (userId: string) => void;
+  forceMuteUser: (userId: string) => void;
+  toggleControlAccess: (userId: string) => void;
 }
 
 const DEFAULT_PLAYBACK: PlaybackState = {
@@ -49,7 +52,8 @@ const RTT_SAMPLE_COUNT = 5; // Average over 5 samples
 export const useRoom = (
   roomCode: string, 
   user: User | null,
-  onUserJoin?: (user: User) => void
+  onUserJoin?: (user: User) => void,
+  onHostAction?: (action: 'mute' | 'kick' | 'control_access', payload?: any) => void
 ): UseRoomReturn => {
   const [users, setUsers] = useState<User[]>([]);
   const [queue, setQueue] = useState<Song[]>([]);
@@ -474,6 +478,32 @@ export const useRoom = (
           }
           // NOTE: sync_heartbeat handler removed - SyncV2 now handles all sync via useServerTime
           // Legacy clients sending sync_heartbeat will be ignored
+          case 'kick_user': {
+            const { targetUserId } = data.payload as { targetUserId: string };
+            if (targetUserId === user?.id) {
+               console.log('[Room] Kicked by host');
+               onHostAction?.('kick');
+            }
+            setUsers(prev => prev.filter(u => u.id !== targetUserId));
+            break;
+          }
+          case 'force_mute_user': {
+            const { targetUserId } = data.payload as { targetUserId: string };
+            if (targetUserId === user?.id) {
+               console.log('[Room] Muted by host');
+               onHostAction?.('mute');
+            }
+            setUsers(prev => prev.map(u => u.id === targetUserId ? { ...u, isMicEnabled: false } : u));
+            break;
+          }
+          case 'permission_update': {
+            const { targetUserId, hasControlAccess } = data.payload as { targetUserId: string; hasControlAccess: boolean };
+            setUsers(prev => prev.map(u => u.id === targetUserId ? { ...u, hasControlAccess } : u));
+            if (targetUserId === user?.id) {
+               onHostAction?.('control_access', { hasControlAccess });
+            }
+            break;
+          }
         }
       })
       .subscribe(async (status) => {
@@ -739,6 +769,41 @@ export const useRoom = (
     });
   }, []);
 
+  const kickUser = useCallback((userId: string) => {
+    if (!isHostRef.current) return;
+    setUsers(prev => prev.filter(u => u.id !== userId));
+    channelRef.current?.send({
+        type: 'broadcast',
+        event: 'room_event',
+        payload: { type: 'kick_user', payload: { targetUserId: userId } }
+    });
+  }, []);
+
+  const forceMuteUser = useCallback((userId: string) => {
+    if (!isHostRef.current) return;
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, isMicEnabled: false } : u));
+    channelRef.current?.send({
+        type: 'broadcast',
+        event: 'room_event',
+        payload: { type: 'force_mute_user', payload: { targetUserId: userId } }
+    });
+  }, []);
+
+  const toggleControlAccess = useCallback((userId: string) => {
+    if (!isHostRef.current) return;
+    setUsers(prev => {
+        const user = prev.find(u => u.id === userId);
+        if (!user) return prev;
+        const newAccess = !user.hasControlAccess;
+        channelRef.current?.send({
+            type: 'broadcast',
+            event: 'room_event',
+            payload: { type: 'permission_update', payload: { targetUserId: userId, hasControlAccess: newAccess } }
+        });
+        return prev.map(u => u.id === userId ? { ...u, hasControlAccess: newAccess } : u);
+    });
+  }, []);
+
   // Auto-assign teams when switching to team-battle (only host to prevent race conditions)
   useEffect(() => {
     if (roomMode === 'team-battle' && users.length > 0 && isHostRef.current) {
@@ -780,5 +845,8 @@ export const useRoom = (
     seek,
     networkLatency,
     clockOffset,
+    kickUser,
+    forceMuteUser,
+    toggleControlAccess,
   };
 };

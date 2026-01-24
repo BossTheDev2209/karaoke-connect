@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   X, Crown, Sliders, Users, Music, Zap, RefreshCw, 
   AlertTriangle, SkipForward, SkipBack, Play, Pause,
-  Volume2, Mic, Settings2, Palette
+  Volume2, Mic, Settings2, Palette, LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -13,15 +13,7 @@ import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { EQSettings } from './EQSettings';
 
-interface User {
-  id: string;
-  nickname: string;
-  isSpeaking?: boolean;
-  isMicEnabled?: boolean;
-  audioLevel?: number;
-  team?: 'left' | 'right';
-  score?: number;
-}
+import { User } from '@/types/karaoke';
 
 interface Song {
   id: string;
@@ -51,6 +43,9 @@ interface HostControlPanelProps {
   onForceSync: () => void;
   // Users
   users: User[];
+  onKickUser: (userId: string) => void;
+  onForceMuteUser: (userId: string) => void;
+  onToggleControlAccess: (userId: string) => void;
   // Volume
   volume: number;
   isMuted: boolean;
@@ -112,6 +107,9 @@ export const HostControlPanel: React.FC<HostControlPanelProps> = ({
   isMicEnabled,
   onMicToggle,
   audioSettings,
+  onKickUser,
+  onForceMuteUser,
+  onToggleControlAccess,
 }) => {
   const [activeSection, setActiveSection] = useState<SectionType>('playback');
   const { preset, setPreset, backgroundEffect, setBackgroundEffect, partyMode, setPartyMode } = useTheme();
@@ -277,8 +275,51 @@ export const HostControlPanel: React.FC<HostControlPanelProps> = ({
                     ? "bg-yellow-500" 
                     : "bg-muted"
               )} />
-              <span className="flex-1 truncate">{user.nickname}</span>
-              {user.isMicEnabled && <Mic className="w-4 h-4 text-primary shrink-0" />}
+              <span className="flex-1 truncate flex items-center gap-2">
+                {user.nickname}
+                {user.hasControlAccess && (
+                  <Badge variant="outline" className="text-[10px] px-1 h-4 border-amber-500/50 text-amber-500">
+                    DJ
+                  </Badge>
+                )}
+              </span>
+              
+              <div className="flex items-center gap-1">
+                {/* Control Access Toggle */}
+                <Button
+                    variant={user.hasControlAccess ? "default" : "ghost"}
+                    size="icon"
+                    className="h-8 w-8 rounded-full"
+                    onClick={() => onToggleControlAccess(user.id)}
+                    title={user.hasControlAccess ? "Revoke Control Access" : "Grant Control Access"}
+                >
+                    <Music className={cn("w-4 h-4", user.hasControlAccess && "text-white")} />
+                </Button>
+
+                {/* Force Mute */}
+                <Button
+                    variant="ghost" 
+                    size="icon"
+                    className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => onForceMuteUser(user.id)}
+                    disabled={!user.isMicEnabled}
+                    title="Force Mute"
+                >
+                    <Mic className={cn("w-4 h-4", !user.isMicEnabled && "opacity-30")} />
+                </Button>
+
+                {/* Kick */}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-full hover:bg-destructive hover:text-destructive-foreground"
+                    onClick={() => onKickUser(user.id)}
+                    title="Kick User"
+                >
+                    <LogOut className="w-4 h-4" />
+                </Button>
+              </div>
+
               {user.audioLevel !== undefined && user.audioLevel > 0 && (
                 <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden shrink-0">
                   <div 

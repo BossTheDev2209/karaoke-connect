@@ -17,6 +17,7 @@ export interface User {
   discordUsername?: string;
   discordAvatar?: string;
   eqSettings?: number[]; // dB values for 10 bands
+  hasControlAccess?: boolean; // Whether non-host user can control playback
 }
 
 export interface AvatarConfig {
@@ -124,6 +125,8 @@ export type RealtimePayload = {
     | 'vote_kick_start' 
     | 'vote_kick_vote' 
     | 'kick_user'
+    | 'force_mute_user'
+    | 'permission_update'
     | 'mode_vote_start'
     | 'mode_vote_cast'
     | 'mode_update'
