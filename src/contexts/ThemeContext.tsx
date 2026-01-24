@@ -26,6 +26,8 @@ interface ThemeContextValue {
   setHideLyricsWhenNotFound: (hide: boolean) => void;
   partyMode: boolean;
   setPartyMode: (enabled: boolean) => void;
+  autoPlayNext: boolean; // Auto start next song in queue
+  setAutoPlayNext: (enabled: boolean) => void;
   setVideoId: (videoId: string | null) => void;
   colors: ThemeColors;
 }
@@ -195,6 +197,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [autoSyncOnJoin, setAutoSyncOnJoinState] = useState<AutoSyncMode>('off');
   const [hideLyricsWhenNotFound, setHideLyricsWhenNotFoundState] = useState<boolean>(false);
   const [partyMode, setPartyModeState] = useState<boolean>(true); // Default ON for fun party experience
+  const [autoPlayNext, setAutoPlayNextState] = useState<boolean>(true); // Default ON
   const [videoId, setVideoId] = useState<string | null>(null);
   const [autoColors, setAutoColors] = useState<ThemeColors | null>(null);
   const extractionRef = useRef<string | null>(null);
@@ -254,6 +257,13 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     } catch {}
   }, []);
 
+  const setAutoPlayNext = useCallback((enabled: boolean) => {
+    setAutoPlayNextState(enabled);
+    try {
+      localStorage.setItem('karaoke_auto_play_next', enabled ? 'true' : 'false');
+    } catch {}
+  }, []);
+
   // Load saved preset on mount
   useEffect(() => {
     try {
@@ -290,6 +300,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       const savedPartyMode = localStorage.getItem('karaoke_party_mode');
       if (savedPartyMode !== null) {
         setPartyModeState(savedPartyMode === 'true');
+      }
+
+      const savedAutoPlayNext = localStorage.getItem('karaoke_auto_play_next');
+      if (savedAutoPlayNext !== null) {
+        setAutoPlayNextState(savedAutoPlayNext === 'true');
       }
     } catch {}
   }, []);
@@ -334,6 +349,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       setHideLyricsWhenNotFound,
       partyMode,
       setPartyMode,
+      autoPlayNext,
+      setAutoPlayNext,
       setVideoId, 
       colors 
     }}>

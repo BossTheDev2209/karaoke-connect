@@ -66,6 +66,7 @@ export default function Room() {
   const [volume, setVolume] = useState(80);
   const [celebration] = useState(getCurrentCelebration());
   const [celebrationEnabled, setCelebrationEnabled] = useState(true);
+  const { autoPlayNext } = useTheme();
   const [showHostControlPanel, setShowHostControlPanel] = useState(false);
   const [userVolumes, setUserVolumes] = useState<Record<string, number>>(() => {
     const saved = localStorage.getItem('karaoke_user_volumes');
@@ -339,10 +340,18 @@ export default function Room() {
     if (nextIndex < queue.length) {
       // Use the new sync system for synchronized start
       if (isHost) {
-        syncV2Ref.current?.prepareSong(nextIndex);
+        if (autoPlayNext) {
+            syncV2Ref.current?.prepareSong(nextIndex);
+        } else {
+            // Queue ended / Auto-play disabled - stop playing but stay on current or just stop?
+            // If we don't prepare next, we just stop.
+            // But we should probably "finish" the current state.
+            updatePlayback({ isPlaying: false, status: 'idle' });
+            // Optionally we could notify "Auto-play disabled"
+        }
       }
     }
-  }, [queue.length, playbackState.currentSongIndex, updatePlayback, isHost, roomMode]);
+  }, [queue.length, playbackState.currentSongIndex, updatePlayback, isHost, roomMode, autoPlayNext]);
 
   const handleNextRound = useCallback(() => {
      setShowWinnerScreen(false);

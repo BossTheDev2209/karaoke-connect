@@ -345,7 +345,10 @@ export const VoteKickOverlay: React.FC<VoteKickBannerProps> = ({
             <Button
               size={isMinimized ? "sm" : "default"}
               variant="destructive"
-              onClick={onVoteYes}
+              onClick={(e) => {
+                e.stopPropagation();
+                onVoteYes();
+              }}
               className="flex-1"
             >
               <Check className="w-4 h-4 mr-1.5" />
@@ -354,7 +357,10 @@ export const VoteKickOverlay: React.FC<VoteKickBannerProps> = ({
             <Button
               size={isMinimized ? "sm" : "default"}
               variant="outline"
-              onClick={onVoteNo}
+              onClick={(e) => {
+                e.stopPropagation();
+                onVoteNo();
+              }}
               className="flex-1"
             >
               <X className="w-4 h-4 mr-1.5" />

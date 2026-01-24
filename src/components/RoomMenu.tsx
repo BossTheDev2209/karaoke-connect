@@ -17,7 +17,8 @@ import {
   Check,
   X,
   Menu,
-  ChevronRight
+  ChevronRight,
+  SkipForward
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -149,7 +150,9 @@ export const RoomMenu: React.FC<RoomMenuProps> = ({
     hideLyricsWhenNotFound,
     setHideLyricsWhenNotFound,
     partyMode,
-    setPartyMode
+    setPartyMode,
+    autoPlayNext,
+    setAutoPlayNext
   } = useTheme();
 
   const [selectedUserToKick, setSelectedUserToKick] = useState<string>('');
@@ -503,6 +506,24 @@ export const RoomMenu: React.FC<RoomMenuProps> = ({
                     id="celebration-toggle"
                     checked={celebrationEnabled}
                     onCheckedChange={onCelebrationToggle}
+                  />
+                </div>
+
+
+                <div className="flex items-center justify-between p-3 rounded-lg bg-card border border-border">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-primary/20 relative">
+                      <SkipForward className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <Label htmlFor="auto-play-toggle" className="text-sm font-medium">Auto Start Next Song</Label>
+                      <p className="text-xs text-muted-foreground">Automatically play next in queue</p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="auto-play-toggle"
+                    checked={autoPlayNext}
+                    onCheckedChange={setAutoPlayNext}
                   />
                 </div>
               </div>
