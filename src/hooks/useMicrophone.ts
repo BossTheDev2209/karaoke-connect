@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { User } from '@/types/karaoke';
 
 export type AudioEffectType = 'none' | 'reverb' | 'echo' | 'studio';
 
@@ -140,7 +141,7 @@ export const useMicrophone = (
   onSpeakingChange?: (isSpeaking: boolean, level: number, scoreIncrement?: number) => void,
   channel?: RealtimeChannel | null,
   currentUserId?: string,
-  roomUsers?: { id: string }[],
+  roomUsers?: User[],
   userVolumes?: Record<string, number>,
   isLyricActive: boolean = false
 ): UseMicrophoneReturn => {
@@ -198,6 +199,7 @@ export const useMicrophone = (
   // WebRTC state
   const peersRef = useRef<Map<string, PeerState>>(new Map());
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+  const pokedPeersRef = useRef<Set<string>>(new Set());
   const remoteAnalysersRef = useRef<Map<string, { ctx: AudioContext; analyser: AnalyserNode }>>(new Map());
 
   const eqFiltersRef = useRef<BiquadFilterNode[]>([]);
@@ -384,6 +386,7 @@ export const useMicrophone = (
 
   // Close peer connection
   const closePeerConnection = useCallback((remoteUserId: string) => {
+    pokedPeersRef.current.delete(remoteUserId);
     const peer = peersRef.current.get(remoteUserId);
     if (peer) {
       peer.pc.close();
@@ -409,7 +412,9 @@ export const useMicrophone = (
   // Create peer connection for voice sharing
   const createPeerConnection = useCallback((remoteUserId: string, _isInitiator: boolean) => {
     console.log(`[Mic] Creating peer connection for ${remoteUserId}`);
-    
+    // Ensure cleanup of any existing connection
+    closePeerConnection(remoteUserId);
+
     const pc = new RTCPeerConnection(ICE_SERVERS);
     
     // Add local tracks - Use PROCESSED stream if available, otherwise raw
@@ -419,6 +424,9 @@ export const useMicrophone = (
       streamToSend.getTracks().forEach(track => {
         pc.addTrack(track, streamToSend);
       });
+    } else {
+      // If we don't have a mic stream, we still want to receive audio
+      pc.addTransceiver('audio', { direction: 'recvonly' });
     }
 
     // Handle ICE candidates
@@ -532,7 +540,7 @@ export const useMicrophone = (
 
   // Handle signaling messages
   useEffect(() => {
-    if (!channel || !isEnabled || !currentUserId) return;
+    if (!channel || !currentUserId) return;
 
     const handleSignal = async ({ payload }: { payload: any }) => {
       const { type, from, to, offer, answer, candidate } = payload;
@@ -545,10 +553,13 @@ export const useMicrophone = (
         let pc = peersRef.current.get(from)?.pc;
         
         // Check if we already have a connection in stable state
-        // This means we already completed the handshake - don't process duplicate offers
         if (pc && pc.signalingState === 'stable' && pc.connectionState === 'connected') {
-          console.log(`[Mic] Ignoring duplicate offer from ${from} - already connected`);
-          return;
+          // Check if this is a renegotiation (different SDP) or a duplicate packet
+          if (pc.remoteDescription?.sdp === offer.sdp) {
+            console.log(`[Mic] Ignoring duplicate offer from ${from}`);
+            return;
+          }
+          console.log(`[Mic] Renegotiation/Restart from ${from}`);
         }
         
         // If we have a connection in wrong state, close it and create new one
@@ -663,18 +674,48 @@ export const useMicrophone = (
     
     for (const user of roomUsers) {
       if (user.id !== currentUserId) {
-        channel.send({
-          type: 'broadcast',
-          event: 'mic_signal',
-          payload: {
-            type: 'mic_join',
-            from: currentUserId,
-            to: user.id,
-          },
-        });
+        if (currentUserId < user.id) {
+           // We Offer (Upgrade/Start)
+           console.log(`[Mic] Announce: Initiating Offer to ${user.id}`);
+           const pc = createPeerConnection(user.id, true);
+           try {
+               const offerDesc = await pc.createOffer();
+               const enhancedOffer = new RTCSessionDescription({
+                 type: offerDesc.type,
+                 sdp: setOpusQuality(offerDesc.sdp || ''),
+               });
+               await pc.setLocalDescription(enhancedOffer);
+     
+               channel.send({
+                 type: 'broadcast',
+                 event: 'mic_signal',
+                 payload: {
+                   type: 'offer',
+                   from: currentUserId,
+                   to: user.id,
+                   offer: enhancedOffer,
+                 },
+               });
+           } catch (error) {
+               console.error(`[Mic] Failed to offer to ${user.id}`, error);
+           }
+        } else {
+           // We Poke
+           console.log(`[Mic] Announce: Poking ${user.id}`);
+           pokedPeersRef.current.add(user.id);
+           channel.send({
+             type: 'broadcast',
+             event: 'mic_signal',
+             payload: {
+               type: 'mic_join',
+               from: currentUserId,
+               to: user.id,
+             },
+           });
+        }
       }
     }
-  }, [channel, currentUserId, roomUsers]);
+  }, [channel, currentUserId, roomUsers, createPeerConnection]);
 
   // Announce mic disabled
   const announceLeave = useCallback(() => {
@@ -998,19 +1039,76 @@ export const useMicrophone = (
     };
   }, [isEnabled]);
 
-  // Handle users leaving the room
+  // Handle users leaving AND auto-connect to existing speakers
   useEffect(() => {
-    if (!roomUsers) return;
+    if (!roomUsers || !currentUserId || !channel) return;
     
     const currentPeerIds = Array.from(peersRef.current.keys());
     const roomUserIds = roomUsers.map(u => u.id);
     
+    // 1. Clean up stale peers
     for (const peerId of currentPeerIds) {
       if (!roomUserIds.includes(peerId)) {
         closePeerConnection(peerId);
       }
     }
-  }, [roomUsers, closePeerConnection]);
+
+    // 2. Connect to existing speakers
+    roomUsers.forEach(async (u) => {
+      // If user is remote, has mic enabled, and we aren't connected
+      // Also check if we already poked them to avoid spam
+      if (
+        u.id !== currentUserId && 
+        u.isMicEnabled && 
+        !peersRef.current.has(u.id) &&
+        !pendingCandidatesRef.current.has(u.id) && 
+        !pokedPeersRef.current.has(u.id)
+      ) {
+        console.log(`[Mic] Found unconnected speaker ${u.nickname} (${u.id})`);
+        
+        if (currentUserId < u.id) {
+          // We have lower ID -> We must OFFER
+          // createPeerConnection adds to peersRef immediately, so no need for pokedPeersRef
+          console.log(`[Mic] Initiating offer to ${u.id}`);
+          const pc = createPeerConnection(u.id, true);
+          try {
+            const offerDesc = await pc.createOffer();
+            const enhancedOffer = new RTCSessionDescription({
+              type: offerDesc.type,
+              sdp: setOpusQuality(offerDesc.sdp || ''),
+            });
+            await pc.setLocalDescription(enhancedOffer);
+  
+            channel.send({
+              type: 'broadcast',
+              event: 'mic_signal',
+              payload: {
+                type: 'offer',
+                from: currentUserId,
+                to: u.id,
+                offer: enhancedOffer,
+              },
+            });
+          } catch (err) {
+            console.error(`[Mic] Failed to create offer for ${u.id}`, err);
+          }
+        } else {
+          // We have higher ID -> Poke them to OFFER
+          console.log(`[Mic] Poking ${u.id} to offer`);
+          pokedPeersRef.current.add(u.id); // Mark as poked
+          channel.send({
+            type: 'broadcast',
+            event: 'mic_signal',
+            payload: {
+              type: 'mic_join',
+              from: currentUserId,
+              to: u.id,
+            },
+          });
+        }
+      }
+    });
+  }, [roomUsers, currentUserId, channel, createPeerConnection, closePeerConnection]);
 
   // Track WebRTC connection stats
   useEffect(() => {
