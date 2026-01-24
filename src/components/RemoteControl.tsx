@@ -9,23 +9,12 @@ import {
   Mic,
   MicOff,
   RefreshCw,
-  Zap,
-  Users,
-  ListMusic,
-  Settings2,
-  ChevronUp,
-  ChevronDown,
-  Swords,
-  Crown,
-  AlertTriangle
+  Crown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { User, Song, RoomMode, BattleFormat } from '@/types/karaoke';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Tooltip,
   TooltipContent,
@@ -311,166 +300,8 @@ export const RemoteControl: React.FC<RemoteControlProps> = ({
         </div>
       </div>
 
-      {/* Expandable section - Host gets full controls, Members get minimal */}
-      {isHost ? (
-        <>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className={cn(
-              "w-full flex items-center justify-center gap-2 text-xs mb-2 mx-3 transition-all",
-              isExpanded 
-                ? "bg-amber-500/10 text-amber-400 border border-amber-500/30" 
-                : "text-amber-400/60 hover:text-amber-400 border border-transparent hover:border-amber-500/20"
-            )}
-          >
-            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-            Host Controls
-            <Crown className="w-3 h-3 text-amber-400" />
-          </Button>
-
-          {isExpanded && (
-            <div className="flex-1 min-h-0 px-3">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-2 h-8">
-              <TabsTrigger value="playback" className="text-xs gap-1">
-                <Zap className="w-3 h-3" />
-                Sync
-              </TabsTrigger>
-              {roomMode === 'team-battle' ? (
-                <TabsTrigger value="battle" className="text-xs gap-1">
-                  <Swords className="w-3 h-3" />
-                  Battle
-                </TabsTrigger>
-              ) : (
-                <TabsTrigger value="users" className="text-xs gap-1">
-                  <Users className="w-3 h-3" />
-                  Users
-                </TabsTrigger>
-              )}
-            </TabsList>
-
-            {/* Sync/Playback Tab */}
-            <TabsContent value="playback" className="flex-1 mt-3 space-y-3">
-              {/* Network latency indicator */}
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Network Latency</span>
-                <Badge variant={networkLatency < 50 ? 'default' : networkLatency < 100 ? 'secondary' : 'destructive'} className="text-[10px]">
-                  {networkLatency}ms
-                </Badge>
-              </div>
-
-              {/* Sync button for everyone */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onSync}
-                className="w-full gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Request Sync
-              </Button>
-
-              {/* Host-only force sync */}
-              {isHost && onForceSync && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={onForceSync}
-                  className="w-full gap-2"
-                >
-                  <AlertTriangle className="w-4 h-4" />
-                  Emergency Resync
-                </Button>
-              )}
-            </TabsContent>
-
-            {/* Battle Tab */}
-            <TabsContent value="battle" className="flex-1 mt-3">
-              <div className="grid grid-cols-2 gap-2">
-                {/* Left Team */}
-                <div className="bg-pink-500/10 border border-pink-500/30 rounded-lg p-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold text-pink-400 uppercase">Pink</span>
-                    <span className="text-lg font-bold text-pink-400">{leftScore}</span>
-                  </div>
-                  <div className="space-y-1">
-                    {leftTeam.map(user => (
-                      <div key={user.id} className="flex items-center gap-1 text-[10px]">
-                        <div className={cn(
-                          "w-1.5 h-1.5 rounded-full",
-                          user.isSpeaking ? "bg-neon-green animate-pulse" : "bg-muted"
-                        )} />
-                        <span className="truncate">{user.nickname}</span>
-                        <span className="ml-auto text-pink-300">{user.score || 0}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Right Team */}
-                <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold text-cyan-400 uppercase">Blue</span>
-                    <span className="text-lg font-bold text-cyan-400">{rightScore}</span>
-                  </div>
-                  <div className="space-y-1">
-                    {rightTeam.map(user => (
-                      <div key={user.id} className="flex items-center gap-1 text-[10px]">
-                        <div className={cn(
-                          "w-1.5 h-1.5 rounded-full",
-                          user.isSpeaking ? "bg-neon-green animate-pulse" : "bg-muted"
-                        )} />
-                        <span className="truncate">{user.nickname}</span>
-                        <span className="ml-auto text-cyan-300">{user.score || 0}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Users Tab */}
-            <TabsContent value="users" className="flex-1 mt-3">
-              <ScrollArea className="h-[120px]">
-                <div className="space-y-1 pr-2">
-                  {users.map(user => (
-                    <div
-                      key={user.id}
-                      className="flex items-center gap-2 p-2 rounded-lg text-xs hover:bg-muted/50"
-                    >
-                      <div className={cn(
-                        "w-2 h-2 rounded-full transition-all",
-                        user.isSpeaking 
-                          ? "bg-neon-green shadow-[0_0_8px_hsl(var(--neon-green))]" 
-                          : user.isMicEnabled 
-                            ? "bg-yellow-500" 
-                            : "bg-muted"
-                      )} />
-                      <span className="flex-1 truncate">{user.nickname}</span>
-                      {user.isMicEnabled && (
-                        <Mic className="w-3 h-3 text-neon-green" />
-                      )}
-                      {user.audioLevel !== undefined && user.audioLevel > 0 && (
-                        <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-neon-green transition-all duration-75"
-                            style={{ width: `${Math.min(100, user.audioLevel * 100)}%` }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-          </Tabs>
-        </div>
-          )}
-        </>
-      ) : (
-        /* Member View - Simple sync option only */
+      {/* Member View - Simple sync option only (Host uses popup panel) */}
+      {!isHost && (
         <div className="px-3 mt-2 pt-2 border-t border-border">
           <Button
             variant="ghost"
