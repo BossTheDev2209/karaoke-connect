@@ -501,18 +501,27 @@ export default function Room() {
   }, [toggleMic, eqSettings, updateMicStatus, isMicEnabled]);
 
   const handlePlayPause = () => {
-    if (isPlaying) {
-      pause();
-      updatePlayback({ isPlaying: false, currentTime });
+    if (isHost) {
+      if (isPlaying) {
+        syncV2.pause();
+      } else {
+        syncV2.resume();
+      }
     } else {
-      play();
-      updatePlayback({ isPlaying: true, currentTime });
+      if (isPlaying) {
+        pause();
+      } else {
+        play();
+      }
     }
   };
 
   const handleSeek = (time: number) => {
-    seekTo(time); // Instant local feedback
-    seek(time);   // Robust broadcast
+    if (isHost) {
+      syncV2.seek(time);
+    } else {
+      seekTo(time); // Instant local feedback
+    }
   };
 
   // Force sync all users to current playback position
@@ -526,14 +535,22 @@ export default function Room() {
   const handleNext = () => {
     if (playbackState.currentSongIndex < queue.length - 1) {
       const nextIndex = playbackState.currentSongIndex + 1;
-      updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
+      if (isHost) {
+        syncV2.prepareSong(nextIndex);
+      } else {
+        updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
+      }
     }
   };
 
   const handlePrevious = () => {
     if (playbackState.currentSongIndex > 0) {
       const prevIndex = playbackState.currentSongIndex - 1;
-      updatePlayback({ currentSongIndex: prevIndex, currentTime: 0, isPlaying: true });
+      if (isHost) {
+        syncV2.prepareSong(prevIndex);
+      } else {
+        updatePlayback({ currentSongIndex: prevIndex, currentTime: 0, isPlaying: true });
+      }
     }
   };
 
@@ -546,7 +563,11 @@ export default function Room() {
   };
 
   const handleSelectSong = (index: number) => {
-    updatePlayback({ currentSongIndex: index, currentTime: 0, isPlaying: true });
+    if (isHost) {
+      syncV2.prepareSong(index);
+    } else {
+      updatePlayback({ currentSongIndex: index, currentTime: 0, isPlaying: true });
+    }
   };
 
   const handleVolumeChange = (v: number) => {

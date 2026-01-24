@@ -298,6 +298,88 @@ export const useRoom = (
             ));
             break;
           }
+          // SyncV2 Events Support
+          case 'prepare_song': {
+            const { videoId, songIndex } = data.payload as { videoId: string; songIndex: number };
+            const newState = {
+              ...playbackRef.current,
+              status: 'preparing' as const,
+              videoId,
+              currentSongIndex: songIndex,
+              isPlaying: false,
+            };
+            setPlaybackState(newState);
+            playbackRef.current = newState;
+            break;
+          }
+          case 'start_song': {
+            const { videoId, startAtRoomTime, seekOffset } = data.payload as { videoId: string; startAtRoomTime: number; seekOffset: number };
+            const newState = {
+              ...playbackRef.current,
+              status: 'playing' as const,
+              videoId,
+              startAtRoomTime,
+              seekOffset: seekOffset || 0,
+              isPlaying: true,
+              currentTime: seekOffset || 0,
+              lastUpdate: Date.now(),
+            };
+            setPlaybackState(newState);
+            playbackRef.current = newState;
+            break;
+          }
+          case 'pause_song': {
+            const { seekOffset } = data.payload as { seekOffset: number };
+            const newState = {
+              ...playbackRef.current,
+              status: 'paused' as const,
+              seekOffset,
+              startAtRoomTime: null,
+              isPlaying: false,
+              currentTime: seekOffset,
+              lastUpdate: Date.now(),
+            };
+            setPlaybackState(newState);
+            playbackRef.current = newState;
+            break;
+          }
+          case 'resume_song': {
+             const { startAtRoomTime, seekOffset } = data.payload as { startAtRoomTime: number; seekOffset: number };
+             const newState = {
+               ...playbackRef.current,
+               status: 'playing' as const,
+               startAtRoomTime,
+               seekOffset,
+               isPlaying: true,
+               lastUpdate: Date.now(),
+             };
+             setPlaybackState(newState);
+             playbackRef.current = newState;
+             break;
+          }
+          case 'seek_song': {
+            const { seekOffset, startAtRoomTime } = data.payload as { seekOffset: number; startAtRoomTime: number | null };
+            const newState = {
+              ...playbackRef.current,
+              seekOffset,
+              startAtRoomTime,
+              currentTime: seekOffset,
+              lastUpdate: Date.now(),
+            };
+            setPlaybackState(newState);
+            playbackRef.current = newState;
+            break;
+          }
+          case 'end_song': {
+             const newState = {
+               ...DEFAULT_PLAYBACK,
+               currentSongIndex: playbackRef.current.currentSongIndex,
+             };
+             setPlaybackState(newState);
+             playbackRef.current = newState;
+             break;
+          }
+
           case 'sync_request': {
             // If we're host, respond with full state
             if (isHostRef.current) {
