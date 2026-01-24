@@ -96,17 +96,7 @@ const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
       {/* Music notes floating effect for loud singing (only in party mode) */}
       {partyMode && <MusicNotesEffect isActive={isMainSinger && user.isSpeaking && isNormalLoud} audioLevel={userAudioLevel} />}
 
-      {/* Vote kick button - Hide when setting volume to avoid clutter */}
-      {!isOpen && onStartVoteKick && usersCount >= 3 && (
-        <div className="absolute -top-1 -right-1 z-10">
-          <VoteKickButton
-            user={user}
-            currentUserId={currentUserId || ''}
-            onStartVote={onStartVoteKick}
-            disabled={voteKickDisabled}
-          />
-        </div>
-      )}
+
 
       {/* Zoom-style active reaction badge */}
       {activeReaction && (
