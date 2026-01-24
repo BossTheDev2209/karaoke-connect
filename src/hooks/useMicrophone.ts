@@ -188,6 +188,7 @@ export const useMicrophone = (
   const monitorGainRef = useRef<GainNode | null>(null); // For hearing yourself
   
   const animationRef = useRef<number>(0);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
   const lastSpeakingRef = useRef(false);
   const lastUpdateRef = useRef(0);
   const lastLevelRef = useRef(0);
@@ -362,7 +363,7 @@ export const useMicrophone = (
     // Analyze remote audio levels
     analyzeRemoteAudio();
 
-    animationRef.current = requestAnimationFrame(analyze);
+    // Loop driven by ScriptProcessorNode (background compatible)
   }, [onSpeakingChange, analyzeRemoteAudio, threshold, isLyricActive]);
 
   // Update Input Gain dynamically (Convert dB to Linear)
@@ -914,6 +915,19 @@ export const useMicrophone = (
       speechStartTimeRef.current = 0;
       speechEndTimeRef.current = 0;
 
+      // Setup Background Keep-Alive Processor
+      // ScriptProcessorNode buffers (2048) ensure the audio thread drives the loop even in background
+      const processor = audioContext.createScriptProcessor(2048, 1, 1);
+      const mute = audioContext.createGain();
+      mute.gain.value = 0; // Ensure silence
+      
+      analyser.connect(processor);
+      processor.connect(mute);
+      mute.connect(audioContext.destination);
+      
+      processor.onaudioprocess = analyze;
+      processorRef.current = processor;
+
       analyze();
       console.log('[Mic] Mic enabled');
       setIsEnabled(true);
@@ -934,6 +948,11 @@ export const useMicrophone = (
 
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
+    }
+    if (processorRef.current) {
+      processorRef.current.disconnect();
+      processorRef.current.onaudioprocess = null;
+      processorRef.current = null;
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
@@ -971,6 +990,13 @@ export const useMicrophone = (
     echoGainRef.current = null;
     monitorGainRef.current = null;
   }, [announceLeave, closePeerConnection]);
+
+  // Keep processor.onaudioprocess up to date with fresh 'analyze' closure
+  useEffect(() => {
+    if (processorRef.current) {
+      processorRef.current.onaudioprocess = analyze;
+    }
+  }, [analyze]);
 
   // Keep latest stopMic in a ref so our unmount cleanup doesn't fire on every re-render.
   useEffect(() => {
