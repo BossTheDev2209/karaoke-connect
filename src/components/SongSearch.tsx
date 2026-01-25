@@ -189,13 +189,13 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
 
               {/* Modal - Centered on screen */}
               <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] w-[90vw] max-w-3xl max-h-[80vh] flex flex-col"
+                className="fixed inset-0 z-[101] flex items-center justify-center p-4"
               >
-                <div className="flex-1 flex flex-col bg-card/95 backdrop-blur-xl rounded-2xl border border-border shadow-2xl overflow-hidden">
+                <div className="w-full max-w-3xl max-h-[80vh] flex flex-col bg-card/95 backdrop-blur-xl rounded-2xl border border-border shadow-2xl overflow-hidden">
                   {/* Header */}
                   <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-neon-purple/10 to-neon-pink/10">
                     <div className="flex items-center gap-3">
