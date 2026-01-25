@@ -238,7 +238,8 @@ export default function Room() {
     // Reset recommendations when song changes
     setRecommendations([]); 
     
-    if (!currentSong || !isHost || queue.length > 1) { 
+    // Fetch if there's a current song and queue is ending (last song or empty)
+    if (!currentSong || queue.length > 1) { 
         return;
     }
     
@@ -308,6 +309,27 @@ export default function Room() {
       }, 100);
     }
   };
+
+  // Host Watcher: Auto-start playback if queue grows while idle (e.g. member adds song via recommendations)
+  useEffect(() => {
+    if (!isHost) return;
+    
+    const isStopped = playbackState.status === 'idle';
+    
+    if (isStopped && queue.length > 0) {
+        // Scenario 1: Pending songs exist after current index
+        const nextIndex = playbackState.currentSongIndex + 1;
+        if (nextIndex < queue.length) {
+             console.log('[Room] Auto-advancing to new song added by member');
+             syncV2Ref.current?.prepareSong(nextIndex);
+        } 
+        // Scenario 2: First song added to empty queue (fresh room)
+        else if (queue.length === 1 && !playbackState.videoId) {
+             console.log('[Room] Auto-starting first song added by member');
+             syncV2Ref.current?.prepareSong(0);
+        }
+    }
+  }, [queue.length, isHost, playbackState.status, playbackState.videoId, playbackState.currentSongIndex]);
 
   // State for Team Battle Winner Screen
   const [showWinnerScreen, setShowWinnerScreen] = useState(false);
