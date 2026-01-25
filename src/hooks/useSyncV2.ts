@@ -293,7 +293,13 @@ export function useSyncV2({
         },
       },
     });
-  }, [channel, getRoomTime]);
+    
+    // Host also schedules own playback
+    setTimeout(() => {
+      onSeekRequired(0);
+      onPlayRequired();
+    }, delayMs);
+  }, [channel, getRoomTime, onSeekRequired, onPlayRequired]);
 
   /**
    * Force start (skip ready check).
@@ -344,9 +350,10 @@ export function useSyncV2({
     
     const state = playbackRef.current;
     const roomTime = getRoomTime();
-    const startAtRoomTime = roomTime + 1000; // 1 second to sync
+    const delayMs = 1000; // 1 second to sync
+    const startAtRoomTime = roomTime + delayMs;
     
-    console.log(`[SyncV2] Resuming from ${state.seekOffset}s`);
+    console.log(`[SyncV2] Resuming from ${state.seekOffset}s in ${delayMs}ms`);
     
     const newState: PlaybackState = {
       ...state,
@@ -370,7 +377,13 @@ export function useSyncV2({
         },
       },
     });
-  }, [channel, getRoomTime]);
+    
+    // Host also schedules own playback
+    setTimeout(() => {
+      onSeekRequired(state.seekOffset);
+      onPlayRequired();
+    }, delayMs);
+  }, [channel, getRoomTime, onSeekRequired, onPlayRequired]);
 
   /**
    * Seek to specific time.
@@ -497,7 +510,7 @@ export function useSyncV2({
           const { videoId, startAtRoomTime, seekOffset } = data.payload;
           console.log('[SyncV2] Received start_song:', { videoId, startAtRoomTime, seekOffset });
           
-          setPlaybackState({
+          const newState: PlaybackState = {
             status: 'playing',
             videoId,
             startAtRoomTime,
@@ -506,7 +519,29 @@ export function useSyncV2({
             isPlaying: true,
             currentTime: seekOffset || 0,
             lastUpdate: Date.now(),
-          });
+          };
+          setPlaybackState(newState);
+          playbackRef.current = newState;
+          
+          // Schedule or immediately start playback
+          const roomTime = getRoomTime();
+          const delayMs = startAtRoomTime - roomTime;
+          
+          if (delayMs > 50) {
+            console.log(`[SyncV2] Scheduling playback in ${delayMs}ms`);
+            setTimeout(() => {
+              const targetTime = (Date.now() + serverTimeOffset - startAtRoomTime) / 1000 + (seekOffset || 0);
+              onSeekRequired(Math.max(0, targetTime));
+              onPlayRequired();
+            }, delayMs);
+          } else {
+            // Already past start time - calculate correct position
+            const elapsed = (roomTime - startAtRoomTime) / 1000;
+            const targetTime = Math.max(0, elapsed + (seekOffset || 0));
+            console.log(`[SyncV2] Starting immediately at ${targetTime.toFixed(2)}s`);
+            onSeekRequired(targetTime);
+            onPlayRequired();
+          }
           break;
         }
         
@@ -532,14 +567,35 @@ export function useSyncV2({
           const { startAtRoomTime, seekOffset } = data.payload;
           console.log('[SyncV2] Received resume_song:', { startAtRoomTime, seekOffset });
           
-          setPlaybackState(prev => ({
-            ...prev,
+          const newState: PlaybackState = {
+            ...playbackRef.current,
             status: 'playing',
             startAtRoomTime,
             seekOffset,
             isPlaying: true,
             lastUpdate: Date.now(),
-          }));
+          };
+          setPlaybackState(newState);
+          playbackRef.current = newState;
+          
+          // Schedule or immediately resume
+          const roomTime = getRoomTime();
+          const delayMs = startAtRoomTime - roomTime;
+          
+          if (delayMs > 50) {
+            console.log(`[SyncV2] Scheduling resume in ${delayMs}ms`);
+            setTimeout(() => {
+              onSeekRequired(seekOffset);
+              onPlayRequired();
+            }, delayMs);
+          } else {
+            // Already past start - calculate current position
+            const elapsed = (roomTime - startAtRoomTime) / 1000;
+            const targetTime = Math.max(0, elapsed + seekOffset);
+            console.log(`[SyncV2] Resuming immediately at ${targetTime.toFixed(2)}s`);
+            onSeekRequired(targetTime);
+            onPlayRequired();
+          }
           break;
         }
         
@@ -598,7 +654,7 @@ export function useSyncV2({
     return () => {
       // Cleanup handled by useRoom when channel is destroyed
     };
-  }, [channel, onCueVideo, onPauseRequired, onSeekRequired]);
+  }, [channel, onCueVideo, onPauseRequired, onSeekRequired, onPlayRequired, getRoomTime, serverTimeOffset]);
 
   // When player becomes ready, broadcast it
   useEffect(() => {
@@ -627,30 +683,8 @@ export function useSyncV2({
     }));
   }, [channel, userId, isPlayerReady]);
 
-  // Start video when state changes to playing
-  useEffect(() => {
-    const state = playbackState;
-    if (state.status !== 'playing' || !state.startAtRoomTime) return;
-    
-    // Calculate when to start
-    const roomTime = getRoomTime();
-    const delayMs = state.startAtRoomTime - roomTime;
-    
-    if (delayMs > 0) {
-      console.log(`[SyncV2] Scheduling playback in ${delayMs}ms`);
-      const timer = setTimeout(() => {
-        onSeekRequired(state.seekOffset);
-        onPlayRequired();
-      }, delayMs);
-      return () => clearTimeout(timer);
-    } else {
-      // Already past start time - seek to correct position and play
-      const targetTime = getTargetTime();
-      console.log(`[SyncV2] Starting immediately at ${targetTime.toFixed(2)}s`);
-      onSeekRequired(targetTime);
-      onPlayRequired();
-    }
-  }, [playbackState.status, playbackState.startAtRoomTime, getRoomTime, getTargetTime, onSeekRequired, onPlayRequired]);
+  // NOTE: Playback scheduling is now handled directly in event handlers (start_song, resume_song)
+  // This ensures playback starts immediately when events are received, without relying on state changes
 
   return {
     playbackState,
