@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Search, Plus, X, Loader2, Music, User, ArrowLeft } from 'lucide-react';
+import { Search, Plus, X, Loader2, Music, User, ArrowLeft, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { YouTubeSearchResult, YouTubeChannel, Song } from '@/types/karaoke';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface SongSearchProps {
   onAddSong: (song: Song) => void;
@@ -25,6 +26,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
   const [activeTab, setActiveTab] = useState<SearchTab>('songs');
   const [selectedChannel, setSelectedChannel] = useState<YouTubeChannel | null>(null);
   const [channelVideos, setChannelVideos] = useState<YouTubeSearchResult[]>([]);
+  const [artistModalOpen, setArtistModalOpen] = useState(false);
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -106,6 +108,18 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
     setChannels([]);
   };
 
+  const handleCloseArtistModal = () => {
+    setArtistModalOpen(false);
+    setSelectedChannel(null);
+    setChannelVideos([]);
+    setChannels([]);
+  };
+
+  const openArtistModal = () => {
+    setArtistModalOpen(true);
+    setActiveTab('artists');
+  };
+
   const handleTabChange = (tab: SearchTab) => {
     setActiveTab(tab);
     setResults([]);
@@ -141,52 +155,229 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
         </Button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mt-2">
+      {/* Artist Button - Opens Fancy Modal */}
+      <div className="mt-2">
         <button
-          onClick={() => handleTabChange('songs')}
+          onClick={openArtistModal}
           className={cn(
-            'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-            activeTab === 'songs' 
-              ? 'bg-primary text-primary-foreground' 
-              : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+            'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all',
+            'bg-gradient-to-r from-neon-purple/20 to-neon-pink/20 border border-neon-purple/30',
+            'hover:from-neon-purple/30 hover:to-neon-pink/30 hover:border-neon-purple/50',
+            'text-foreground hover:scale-[1.02] active:scale-[0.98]'
           )}
         >
-          <Music className="w-3.5 h-3.5" />
-          Songs
-        </button>
-        <button
-          onClick={() => handleTabChange('artists')}
-          className={cn(
-            'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-            activeTab === 'artists' 
-              ? 'bg-primary text-primary-foreground' 
-              : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-          )}
-        >
-          <User className="w-3.5 h-3.5" />
-          Artists
+          <User className="w-4 h-4 text-neon-purple" />
+          <span>Browse Artists</span>
+          <Sparkles className="w-3.5 h-3.5 text-neon-pink" />
         </button>
       </div>
 
-      {isOpen && hasResults && (
-        <div className="absolute top-full left-0 right-0 mt-2 z-50 glass rounded-xl max-h-96 overflow-y-auto">
+      {/* Artist Modal - Fancy Popup */}
+      <AnimatePresence>
+        {artistModalOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={handleCloseArtistModal}
+              className="fixed inset-0 z-50 bg-background/80 backdrop-blur-md"
+            />
+
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="fixed inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-50 md:w-[90vw] md:max-w-3xl md:max-h-[80vh] flex flex-col"
+            >
+              <div className="flex-1 flex flex-col bg-card/95 backdrop-blur-xl rounded-2xl border border-border shadow-2xl overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-neon-purple/10 to-neon-pink/10">
+                  <div className="flex items-center gap-3">
+                    {selectedChannel ? (
+                      <button
+                        onClick={handleBackToChannels}
+                        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <ArrowLeft className="w-4 h-4" />
+                        Back
+                      </button>
+                    ) : (
+                      <>
+                        <div className="p-2 rounded-xl bg-gradient-to-br from-neon-purple to-neon-pink">
+                          <User className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-bold">Browse Artists</h2>
+                          <p className="text-xs text-muted-foreground">Find your favorite karaoke channels</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleCloseArtistModal}
+                    className="rounded-xl hover:bg-destructive/20"
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
+                </div>
+
+                {/* Search Bar in Modal */}
+                {!selectedChannel && (
+                  <div className="p-4 border-b border-border">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                          placeholder="Search for artists or channels..."
+                          className="pl-10 bg-muted/50 border-border rounded-xl"
+                          autoFocus
+                        />
+                      </div>
+                      <Button
+                        onClick={handleSearch}
+                        disabled={isLoading}
+                        className="rounded-xl bg-gradient-to-r from-neon-purple to-neon-pink hover:opacity-90"
+                      >
+                        {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Channel Profile Header */}
+                {selectedChannel && (
+                  <div className="p-4 border-b border-border bg-gradient-to-r from-muted/50 to-transparent">
+                    <div className="flex items-center gap-4">
+                      <img
+                        src={selectedChannel.thumbnail}
+                        alt={selectedChannel.title}
+                        className="w-16 h-16 rounded-full object-cover ring-2 ring-neon-purple/50"
+                      />
+                      <div className="flex-1">
+                        <h3 className="font-bold text-lg">{selectedChannel.title}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {selectedChannel.subscriberCount} subscribers • {selectedChannel.videoCount} videos
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Content Area */}
+                <div className="flex-1 overflow-y-auto p-4">
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="flex flex-col items-center gap-3">
+                        <Loader2 className="w-8 h-8 animate-spin text-neon-purple" />
+                        <p className="text-sm text-muted-foreground">
+                          {selectedChannel ? 'Loading videos...' : 'Searching artists...'}
+                        </p>
+                      </div>
+                    </div>
+                  ) : !selectedChannel && channels.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <div className="p-4 rounded-full bg-muted/50 mb-4">
+                        <User className="w-8 h-8 text-muted-foreground" />
+                      </div>
+                      <p className="text-muted-foreground">Search for artists to get started</p>
+                      <p className="text-xs text-muted-foreground mt-1">Try "karaoke channel" or your favorite artist</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Artists Grid */}
+                      {!selectedChannel && channels.length > 0 && (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {channels.map((channel) => (
+                            <motion.button
+                              key={channel.channelId}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => handleSelectChannel(channel)}
+                              className="flex flex-col items-center gap-3 p-4 rounded-xl bg-muted/30 hover:bg-muted/50 border border-transparent hover:border-neon-purple/30 transition-all group"
+                            >
+                              <div className="relative">
+                                <img
+                                  src={channel.thumbnail}
+                                  alt={channel.title}
+                                  className="w-20 h-20 rounded-full object-cover ring-2 ring-border group-hover:ring-neon-purple/50 transition-all"
+                                />
+                                <div className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-gradient-to-br from-neon-purple to-neon-pink opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Music className="w-3 h-3 text-white" />
+                                </div>
+                              </div>
+                              <div className="text-center">
+                                <p className="font-medium text-sm truncate max-w-[120px]">{channel.title}</p>
+                                <p className="text-xs text-muted-foreground">{channel.subscriberCount}</p>
+                              </div>
+                            </motion.button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Channel Videos List */}
+                      {selectedChannel && channelVideos.length > 0 && (
+                        <div className="space-y-2">
+                          {channelVideos.map((video) => (
+                            <motion.button
+                              key={video.videoId}
+                              whileHover={{ scale: 1.01, x: 4 }}
+                              whileTap={{ scale: 0.99 }}
+                              onClick={() => handleAddSong(video)}
+                              className="w-full flex items-center gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 border border-transparent hover:border-neon-green/30 transition-all group text-left"
+                            >
+                              <img
+                                src={video.thumbnail}
+                                alt={video.title}
+                                className="w-24 h-16 object-cover rounded-lg"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm line-clamp-2">{video.title}</p>
+                                <p className="text-xs text-muted-foreground mt-1">{video.duration}</p>
+                              </div>
+                              <div className="p-2 rounded-lg bg-neon-green/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Plus className="w-5 h-5 text-neon-green" />
+                              </div>
+                            </motion.button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* Footer with count */}
+                {(channels.length > 0 || channelVideos.length > 0) && (
+                  <div className="p-3 border-t border-border bg-muted/30 text-center">
+                    <p className="text-xs text-muted-foreground">
+                      {selectedChannel 
+                        ? `${channelVideos.length} videos from ${selectedChannel.title}`
+                        : `${channels.length} artists found`
+                      }
+                    </p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Song Results Dropdown (only for songs tab) */}
+      {isOpen && results.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-2 z-40 glass rounded-xl max-h-96 overflow-y-auto">
           <div className="p-2 flex justify-between items-center border-b border-border">
-            {selectedChannel ? (
-              <button 
-                onClick={handleBackToChannels}
-                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to artists
-              </button>
-            ) : (
-              <span className="text-sm text-muted-foreground">
-                {activeTab === 'songs' 
-                  ? `${results.length} songs` 
-                  : `${channels.length} artists`}
-              </span>
-            )}
+            <span className="text-sm text-muted-foreground">
+              {results.length} songs
+            </span>
             <Button
               variant="ghost"
               size="icon"
@@ -197,56 +388,8 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
             </Button>
           </div>
 
-          {/* Channel Profile Header */}
-          {selectedChannel && (
-            <div className="p-3 border-b border-border flex items-center gap-3 bg-muted/30">
-              <img
-                src={selectedChannel.thumbnail}
-                alt={selectedChannel.title}
-                className="w-12 h-12 rounded-full object-cover"
-              />
-              <div>
-                <p className="font-semibold">{selectedChannel.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {selectedChannel.subscriberCount} subscribers • {selectedChannel.videoCount} videos
-                </p>
-              </div>
-            </div>
-          )}
-
           <div className="p-2 space-y-1">
-            {/* Show channels list */}
-            {activeTab === 'artists' && !selectedChannel && channels.map((channel) => (
-              <button
-                key={channel.channelId}
-                onClick={() => handleSelectChannel(channel)}
-                className={cn(
-                  'w-full flex items-center gap-3 p-2 rounded-lg transition-colors',
-                  'hover:bg-muted/50 text-left group'
-                )}
-              >
-                <img
-                  src={channel.thumbnail}
-                  alt={channel.title}
-                  className="w-12 h-12 rounded-full object-cover"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{channel.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {channel.subscriberCount} subscribers
-                  </p>
-                  {channel.description && (
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {channel.description}
-                    </p>
-                  )}
-                </div>
-                <Music className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
-            ))}
-
-            {/* Show videos (either search results or channel videos) */}
-            {(activeTab === 'songs' || selectedChannel) && videosToShow.map((result) => (
+            {results.map((result) => (
               <button
                 key={result.videoId}
                 onClick={() => handleAddSong(result)}
@@ -274,13 +417,6 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                 </div>
               </button>
             ))}
-
-            {/* Loading state for channel videos */}
-            {isLoading && selectedChannel && (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-              </div>
-            )}
           </div>
         </div>
       )}
