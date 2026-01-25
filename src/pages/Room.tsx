@@ -216,7 +216,11 @@ export default function Room() {
   }, []);
 
   // Ref for syncV2 to break circular dependency with handleVideoEnded
-  const syncV2Ref = useRef<{ prepareSong: (index: number) => void } | null>(null);
+  const syncV2Ref = useRef<{ 
+    prepareSong: (index: number) => void; 
+    endSong: () => void;
+    getTargetTime: () => number;
+  } | null>(null);
 
   // When the current video changes (often driven by remote sync), suppress transient player events
   useEffect(() => {
@@ -439,6 +443,14 @@ export default function Room() {
   // Get preloaded lyrics for current song
   const preloadedLyrics = currentSong ? getLyricsForSong(currentSong.id) : undefined;
 
+  // Use synchronized time for lyrics (falls back to player currentTime if not calibrated)
+  const syncedCurrentTime = useMemo(() => {
+    if (syncV2?.isTimeCalibrated && playbackState.status === 'playing') {
+      return syncV2.getTargetTime();
+    }
+    return currentTime;
+  }, [syncV2, playbackState.status, currentTime]);
+
   const { 
     lyrics, 
     currentLineIndex, 
@@ -454,7 +466,7 @@ export default function Room() {
   } = useLyrics(
     currentSong?.artist || null,
     currentSong?.title || null,
-    currentTime,
+    syncedCurrentTime,
     preloadedLyrics
   );
 
