@@ -208,6 +208,7 @@ export const useYouTubePlayer = (
           cc_load_policy: 0, // Don't load captions by default
           // Privacy mode: set origin to prevent watch history tracking
           ...(privacyMode && { origin: window.location.origin }),
+          widget_referrer: window.location.origin, // improve privacy
         },
         events: {
           onReady: () => {
