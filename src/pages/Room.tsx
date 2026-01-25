@@ -1158,6 +1158,7 @@ export default function Room() {
                 onDisableCaptions={disableCaptions}
                 source={lyricsSource}
                 hasMultipleMatches={allMatches.length > 1}
+                matchCount={allMatches.length}
                 onChangeLyrics={() => setShowLyricsSelector(true)}
               />
             </div>
