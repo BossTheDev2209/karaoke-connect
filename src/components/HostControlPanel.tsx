@@ -1,220 +1,57 @@
 import React, { useState } from 'react';
 import { 
-  X, Crown, Sliders, Users, Music, Zap, RefreshCw, 
-  AlertTriangle, SkipForward, SkipBack, Play, Pause,
-  Volume2, Mic, Settings2, Palette, LogOut
+  X, Crown, Users, Music, Zap, 
+  AlertTriangle, Mic, LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { useTheme } from '@/contexts/ThemeContext';
-import { EQSettings } from './EQSettings';
 
 import { User } from '@/types/karaoke';
-
-interface Song {
-  id: string;
-  title: string;
-  artist: string;
-  videoId: string;
-  addedBy?: string;
-}
 
 interface HostControlPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  // Playback
-  isPlaying: boolean;
-  currentTime: number;
-  duration: number;
-  currentSong: Song | null;
-  canGoPrevious: boolean;
-  canGoNext: boolean;
-  onPlayPause: () => void;
-  onNext: () => void;
-  onPrevious: () => void;
-  onSeek: (time: number) => void;
   // Sync
   networkLatency: number;
-  onSync: () => void;
   onForceSync: () => void;
   // Users
   users: User[];
   onKickUser: (userId: string) => void;
   onForceMuteUser: (userId: string) => void;
   onToggleControlAccess: (userId: string) => void;
-  // Volume
-  volume: number;
-  isMuted: boolean;
-  onVolumeChange: (value: number) => void;
-  onMuteToggle: () => void;
-  // Mic
-  isMicEnabled: boolean;
-  onMicToggle: () => void;
   // Current user
   currentUserId: string;
-  // Audio settings props
-  audioSettings?: {
-    eqSettings: number[];
-    onEqChange: (settings: number[]) => void;
-    noiseSuppression: boolean;
-    onNoiseSuppressionChange: (value: boolean) => void;
-    echoCancellation: boolean;
-    onEchoCancellationChange: (value: boolean) => void;
-    autoGainControl: boolean;
-    onAutoGainControlChange: (value: boolean) => void;
-    micGain: number;
-    onMicGainChange: (value: number) => void;
-    compressorThreshold: number;
-    onCompressorThresholdChange: (value: number) => void;
-    compressorRatio: number;
-    onCompressorRatioChange: (value: number) => void;
-  };
 }
 
-type SectionType = 'playback' | 'sync' | 'users' | 'audio' | 'appearance';
+type SectionType = 'sync' | 'users';
 
 const navItems: { id: SectionType; label: string; icon: React.ElementType }[] = [
-  { id: 'playback', label: 'Playback', icon: Play },
   { id: 'sync', label: 'Sync', icon: Zap },
   { id: 'users', label: 'Users', icon: Users },
-  { id: 'audio', label: 'Audio', icon: Sliders },
-  { id: 'appearance', label: 'Appearance', icon: Palette },
 ];
 
 export const HostControlPanel: React.FC<HostControlPanelProps> = ({
   isOpen,
   onClose,
-  isPlaying,
-  currentTime,
-  duration,
-  currentSong,
-  canGoPrevious,
-  canGoNext,
-  onPlayPause,
-  onNext,
-  onPrevious,
-  onSeek,
   networkLatency,
-  onSync,
   onForceSync,
   users,
-  volume,
-  isMuted,
-  onVolumeChange,
-  onMuteToggle,
-  isMicEnabled,
-  onMicToggle,
   currentUserId,
-  audioSettings,
   onKickUser,
   onForceMuteUser,
   onToggleControlAccess,
 }) => {
-  const [activeSection, setActiveSection] = useState<SectionType>('playback');
-  const { preset, setPreset, backgroundEffect, setBackgroundEffect, partyMode, setPartyMode } = useTheme();
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  const [activeSection, setActiveSection] = useState<SectionType>('sync');
 
   if (!isOpen) return null;
-
-  const renderPlaybackSection = () => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-1">Now Playing</h3>
-        <p className="text-sm text-muted-foreground">Control the current song playback</p>
-      </div>
-
-      {currentSong && (
-        <div className="p-4 rounded-xl bg-muted/30 border border-border">
-          <p className="font-medium truncate">{currentSong.title}</p>
-          <p className="text-sm text-muted-foreground truncate">{currentSong.artist}</p>
-        </div>
-      )}
-
-      {/* Progress */}
-      <div className="space-y-2">
-        <Slider
-          value={[currentTime]}
-          max={duration || 100}
-          step={0.1}
-          onValueChange={([v]) => onSeek(v)}
-          className="cursor-pointer"
-        />
-        <div className="flex justify-between text-xs text-muted-foreground font-mono">
-          <span>{formatTime(currentTime)}</span>
-          <span>{formatTime(duration)}</span>
-        </div>
-      </div>
-
-      {/* Main Controls */}
-      <div className="flex items-center justify-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onPrevious}
-          disabled={!canGoPrevious}
-          className="h-12 w-12 rounded-full"
-        >
-          <SkipBack className="w-5 h-5" />
-        </Button>
-
-        <Button
-          onClick={onPlayPause}
-          className="h-16 w-16 rounded-full bg-primary hover:bg-primary/90"
-        >
-          {isPlaying ? <Pause className="w-7 h-7" /> : <Play className="w-7 h-7 ml-1" />}
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onNext}
-          disabled={!canGoNext}
-          className="h-12 w-12 rounded-full"
-        >
-          <SkipForward className="w-5 h-5" />
-        </Button>
-      </div>
-
-      {/* Volume */}
-      <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/20">
-        <Button variant="ghost" size="icon" onClick={onMuteToggle} className="shrink-0">
-          <Volume2 className={cn("w-5 h-5", isMuted && "text-muted-foreground")} />
-        </Button>
-        <Slider
-          value={[isMuted ? 0 : volume]}
-          max={100}
-          step={1}
-          onValueChange={([v]) => onVolumeChange(v)}
-          className="flex-1"
-        />
-        <span className="text-sm text-muted-foreground w-8">{volume}%</span>
-      </div>
-
-      {/* Mic Toggle */}
-      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/20">
-        <div className="flex items-center gap-3">
-          <Mic className={cn("w-5 h-5", isMicEnabled ? "text-primary" : "text-muted-foreground")} />
-          <span>Microphone</span>
-        </div>
-        <Switch checked={isMicEnabled} onCheckedChange={onMicToggle} />
-      </div>
-    </div>
-  );
 
   const renderSyncSection = () => (
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold mb-1">Synchronization</h3>
-        <p className="text-sm text-muted-foreground">Keep everyone in sync</p>
+        <p className="text-sm text-muted-foreground">Force sync all connected users</p>
       </div>
 
       {/* Latency Display */}
@@ -229,26 +66,19 @@ export const HostControlPanel: React.FC<HostControlPanelProps> = ({
           <div 
             className={cn(
               "h-full transition-all",
-              networkLatency < 50 ? "bg-green-500" : networkLatency < 100 ? "bg-yellow-500" : "bg-red-500"
+              networkLatency < 50 ? "bg-emerald-500" : networkLatency < 100 ? "bg-amber-500" : "bg-destructive"
             )}
             style={{ width: `${Math.min(100, (networkLatency / 200) * 100)}%` }}
           />
         </div>
       </div>
 
-      {/* Sync Actions */}
-      <div className="space-y-3">
-        <Button variant="outline" className="w-full gap-2 h-12" onClick={onSync}>
-          <RefreshCw className="w-4 h-4" />
-          Request Sync
-        </Button>
-
-        <Button variant="destructive" className="w-full gap-2 h-12" onClick={onForceSync}>
-          <AlertTriangle className="w-4 h-4" />
-          Emergency Resync
-          <span className="text-xs opacity-70">(Forces all users)</span>
-        </Button>
-      </div>
+      {/* Force Sync Action - Host Only */}
+      <Button variant="destructive" className="w-full gap-2 h-12" onClick={onForceSync}>
+        <AlertTriangle className="w-4 h-4" />
+        Emergency Resync
+        <span className="text-xs opacity-70">(Forces all users)</span>
+      </Button>
 
       <p className="text-xs text-muted-foreground text-center">
         Use Emergency Resync if users are experiencing significant playback drift.
@@ -275,7 +105,7 @@ export const HostControlPanel: React.FC<HostControlPanelProps> = ({
                 user.isSpeaking 
                   ? "bg-primary shadow-[0_0_10px_hsl(var(--primary))] animate-pulse" 
                   : user.isMicEnabled 
-                    ? "bg-yellow-500" 
+                    ? "bg-amber-500" 
                     : "bg-muted"
               )} />
               <span className="flex-1 truncate flex items-center gap-2">
@@ -297,7 +127,7 @@ export const HostControlPanel: React.FC<HostControlPanelProps> = ({
                       onClick={() => onToggleControlAccess(user.id)}
                       title={user.hasControlAccess ? "Revoke Control Access" : "Grant Control Access"}
                   >
-                      <Music className={cn("w-4 h-4", user.hasControlAccess && "text-white")} />
+                      <Music className={cn("w-4 h-4", user.hasControlAccess && "text-primary-foreground")} />
                   </Button>
                 )}
 
@@ -344,105 +174,10 @@ export const HostControlPanel: React.FC<HostControlPanelProps> = ({
     </div>
   );
 
-  const renderAudioSection = () => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-1">Audio Settings</h3>
-        <p className="text-sm text-muted-foreground">Adjust microphone and audio processing</p>
-      </div>
-
-      {audioSettings ? (
-        <ScrollArea className="h-[350px] pr-4">
-          <EQSettings
-            initialSettings={audioSettings.eqSettings}
-            onChange={audioSettings.onEqChange}
-            noiseSuppression={audioSettings.noiseSuppression}
-            onNoiseSuppressionChange={audioSettings.onNoiseSuppressionChange}
-            echoCancellation={audioSettings.echoCancellation}
-            onEchoCancellationChange={audioSettings.onEchoCancellationChange}
-            autoGainControl={audioSettings.autoGainControl}
-            onAutoGainControlChange={audioSettings.onAutoGainControlChange}
-            micGain={audioSettings.micGain}
-            onMicGainChange={audioSettings.onMicGainChange}
-            compressorThreshold={audioSettings.compressorThreshold}
-            onCompressorThresholdChange={audioSettings.onCompressorThresholdChange}
-            compressorRatio={audioSettings.compressorRatio}
-            onCompressorRatioChange={audioSettings.onCompressorRatioChange}
-          />
-        </ScrollArea>
-      ) : (
-        <p className="text-sm text-muted-foreground">Audio settings not available</p>
-      )}
-    </div>
-  );
-
-  const renderAppearanceSection = () => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-1">Appearance</h3>
-        <p className="text-sm text-muted-foreground">Customize the room's look and feel</p>
-      </div>
-
-      {/* Color Theme */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium">Color Theme</h4>
-        <div className="grid grid-cols-3 gap-3">
-          {(['neon', 'sunset', 'ocean', 'forest', 'galaxy', 'candy'] as const).map((theme) => (
-            <button
-              key={theme}
-              onClick={() => setPreset(theme)}
-              className={cn(
-                "p-3 rounded-xl border-2 transition-all text-center capitalize text-sm",
-                preset === theme 
-                  ? "border-primary bg-primary/10" 
-                  : "border-border hover:border-primary/50"
-              )}
-            >
-              {theme}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Background Style */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium">Background</h4>
-        <div className="grid grid-cols-2 gap-3">
-          {(['none', 'beat-sync', 'particles', 'neon-grid'] as const).map((effect) => (
-            <button
-              key={effect}
-              onClick={() => setBackgroundEffect(effect)}
-              className={cn(
-                "p-3 rounded-xl border-2 transition-all text-center capitalize text-sm",
-                backgroundEffect === effect 
-                  ? "border-primary bg-primary/10" 
-                  : "border-border hover:border-primary/50"
-              )}
-            >
-              {effect === 'none' ? 'Default' : effect.replace('-', ' ')}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Party Mode */}
-      <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border">
-        <div>
-          <h4 className="font-medium">Party Mode</h4>
-          <p className="text-xs text-muted-foreground">Enable fun animations</p>
-        </div>
-        <Switch checked={partyMode} onCheckedChange={setPartyMode} />
-      </div>
-    </div>
-  );
-
   const renderContent = () => {
     switch (activeSection) {
-      case 'playback': return renderPlaybackSection();
       case 'sync': return renderSyncSection();
       case 'users': return renderUsersSection();
-      case 'audio': return renderAudioSection();
-      case 'appearance': return renderAppearanceSection();
       default: return null;
     }
   };
@@ -474,7 +209,7 @@ export const HostControlPanel: React.FC<HostControlPanelProps> = ({
         </div>
 
         {/* Body */}
-        <div className="flex min-h-[450px]">
+        <div className="flex min-h-[350px]">
           {/* Sidebar Navigation */}
           <nav className="w-48 shrink-0 border-r border-border p-3 space-y-1 bg-muted/20">
             {navItems.map((item) => (

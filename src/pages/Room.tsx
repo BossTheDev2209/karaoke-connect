@@ -822,46 +822,13 @@ export default function Room() {
       <HostControlPanel
         isOpen={showHostControlPanel}
         onClose={() => setShowHostControlPanel(false)}
-        isPlaying={isPlaying}
-        currentTime={currentTime}
-        duration={duration}
-        currentSong={currentSong}
-        canGoPrevious={playbackState.currentSongIndex > 0}
-        canGoNext={playbackState.currentSongIndex < queue.length - 1}
-        onPlayPause={handlePlayPause}
-        onNext={handleNext}
-        onPrevious={handlePrevious}
-        onSeek={handleSeek}
         networkLatency={networkLatency}
-        onSync={requestSync}
         onForceSync={handleForceSync}
         users={users}
-        volume={volume}
-        isMuted={isMuted}
-        onVolumeChange={handleVolumeChange}
-        onMuteToggle={isMuted ? unmute : mute}
-        isMicEnabled={isMicEnabled}
-        onMicToggle={handleMicToggle}
         onKickUser={kickUser}
         onForceMuteUser={forceMuteUser}
         onToggleControlAccess={toggleControlAccess}
         currentUserId={user.id}
-        audioSettings={{
-          eqSettings: eqSettings,
-          onEqChange: handleEqChange,
-          noiseSuppression: noiseSuppression,
-          onNoiseSuppressionChange: setNoiseSuppression,
-          echoCancellation: echoCancellation,
-          onEchoCancellationChange: setEchoCancellation,
-          autoGainControl: autoGainControl,
-          onAutoGainControlChange: setAutoGainControl,
-          micGain: micGain,
-          onMicGainChange: setMicGain,
-          compressorThreshold: compressorThreshold,
-          onCompressorThresholdChange: setCompressorThreshold,
-          compressorRatio: compressorRatio,
-          onCompressorRatioChange: setCompressorRatio,
-        }}
       />
 
       {/* Floating reactions */}
