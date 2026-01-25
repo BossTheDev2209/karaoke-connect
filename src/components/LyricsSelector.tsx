@@ -102,71 +102,87 @@ export const LyricsSelector: React.FC<LyricsSelectorProps> = ({
 
         {/* Matches List */}
         <div className="p-3 max-h-[50vh] overflow-y-auto space-y-2">
-          {matches.map((match, index) => (
-            <button
-              key={`${match.source}-${index}`}
-              className={cn(
-                "w-full p-3 rounded-xl border text-left transition-all duration-200",
-                selectedIndex === index
-                  ? "bg-primary/20 border-primary/50 ring-2 ring-primary/30"
-                  : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
-              )}
-              onClick={() => onSelect(index)}
-            >
-              <div className="flex items-start gap-3">
-                {/* Selection indicator */}
-                <div className={cn(
-                  "flex-shrink-0 w-5 h-5 mt-0.5 rounded-full border-2 flex items-center justify-center transition-colors",
+          {matches.map((match, index) => {
+            // Preview first few lines of lyrics
+            const lyricsPreview = (match.syncedLyrics || match.plainLyrics || '')
+              .split('\n')
+              .slice(0, 3)
+              .map(line => line.replace(/\[\d{2}:\d{2}\.\d{2}\]/g, '').trim())
+              .filter(line => line.length > 0)
+              .join(' • ');
+              
+            return (
+              <button
+                key={`${match.source}-${index}`}
+                className={cn(
+                  "w-full p-3 rounded-xl border text-left transition-all duration-200",
                   selectedIndex === index
-                    ? "bg-primary border-primary"
-                    : "border-white/30"
-                )}>
-                  {selectedIndex === index && (
-                    <Check className="w-3 h-3 text-white" />
-                  )}
-                </div>
-
-                {/* Match info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-white truncate">
-                      {match.trackName || 'Unknown Title'}
-                    </span>
-                    {index === 0 && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-gradient-to-r from-amber-500/30 to-orange-500/30 text-amber-300 rounded border border-amber-500/30">
-                        <Sparkles className="w-2.5 h-2.5" />
-                        Best
-                      </span>
+                    ? "bg-primary/20 border-primary/50 ring-2 ring-primary/30"
+                    : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
+                )}
+                onClick={() => onSelect(index)}
+              >
+                <div className="flex items-start gap-3">
+                  {/* Selection indicator */}
+                  <div className={cn(
+                    "flex-shrink-0 w-5 h-5 mt-0.5 rounded-full border-2 flex items-center justify-center transition-colors",
+                    selectedIndex === index
+                      ? "bg-primary border-primary"
+                      : "border-white/30"
+                  )}>
+                    {selectedIndex === index && (
+                      <Check className="w-3 h-3 text-white" />
                     )}
                   </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-sm text-white/60 truncate">
-                      {match.artistName || 'Unknown Artist'}
-                    </span>
-                    <span className={cn(
-                      "inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded border",
-                      getSourceColor(match.source)
-                    )}>
-                      {getSourceLabel(match.source)}
-                    </span>
-                    {match.syncedLyrics && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/30">
-                        <Clock className="w-2.5 h-2.5" />
-                        Synced
+
+                  {/* Match info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-white truncate">
+                        {match.trackName || 'Unknown Title'}
                       </span>
+                      {index === 0 && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-gradient-to-r from-amber-500/30 to-orange-500/30 text-amber-300 rounded border border-amber-500/30">
+                          <Sparkles className="w-2.5 h-2.5" />
+                          Best
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-sm text-white/60 truncate">
+                        {match.artistName || 'Unknown Artist'}
+                      </span>
+                      <span className={cn(
+                        "inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded border",
+                        getSourceColor(match.source)
+                      )}>
+                        {getSourceLabel(match.source)}
+                      </span>
+                      {match.syncedLyrics && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-cyan-500/20 text-cyan-400 rounded border border-cyan-500/30">
+                          <Clock className="w-2.5 h-2.5" />
+                          Synced
+                        </span>
+                      )}
+                    </div>
+                    {/* Lyrics preview */}
+                    {lyricsPreview && (
+                      <p className="text-xs text-white/40 mt-2 line-clamp-1 italic">
+                        "{lyricsPreview}"
+                      </p>
                     )}
                   </div>
-                </div>
 
-                {/* Score indicator */}
-                <div className="flex-shrink-0 text-right">
-                  <div className="text-xs text-white/40">
-                    {Math.round(match.score * 100)}%
+                  {/* Score indicator */}
+                  <div className="flex-shrink-0 text-right">
+                    <div className="text-xs text-white/40">
+                      {Math.round(match.score * 100)}%
+                    </div>
                   </div>
                 </div>
-              </div>
-            </button>
-          ))}
+              </button>
+            );
+          })}
 
           {/* No lyrics option */}
           <button

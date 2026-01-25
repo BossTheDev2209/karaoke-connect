@@ -25,9 +25,10 @@ interface LyricsDisplayProps {
   hasCaptionsAvailable?: boolean;
   onEnableCaptions?: () => void;
   onDisableCaptions?: () => void;
-  // NEW: Source and multiple matches support
+  // Source and multiple matches support
   source?: string | null;
   hasMultipleMatches?: boolean;
+  matchCount?: number;
   onChangeLyrics?: () => void;
 }
 
@@ -104,9 +105,9 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   hasCaptionsAvailable = false,
   onEnableCaptions,
   onDisableCaptions,
-  // NEW
   source,
   hasMultipleMatches = false,
+  matchCount = 0,
   onChangeLyrics,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -234,17 +235,17 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
           </span>
         )}
 
-        {/* Change lyrics button - show when multiple matches available */}
-        {hasMultipleMatches && onChangeLyrics && (
+        {/* Change lyrics button - show when matches available */}
+        {onChangeLyrics && matchCount > 0 && (
           <Button
             variant="ghost"
             size="sm"
             onClick={onChangeLyrics}
-            className="h-6 px-2 text-xs bg-background/80 backdrop-blur rounded-lg"
-            title="Choose different lyrics"
+            className="h-6 px-2 text-xs bg-gradient-to-r from-neon-purple/20 to-neon-pink/20 hover:from-neon-purple/30 hover:to-neon-pink/30 border border-neon-purple/30 rounded-lg"
+            title={matchCount > 1 ? `${matchCount} lyrics options available` : "Choose different lyrics"}
           >
             <List className="w-3 h-3 mr-1" />
-            Change
+            {matchCount > 1 ? `${matchCount} Options` : 'Change'}
           </Button>
         )}
 
