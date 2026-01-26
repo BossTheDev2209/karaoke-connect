@@ -29,7 +29,32 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
   const [channelVideos, setChannelVideos] = useState<YouTubeSearchResult[]>([]);
   const [artistModalOpen, setArtistModalOpen] = useState(false);
 
-  const handleSearch = async () => {
+  // Search for songs (main search bar)
+  const handleSongSearch = async () => {
+    if (!query.trim()) return;
+
+    setIsLoading(true);
+    
+    try {
+      const searchQuery = karaokeFilterEnabled 
+        ? `${query} karaoke instrumental` 
+        : query;
+
+      const { data, error } = await supabase.functions.invoke('youtube-search', {
+        body: { query: searchQuery, type: 'video' },
+      });
+      if (error) throw error;
+      setResults(data.results || []);
+      setIsOpen(true);
+    } catch (err) {
+      console.error('Search error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Search for artists (artist modal)
+  const handleArtistSearch = async () => {
     if (!query.trim()) return;
 
     setIsLoading(true);
@@ -37,26 +62,11 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
     setChannelVideos([]);
     
     try {
-      const searchQuery = activeTab === 'songs' && karaokeFilterEnabled 
-        ? `${query} karaoke instrumental` 
-        : query;
-
-      if (activeTab === 'songs') {
-        const { data, error } = await supabase.functions.invoke('youtube-search', {
-          body: { query: searchQuery, type: 'video' },
-        });
-        if (error) throw error;
-        setResults(data.results || []);
-        setChannels([]);
-      } else {
-        const { data, error } = await supabase.functions.invoke('youtube-search', {
-          body: { query, type: 'channel' },
-        });
-        if (error) throw error;
-        setChannels(data.channels || []);
-        setResults([]);
-      }
-      setIsOpen(true);
+      const { data, error } = await supabase.functions.invoke('youtube-search', {
+        body: { query, type: 'channel' },
+      });
+      if (error) throw error;
+      setChannels(data.channels || []);
     } catch (err) {
       console.error('Search error:', err);
     } finally {
@@ -142,13 +152,13 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder={activeTab === 'songs' ? "Search for songs..." : "Search for artists..."}
+            onKeyDown={(e) => e.key === 'Enter' && handleSongSearch()}
+            placeholder="Search for songs..."
             className="pl-10 bg-input border-border"
           />
         </div>
         <Button 
-          onClick={handleSearch} 
+          onClick={handleSongSearch} 
           disabled={isLoading}
           className="btn-neon"
         >
@@ -238,14 +248,14 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                           <Input
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                            onKeyDown={(e) => e.key === 'Enter' && handleArtistSearch()}
                             placeholder="Search for artists or channels..."
                             className="pl-10 bg-muted/50 border-border rounded-xl"
                             autoFocus
                           />
                         </div>
                         <Button
-                          onClick={handleSearch}
+                          onClick={handleArtistSearch}
                           disabled={isLoading}
                           className="rounded-xl bg-gradient-to-r from-neon-purple to-neon-pink hover:opacity-90"
                         >
