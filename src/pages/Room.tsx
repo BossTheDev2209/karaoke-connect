@@ -963,8 +963,8 @@ export default function Room() {
             <SongQueue 
               queue={queue} 
               currentIndex={playbackState.currentSongIndex} 
-              onRemove={isHost ? handleRemoveSong : undefined} 
-              onSelect={isHost ? handleSelectSong : undefined}
+              onRemove={canControl ? handleRemoveSong : undefined} 
+              onSelect={canControl ? handleSelectSong : undefined}
               getLyricStatus={getStatusForSong}
             />
           </div>
