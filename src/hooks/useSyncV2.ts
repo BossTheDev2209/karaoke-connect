@@ -479,6 +479,52 @@ export function useSyncV2({
       const data = payload;
       
       switch (data.type) {
+        // Handle full_sync_response for new joiners - this is the KEY fix!
+        case 'full_sync_response': {
+          const syncData = data.payload as {
+            queue: any[];
+            playbackState: PlaybackState;
+            roomMode: string;
+            battleFormat?: any;
+            serverTime?: number;
+          };
+          
+          console.log('[SyncV2] Received full_sync_response:', syncData.playbackState);
+          
+          // Only handle if playback is active (status playing or has startAtRoomTime)
+          const incomingState = syncData.playbackState;
+          if (incomingState.status === 'playing' || incomingState.startAtRoomTime) {
+            // Hydrate SyncV2 state
+            const newState: PlaybackState = {
+              ...incomingState,
+              status: incomingState.isPlaying ? 'playing' : (incomingState.status || 'idle'),
+            };
+            setPlaybackState(newState);
+            playbackRef.current = newState;
+            
+            // If playing, start playback at correct position
+            if (incomingState.isPlaying && incomingState.startAtRoomTime) {
+              const roomTime = getRoomTime();
+              const elapsed = (roomTime - incomingState.startAtRoomTime) / 1000;
+              const targetTime = Math.max(0, elapsed + (incomingState.seekOffset || 0));
+              
+              console.log(`[SyncV2] New joiner syncing to ${targetTime.toFixed(2)}s (elapsed=${elapsed.toFixed(2)}s)`);
+              
+              // Cue video first if we have a videoId
+              if (incomingState.videoId) {
+                onCueVideo(incomingState.videoId);
+              }
+              
+              // Small delay to allow video to cue, then seek and play
+              setTimeout(() => {
+                onSeekRequired(targetTime);
+                onPlayRequired();
+              }, 500);
+            }
+          }
+          break;
+        }
+        
         case 'prepare_song': {
           const { videoId, songIndex } = data.payload;
           console.log('[SyncV2] Received prepare_song:', videoId);
