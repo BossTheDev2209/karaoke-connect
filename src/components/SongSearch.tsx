@@ -15,30 +15,33 @@ interface SongSearchProps {
   compact?: boolean;
 }
 
-type SearchTab = 'songs' | 'artists';
-
 export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compact = false }) => {
   const { karaokeFilterEnabled } = useTheme();
-  const [query, setQuery] = useState('');
+  
+  // Song search state (main bar) - completely independent
+  const [songQuery, setSongQuery] = useState('');
   const [results, setResults] = useState<YouTubeSearchResult[]>([]);
-  const [channels, setChannels] = useState<YouTubeChannel[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSongLoading, setIsSongLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<SearchTab>('songs');
+  
+  // Artist search state (modal) - completely independent
+  const [artistQuery, setArtistQuery] = useState('');
+  const [channels, setChannels] = useState<YouTubeChannel[]>([]);
+  const [isArtistLoading, setIsArtistLoading] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<YouTubeChannel | null>(null);
   const [channelVideos, setChannelVideos] = useState<YouTubeSearchResult[]>([]);
   const [artistModalOpen, setArtistModalOpen] = useState(false);
 
-  // Search for songs (main search bar)
+  // Search for songs (main search bar) - uses songQuery
   const handleSongSearch = async () => {
-    if (!query.trim()) return;
+    if (!songQuery.trim()) return;
 
-    setIsLoading(true);
+    setIsSongLoading(true);
     
     try {
       const searchQuery = karaokeFilterEnabled 
-        ? `${query} karaoke instrumental` 
-        : query;
+        ? `${songQuery} karaoke instrumental` 
+        : songQuery;
 
       const { data, error } = await supabase.functions.invoke('youtube-search', {
         body: { query: searchQuery, type: 'video' },
@@ -49,33 +52,33 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
     } catch (err) {
       console.error('Search error:', err);
     } finally {
-      setIsLoading(false);
+      setIsSongLoading(false);
     }
   };
 
-  // Search for artists (artist modal)
+  // Search for artists (artist modal) - uses artistQuery
   const handleArtistSearch = async () => {
-    if (!query.trim()) return;
+    if (!artistQuery.trim()) return;
 
-    setIsLoading(true);
+    setIsArtistLoading(true);
     setSelectedChannel(null);
     setChannelVideos([]);
     
     try {
       const { data, error } = await supabase.functions.invoke('youtube-search', {
-        body: { query, type: 'channel' },
+        body: { query: artistQuery, type: 'channel' },
       });
       if (error) throw error;
       setChannels(data.channels || []);
     } catch (err) {
       console.error('Search error:', err);
     } finally {
-      setIsLoading(false);
+      setIsArtistLoading(false);
     }
   };
 
   const handleSelectChannel = async (channel: YouTubeChannel) => {
-    setIsLoading(true);
+    setIsArtistLoading(true);
     setSelectedChannel(channel);
     
     try {
@@ -87,7 +90,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
     } catch (err) {
       console.error('Error fetching channel videos:', err);
     } finally {
-      setIsLoading(false);
+      setIsArtistLoading(false);
     }
   };
 
@@ -112,11 +115,8 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
 
   const handleClose = () => {
     setIsOpen(false);
-    setSelectedChannel(null);
-    setChannelVideos([]);
-    setQuery('');
+    setSongQuery('');
     setResults([]);
-    setChannels([]);
   };
 
   const handleCloseArtistModal = () => {
@@ -124,25 +124,12 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
     setSelectedChannel(null);
     setChannelVideos([]);
     setChannels([]);
+    setArtistQuery('');
   };
 
   const openArtistModal = () => {
     setArtistModalOpen(true);
-    setActiveTab('artists');
   };
-
-  const handleTabChange = (tab: SearchTab) => {
-    setActiveTab(tab);
-    setResults([]);
-    setChannels([]);
-    setSelectedChannel(null);
-    setChannelVideos([]);
-  };
-
-  const videosToShow = selectedChannel ? channelVideos : results;
-  const hasResults = activeTab === 'songs' 
-    ? videosToShow.length > 0 
-    : (selectedChannel ? channelVideos.length > 0 : channels.length > 0);
 
   return (
     <div className="relative">
@@ -150,8 +137,8 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={songQuery}
+            onChange={(e) => setSongQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSongSearch()}
             placeholder="Search for songs..."
             className="pl-10 bg-input border-border"
@@ -159,10 +146,10 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
         </div>
         <Button 
           onClick={handleSongSearch} 
-          disabled={isLoading}
+          disabled={isSongLoading}
           className="btn-neon"
         >
-          {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+          {isSongLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
         </Button>
       </div>
 
@@ -246,8 +233,8 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                         <div className="relative flex-1">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                           <Input
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
+                            value={artistQuery}
+                            onChange={(e) => setArtistQuery(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleArtistSearch()}
                             placeholder="Search for artists or channels..."
                             className="pl-10 bg-muted/50 border-border rounded-xl"
@@ -256,10 +243,10 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                         </div>
                         <Button
                           onClick={handleArtistSearch}
-                          disabled={isLoading}
+                          disabled={isArtistLoading}
                           className="rounded-xl bg-gradient-to-r from-neon-purple to-neon-pink hover:opacity-90"
                         >
-                          {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+                          {isArtistLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
                         </Button>
                       </div>
                     </div>
@@ -286,7 +273,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
 
                   {/* Content Area */}
                   <div className="flex-1 overflow-y-auto p-4">
-                    {isLoading ? (
+                    {isArtistLoading ? (
                       <div className="flex items-center justify-center py-12">
                         <div className="flex flex-col items-center gap-3">
                           <Loader2 className="w-8 h-8 animate-spin text-neon-purple" />
