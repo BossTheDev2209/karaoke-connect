@@ -80,7 +80,7 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
   duration
 }) => {
   const [activeTab, setActiveTab] = useState('remote');
-  const [showVideo, setShowVideo] = useState(false);
+  const [showVideo, setShowVideo] = useState(true);
 
   // Format time helper
   const formatTime = (seconds: number) => {
@@ -167,9 +167,9 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
         ref={youtubePlayerRef}
         id="youtube-player"
         className={cn(
-          "transition-all duration-300 bg-black overflow-hidden shadow-lg",
+          "transition-all duration-300 bg-black overflow-hidden shadow-lg shrink-0",
           (showVideo && activeTab === 'remote') 
-            ? "w-full aspect-video relative opacity-100" 
+            ? "w-full h-[35vh] min-h-[180px] max-h-[280px] relative opacity-100" 
             : "absolute top-0 left-0 w-px h-px opacity-0 pointer-events-none"
         )}
       />
