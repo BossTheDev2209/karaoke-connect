@@ -294,20 +294,9 @@
     }
   }
 
+  /* Discord-style instant speaking ring - no animation */
   .avatar-speaking {
-    animation: pulse-glow 0.5s ease-in-out infinite alternate;
-  }
-
-  @keyframes pulse-glow {
-    from {
-      transform: scale(1);
-      box-shadow: 0 0 10px hsl(var(--neon-green) / 0.5);
-    }
-    to {
-      transform: scale(1);
-      box-shadow: 0 0 25px hsl(var(--neon-green) / 0.8),
-        0 0 50px hsl(var(--neon-green) / 0.4);
-    }
+    box-shadow: 0 0 0 3px hsl(var(--neon-green));
   }
 
   @keyframes float {

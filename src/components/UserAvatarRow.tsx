@@ -130,17 +130,10 @@ const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
         <Popover open={isOpen} onOpenChange={setIsOpen}>
           <PopoverTrigger asChild>
             <button className="relative outline-none focus:ring-2 focus:ring-primary rounded-full transition-transform active:scale-95">
-              {/* Discord-style Speaking Ring */}
-              <div 
-                className={cn(
-                  "absolute -inset-1 rounded-full border-2 border-green-500 z-0 transition-opacity duration-150",
-                  user.isSpeaking ? "opacity-100" : "opacity-0"
-                )}
-                style={{
-                  transform: 'scale(1)',
-                  boxShadow: user.isSpeaking ? `0 0 ${10 + userAudioLevel * 15}px rgba(34, 197, 94, 0.6)` : 'none'
-                }}
-              />
+              {/* Discord-style Speaking Ring - instant on/off */}
+              {user.isSpeaking && (
+                <div className="absolute -inset-1 rounded-full border-[3px] border-neon-green z-0" />
+              )}
               
               <div className="relative z-10">
                 <UserAvatar
