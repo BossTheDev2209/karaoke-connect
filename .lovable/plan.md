@@ -1,64 +1,52 @@
 
-# Fix Song Control Privilege for Queue Selection
 
-## Problem Summary
-Users with "DJ" control access (granted by host via the Host Control Panel) can use the playback controls (play/pause, skip, seek) in the RemoteControl panel, but they **cannot select songs from the queue** or remove songs. This is because the SongQueue component checks `isHost` directly instead of using the `canControl` permission flag.
+# Discord-Style Instant Speaking Ring
 
-## Root Cause
-In `src/pages/Room.tsx`, the SongQueue component is wired incorrectly:
+## Overview
+Replace the current animated speaking indicator system with a fast, instant on/off green ring that immediately responds to speaking state - just like Discord's voice channels.
 
-```tsx
-// Current (broken)
-<SongQueue 
-  onRemove={isHost ? handleRemoveSong : undefined} 
-  onSelect={isHost ? handleSelectSong : undefined}
-/>
+## Current Problems
+1. `avatar-speaking` CSS class uses a 0.5s pulsing animation (slow, laggy feel)
+2. The speaking ring in UserAvatarRow has `transition-opacity duration-150` and dynamic box-shadow calculations
+3. Mic icon in UserAvatar has `animate-pulse` animation
+4. Multiple overlapping visual effects create visual noise
+
+## Solution: Clean Discord-Style Implementation
+
+### Changes to `src/index.css`
+Remove the pulsing animation, replace with instant static glow:
+```css
+.avatar-speaking {
+  /* No animation - instant static glow */
+  box-shadow: 0 0 0 3px hsl(var(--neon-green));
+}
 ```
 
-It should use `canControl` which includes users with `hasControlAccess`:
+### Changes to `src/components/UserAvatarRow.tsx`
+Simplify the speaking ring to be instant on/off:
+- Remove `transition-opacity duration-150`
+- Remove dynamic `boxShadow` calculation based on audio level
+- Use simple conditional class for instant visibility
 
-```tsx
-// Correct
-<SongQueue 
-  onRemove={canControl ? handleRemoveSong : undefined} 
-  onSelect={canControl ? handleSelectSong : undefined}
-/>
-```
+### Changes to `src/components/UserAvatar.tsx`
+- Remove `animate-pulse` from the mic icon when speaking
+- Remove the `avatar-speaking` class usage (will be handled by parent)
+- Remove the green overlay pulse on custom avatars
 
-## Changes Required
+### Changes to `src/components/HumanAvatar.tsx`
+- Remove `avatar-speaking` class usage (handled by parent ring)
 
-### File: `src/pages/Room.tsx`
+## Technical Summary
 
-**Change 1: Fix SongQueue Desktop View** (around line 966-967)
-- Replace `isHost` with `canControl` for both `onRemove` and `onSelect` props
+| File | Change |
+|------|--------|
+| `src/index.css` | Replace `pulse-glow` animation with static border/shadow |
+| `src/components/UserAvatarRow.tsx` | Instant ring visibility, no transitions |
+| `src/components/UserAvatar.tsx` | Remove pulse animations and avatar-speaking class |
+| `src/components/HumanAvatar.tsx` | Remove avatar-speaking class |
 
-**Change 2: Also verify Mobile Layout** (around line 727-728)
-- The `MobileRoomLayout` component also passes these handlers, need to verify it uses proper permissions
+## Result
+- Green ring appears/disappears instantly when `user.isSpeaking` changes
+- No animations, no delays, no smooth transitions
+- Matches Discord's snappy voice activity indicator
 
-## Technical Details
-
-The `canControl` variable is already correctly computed:
-```tsx
-const canControl = useMemo(() => {
-  if (isHost) return true;
-  const currentUserData = users.find(u => u.id === user?.id);
-  return !!currentUserData?.hasControlAccess;
-}, [isHost, users, user?.id]);
-```
-
-This correctly grants control to:
-1. The host (always)
-2. Any user with `hasControlAccess: true` (granted via Host Control Panel → Users → Music note icon)
-
-The `hasControlAccess` flag is properly:
-- Toggled by `toggleControlAccess()` in `useRoom.ts`
-- Broadcast via `permission_update` event
-- Synced across all clients
-
-## Testing Verification
-After the fix, users with "DJ" badge should be able to:
-- ✅ Click on any song in the queue to select it
-- ✅ Remove songs from the queue via the trash icon
-- ✅ Use play/pause controls (already working)
-- ✅ Skip forward/backward (already working)
-- ✅ Seek using the progress bar (already working)
