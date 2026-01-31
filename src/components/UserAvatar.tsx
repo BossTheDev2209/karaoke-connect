@@ -45,13 +45,13 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
       {/* Mic status indicator */}
       {user.isMicEnabled !== undefined && (
         <div className={cn(
-          "absolute -top-1 -right-1 z-20 rounded-full p-1 shadow-lg border transition-all duration-300",
+          "absolute -top-1 -right-1 z-20 rounded-full p-1 shadow-lg border",
           user.isMicEnabled 
             ? "bg-neon-green/20 border-neon-green/50 text-neon-green" 
             : "bg-muted/80 border-border text-muted-foreground"
         )}>
           {user.isMicEnabled ? (
-            <Mic className={cn(micIndicatorSize[size], user.isSpeaking && "animate-pulse")} />
+            <Mic className={micIndicatorSize[size]} />
           ) : (
             <MicOff className={micIndicatorSize[size]} />
           )}
@@ -61,9 +61,8 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
       {hasCustomAvatar ? (
         <div 
           className={cn(
-            'relative rounded-full overflow-hidden border-2 transition-all duration-300',
+            'relative rounded-full overflow-hidden border-2',
             sizeClasses[size],
-            user.isSpeaking && 'avatar-speaking',
             isMainSinger ? 'border-primary shadow-[0_0_20px_hsl(var(--primary)/0.5)]' : 'border-transparent'
           )}
         >
@@ -72,10 +71,6 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
             alt={user.nickname}
             className="w-full h-full object-cover"
           />
-          {/* Speaking glow effect when no speaking image */}
-          {user.isSpeaking && !user.customAvatarSpeaking && (
-            <div className="absolute inset-0 bg-neon-green/20 animate-pulse" />
-          )}
         </div>
       ) : (
         <div className="relative">

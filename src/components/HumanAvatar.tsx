@@ -33,7 +33,6 @@ export const HumanAvatar: React.FC<HumanAvatarProps> = ({
       className={cn(
         'relative rounded-full flex items-end justify-center overflow-hidden',
         sizeClasses[size],
-        isSpeaking && 'avatar-speaking',
         className
       )}
       style={{ backgroundColor: `${bodyColor}30` }}
