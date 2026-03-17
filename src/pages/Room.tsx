@@ -12,7 +12,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/integrations/supabase/client';
 
 import { DesktopRoomLayout } from '@/components/room/DesktopRoomLayout';
-import { getCurrentCelebration } from '@/components/effects/CelebrationOverlay';
+import { CelebrationOverlay, getCurrentCelebration } from '@/components/effects/CelebrationOverlay';
+import { DustFallEffect } from '@/components/effects/SingerEffects';
 import { useReactions, useWaving } from '@/components/Reactions';
 import { useAudioReactive } from '@/hooks/useAudioReactive';
 import { useVoteKick } from '@/components/VoteKick';
@@ -20,7 +21,6 @@ import { MobileRoomLayout } from '@/components/MobileRoomLayout';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 import { toast } from 'sonner';
 
 
