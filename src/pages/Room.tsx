@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 import { LyricsDisplay } from '@/components/LyricsDisplay';
 import { RemoteControl } from '@/components/RemoteControl';
+import { DesktopRoomLayout } from '@/components/room/DesktopRoomLayout';
 import { SongQueue } from '@/components/SongQueue';
 import { SongSearch } from '@/components/SongSearch';
 import { UserAvatarRow } from '@/components/UserAvatarRow';
