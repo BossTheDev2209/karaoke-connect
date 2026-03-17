@@ -11,27 +11,15 @@ import { useSyncV2 } from '@/hooks/useSyncV2';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/integrations/supabase/client';
 
-import { LyricsDisplay } from '@/components/LyricsDisplay';
-import { RemoteControl } from '@/components/RemoteControl';
-import { SongQueue } from '@/components/SongQueue';
-import { SongSearch } from '@/components/SongSearch';
-import { UserAvatarRow } from '@/components/UserAvatarRow';
-import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
-import { RoomMenu } from '@/components/RoomMenu';
+import { DesktopRoomLayout } from '@/components/room/DesktopRoomLayout';
 import { CelebrationOverlay, getCurrentCelebration } from '@/components/effects/CelebrationOverlay';
-import { ReactionBar, FloatingReactions, useReactions, useWaving } from '@/components/Reactions';
-import { SingReactOverlay } from '@/components/effects/SingReactOverlay';
 import { DustFallEffect } from '@/components/effects/SingerEffects';
+import { useReactions, useWaving } from '@/components/Reactions';
 import { useAudioReactive } from '@/hooks/useAudioReactive';
-import { useVoteKick, VoteKickOverlay } from '@/components/VoteKick';
-import { TeamBattleOverlay } from '@/components/TeamBattleOverlay';
-import { LyricsSelector } from '@/components/LyricsSelector';
+import { useVoteKick } from '@/components/VoteKick';
 import { MobileRoomLayout } from '@/components/MobileRoomLayout';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { HostControlPanel } from '@/components/HostControlPanel';
 
-import { LogOut, Swords, Mic2, Sparkles, Play, Crown, Settings2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -813,454 +801,247 @@ export default function Room() {
     );
   }
 
+  // --- Prop assembly for DesktopRoomLayout (all logic stays here) ---
+
+  const headerProps = {
+    code,
+    isHost,
+    isConnected,
+    userCount: users.length,
+    networkLatency,
+    isMicEnabled,
+    webrtcStats,
+    roomMode,
+    onShowHostControlPanel: () => setShowHostControlPanel(true),
+    onLeave: handleLeave,
+    roomMenuProps: {
+      channel,
+      currentUserId: user.id,
+      users,
+      currentMode: roomMode,
+      isHost,
+      onModeChange: updateMode,
+      activeVoteKick,
+      hasVoted,
+      onStartVoteKick: handleVoteKick,
+      onVoteYes: voteYes,
+      onVoteNo: voteNo,
+      voteKickDisabled: !!activeVoteKick,
+      celebrationEnabled,
+      onCelebrationToggle: setCelebrationEnabled,
+      eqSettings,
+      onEqChange: handleEqChange,
+      threshold,
+      onThresholdChange: setThreshold,
+      isMonitorEnabled,
+      onMonitorEnabledChange: setMonitorEnabled,
+      monitorVolume,
+      onMonitorVolumeChange: setMonitorVolume,
+      noiseSuppression,
+      onNoiseSuppressionChange: setNoiseSuppression,
+      echoCancellation,
+      onEchoCancellationChange: setEchoCancellation,
+      autoGainControl,
+      onAutoGainControlChange: setAutoGainControl,
+      micGain,
+      onMicGainChange: setMicGain,
+      compressorThreshold,
+      onCompressorThresholdChange: setCompressorThreshold,
+      compressorRatio,
+      onCompressorRatioChange: setCompressorRatio,
+    },
+  };
+
+  const showReadyCheck = syncV2.playbackState.status === 'preparing' || syncV2.playbackState.status === 'ready';
+  const readyCheckUsers = users.map(u => ({
+    id: u.id,
+    nickname: u.nickname,
+    isReady: !!syncV2.playerReadyStates[u.id],
+  }));
+  const showNoSong = !currentSong;
+  const showRecommendations = !isPlaying && !playerError && queue.length <= 1 && recommendations.length > 0;
+  const showPlayerError = !!playerError && !!currentSong;
+  const showLyrics = !(hideLyricsWhenNotFound && (lyricsError || lyrics.length === 0));
+
+  const stageProps = {
+    showSingReactOverlay: true,
+    singReactOverlayProps: {
+      isPlaying,
+      userId: user.id,
+      channel,
+      className: "absolute inset-0 rounded-lg overflow-hidden",
+    },
+    showCountdown,
+    remainingSeconds,
+    showReadyCheck,
+    readyCheckUsers,
+    isHost,
+    onForceStart: () => syncV2.forceStart(),
+    showNoSong,
+    showRecommendations,
+    recommendations,
+    onAddRecommendation: addRecommendation,
+    onDismissRecommendations: () => setRecommendations([]),
+    showPlayerError,
+    playerError,
+    onClearErrorAndSkip: () => {
+      clearError();
+      handleVideoEnded();
+    },
+    hasMoreSongs: queue.length > 1,
+    showLyrics,
+    lyricsDisplayProps: {
+      lyrics,
+      currentLineIndex,
+      currentTime,
+      isLoading: lyricsLoading,
+      error: lyricsError,
+      offset: lyricsOffset,
+      onOffsetChange: setLyricsOffset,
+      onSeek: handleSeek,
+      areCaptionsEnabled,
+      hasCaptionsAvailable,
+      onEnableCaptions: enableCaptions,
+      onDisableCaptions: disableCaptions,
+      source: lyricsSource,
+      hasMultipleMatches: allMatches.length > 1,
+      matchCount: allMatches.length,
+      onChangeLyrics: () => setShowLyricsSelector(true),
+    },
+  };
+
+  const controlsProps = {
+    remoteControlProps: {
+      isPlaying,
+      isMuted,
+      volume,
+      currentTime,
+      duration,
+      isMicEnabled,
+      canGoPrevious: playbackState.currentSongIndex > 0,
+      canGoNext: playbackState.currentSongIndex < queue.length - 1,
+      onPlayPause: handlePlayPause,
+      onNext: handleNext,
+      onPrevious: handlePrevious,
+      onSeek: handleSeek,
+      onVolumeChange: handleVolumeChange,
+      onMuteToggle: isMuted ? unmute : mute,
+      onMicToggle: handleMicToggle,
+      onSync: requestSync,
+      isHost: canControl,
+      users,
+      queue,
+      currentSongIndex: playbackState.currentSongIndex,
+      roomMode,
+      battleFormat,
+      onForceSync: handleForceSync,
+      onSmartPlay: handlePlayPause,
+      onSmartPause: handlePlayPause,
+      onHostSeek: handleSeek,
+      onRemoveSong: handleRemoveSong,
+      onSelectSong: handleSelectSong,
+      currentSong,
+      networkLatency,
+    },
+    reactionBarProps: {
+      onReact: sendReaction,
+      isWaving,
+      onWaveToggle: toggleWaving,
+    },
+  };
+
+  const overlaysProps = {
+    showTeamBattle: roomMode === 'team-battle',
+    teamBattleProps: {
+      users,
+      isPlaying: playbackState.isPlaying,
+      onContinue: handleNextRound,
+      showWinner: showWinnerScreen,
+      isHost,
+      currentUserId: user.id,
+    },
+    showVoteKick: !!activeVoteKick,
+    voteKickProps: {
+      voteKick: activeVoteKick!,
+      currentUserId: user.id,
+      hasVoted,
+      onVoteYes: voteYes,
+      onVoteNo: voteNo,
+    },
+    showLyricsSelector: showLyricsSelector && allMatches.length > 1,
+    lyricsSelectorProps: {
+      matches: allMatches,
+      selectedIndex: selectedMatchIndex,
+      onSelect: selectMatch,
+      onConfirm: handleLyricsConfirm,
+      onSkip: handleLyricsSkip,
+      songTitle: currentSong?.title || 'Unknown Song',
+      autoConfirmSeconds: 10,
+    },
+  };
+
+  const queuePanelProps = {
+    isHost,
+    queue,
+    currentSongIndex: playbackState.currentSongIndex,
+    canControl,
+    onAddSong: handleAddSong,
+    onRemoveSong: handleRemoveSong,
+    onSelectSong: handleSelectSong,
+    userId: user.id,
+    getStatusForSong,
+  };
+
+  const avatarRowProps = {
+    users,
+    currentUserId: user.id,
+    wavingUsers,
+    audioIntensity,
+    beatPhase,
+    isBeat,
+    bpm,
+    onStartVoteKick: startVoteKick,
+    voteKickDisabled: !!activeVoteKick,
+    roomMode,
+    battleFormat,
+    userVolumes,
+    onVolumeChange: handleUserVolumeChange,
+  };
+
+  const layoutFlags = {
+    isHost,
+    celebrationEnabled,
+    isExtraLoudSinging,
+    isPlaying,
+    maxUserAudioLevel,
+  };
+
+  const hostControlPanelProps = {
+    isOpen: showHostControlPanel,
+    onClose: () => setShowHostControlPanel(false),
+    networkLatency,
+    onForceSync: handleForceSync,
+    users,
+    onKickUser: kickUser,
+    onForceMuteUser: forceMuteUser,
+    onToggleControlAccess: toggleControlAccess,
+    currentUserId: user.id,
+  };
+
   return (
-    <div className="h-screen flex flex-col p-4 gap-3 overflow-hidden">
-      {/* Celebration effects */}
-      {celebrationEnabled && <CelebrationOverlay theme={celebration} />}
-      
-      {/* Host Control Panel (Modrinth-style popup) */}
-      <HostControlPanel
-        isOpen={showHostControlPanel}
-        onClose={() => setShowHostControlPanel(false)}
-        networkLatency={networkLatency}
-        onForceSync={handleForceSync}
-        users={users}
-        onKickUser={kickUser}
-        onForceMuteUser={forceMuteUser}
-        onToggleControlAccess={toggleControlAccess}
-        currentUserId={user.id}
-      />
-
-      {/* Floating reactions */}
-      
-      {/* Dust fall effect when singing EXTRA loudly (Level 2) */}
-      <DustFallEffect isActive={isExtraLoudSinging && isPlaying} intensity={maxUserAudioLevel} />
-      {/* Header - Host gets amber accent */}
-      <header className={cn(
-        "flex flex-wrap gap-2 items-center justify-between rounded-xl px-4 py-2 transition-all",
-        isHost 
-          ? "bg-gradient-to-r from-amber-950/40 via-background to-background border border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.1)]" 
-          : "bg-gradient-to-r from-primary/10 via-background to-background border border-border/50 shadow-sm"
-      )}>
-        <RoomCodeDisplay code={code} />
-        <div className="flex items-center gap-2">
-          {/* Connection indicator */}
-          <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-neon-green' : 'bg-destructive'}`} />
-          <span className="text-sm text-muted-foreground">
-            {users.length} online
-            {networkLatency > 0 && ` · ${networkLatency}ms`}
-            {isMicEnabled && webrtcStats.connectedPeers > 0 && (
-              <span className={cn(
-                "ml-1",
-                webrtcStats.connectionQuality === 'excellent' && "text-green-400",
-                webrtcStats.connectionQuality === 'good' && "text-green-500",
-                webrtcStats.connectionQuality === 'fair' && "text-yellow-500",
-                webrtcStats.connectionQuality === 'poor' && "text-red-500",
-              )}>
-                · 🎤{webrtcStats.avgLatency > 0 ? `${webrtcStats.avgLatency}ms` : '⚡'}
-              </span>
-            )}
-          </span>
-          
-          {/* Host Badge */}
-          {isHost && (
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 border border-amber-500/50 text-amber-400">
-              👑 Host
-            </div>
-          )}
-          
-          {/* Mode Badge */}
-          <div className={cn(
-            "flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all",
-            roomMode === 'team-battle' 
-              ? "bg-primary/20 border-primary text-primary animate-pulse" 
-              : "bg-muted/50 border-border text-muted-foreground"
-          )}>
-            {roomMode === 'team-battle' ? <Swords className="w-3 h-3" /> : <Mic2 className="w-3 h-3" />}
-            {roomMode === 'team-battle' ? 'Team Battle' : 'Free Sing'}
-          </div>
-
-          {/* Host Control Panel Button (Host only) */}
-          {isHost && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowHostControlPanel(true)}
-              className="gap-2 border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-500/50 text-amber-400"
-            >
-              <Settings2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Host Controls</span>
-            </Button>
-          )}
-          {/* Unified Room Menu (replaces VotingPanel & RoomSettings) */}
-          <RoomMenu
-            // Voting Props
-            channel={channel}
-            currentUserId={user.id}
-            users={users}
-            currentMode={roomMode}
-            isHost={isHost}
-            onModeChange={updateMode}
-            activeVoteKick={activeVoteKick}
-            hasVoted={hasVoted}
-            onStartVoteKick={handleVoteKick}
-            onVoteYes={voteYes}
-            onVoteNo={voteNo}
-            voteKickDisabled={!!activeVoteKick}
-            
-            // Settings Props
-            celebrationEnabled={celebrationEnabled} 
-            onCelebrationToggle={setCelebrationEnabled}
-            eqSettings={eqSettings}
-            onEqChange={handleEqChange}
-            threshold={threshold}
-            onThresholdChange={setThreshold}
-            isMonitorEnabled={isMonitorEnabled}
-            onMonitorEnabledChange={setMonitorEnabled}
-            monitorVolume={monitorVolume}
-            onMonitorVolumeChange={setMonitorVolume}
-            // Advanced Audio
-            noiseSuppression={noiseSuppression}
-            onNoiseSuppressionChange={setNoiseSuppression}
-            echoCancellation={echoCancellation}
-            onEchoCancellationChange={setEchoCancellation}
-            autoGainControl={autoGainControl}
-            onAutoGainControlChange={setAutoGainControl}
-            micGain={micGain}
-            onMicGainChange={setMicGain}
-            compressorThreshold={compressorThreshold}
-            onCompressorThresholdChange={setCompressorThreshold}
-            compressorRatio={compressorRatio}
-            onCompressorRatioChange={setCompressorRatio}
-          />
-          <Button variant="ghost" size="icon" onClick={handleLeave}>
-            <LogOut className="w-4 h-4" />
-          </Button>
-        </div>
-      </header>
-
-      {/* Main content - Video takes priority */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3">
-        {/* Queue panel - Different for Host vs Member */}
-        <div className={cn(
-          "lg:col-span-3 card-karaoke overflow-hidden flex flex-col order-3 lg:order-1",
-          isHost && "border-amber-500/20 bg-gradient-to-b from-amber-950/20 to-transparent"
-        )}>
-          <div className="flex items-center gap-2 mb-3">
-            {isHost ? (
-              <>
-                <Crown className="w-4 h-4 text-amber-400" />
-                <h3 className="font-bold text-amber-400">Your Queue</h3>
-              </>
-            ) : (
-              <h3 className="font-semibold text-muted-foreground">Room Queue</h3>
-            )}
-          </div>
-          <div className={cn("mb-3", !isHost && "opacity-70")}>
-            <SongSearch onAddSong={handleAddSong} userId={user.id} />
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            <SongQueue 
-              queue={queue} 
-              currentIndex={playbackState.currentSongIndex} 
-              onRemove={canControl ? handleRemoveSong : undefined} 
-              onSelect={canControl ? handleSelectSong : undefined}
-              getLyricStatus={getStatusForSong}
-            />
-          </div>
-        </div>
-
-        {/* Video & Lyrics - Main focus */}
-        <div className="lg:col-span-6 flex flex-col gap-3 min-h-0 order-1 lg:order-2">
-          <div className="card-karaoke relative flex-1 min-h-0">
-            <div id="youtube-player" className="w-full h-full rounded-lg overflow-hidden" />
-
-            {/* Sing React overlay with light sticks */}
-            <SingReactOverlay
-              isPlaying={isPlaying}
-              userId={user.id}
-              channel={channel}
-              className="absolute inset-0 rounded-lg overflow-hidden"
-            />
-
-            {showCountdown && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="rounded-2xl bg-card/70 backdrop-blur border border-border shadow-lg px-6 py-4">
-                  <div className="text-6xl font-black text-primary tabular-nums text-center">
-                    {remainingSeconds}
-                  </div>
-                  <div className="mt-1 text-[10px] uppercase tracking-[0.3em] text-muted-foreground text-center">
-                    seconds
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Ready Check Overlay (SyncV2) */}
-            {(syncV2.playbackState.status === 'preparing' || syncV2.playbackState.status === 'ready') && (
-              <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg z-20">
-                <div className="text-center space-y-4 p-6">
-                  <div className="animate-pulse">
-                    <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto">
-                      <Play className="w-8 h-8 text-primary" />
-                    </div>
-                  </div>
-                  <div className="text-xl font-semibold">Waiting for players...</div>
-                  <div className="flex flex-wrap justify-center gap-2 max-w-xs">
-                    {users.map(u => (
-                      <div 
-                        key={u.id}
-                        className={cn(
-                          "px-3 py-1 rounded-full text-sm flex items-center gap-2",
-                          syncV2.playerReadyStates[u.id] 
-                            ? "bg-green-500/20 text-green-400 border border-green-500/30" 
-                            : "bg-muted text-muted-foreground border border-border"
-                        )}
-                      >
-                        {syncV2.playerReadyStates[u.id] && <span className="text-green-400">✓</span>}
-                        {u.nickname}
-                      </div>
-                    ))}
-                  </div>
-                  {isHost && (
-                    <Button 
-                      variant="default" 
-                      size="sm" 
-                      onClick={() => syncV2.forceStart()}
-                      className="mt-2"
-                    >
-                      Start Now
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )}
-
-
-            {!currentSong && (
-              <div className="absolute inset-0 flex items-center justify-center bg-card/80 rounded-lg">
-                <p className="text-muted-foreground">Add songs to start!</p>
-              </div>
-            )}
-
-            {/* Recommendations Overlay (Up Next) */}
-            {!isPlaying && !playerError && queue.length <= 1 && recommendations.length > 0 && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md rounded-lg z-20 p-6 animate-in fade-in duration-300">
-                <div className="text-center mb-6">
-                  <h3 className="text-xl font-bold text-white mb-2">Up Next</h3>
-                  <p className="text-white/60 text-sm">Based on your last song</p>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl">
-                  {recommendations.map((rec) => (
-                    <button 
-                      key={rec.id}
-                      type="button"
-                      className="group relative aspect-video bg-black/50 rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all text-left"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        console.log('[Recommendations] Adding song to queue:', rec.title, rec.videoId);
-                        addRecommendation(rec);
-                      }}
-                    >
-                      <img src={rec.thumbnail} alt={rec.title} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
-                      <div className="absolute inset-0 flex flex-col justify-end p-3 bg-gradient-to-t from-black/90 to-transparent">
-                        <p className="text-white font-medium text-sm line-clamp-2 leading-tight">{rec.title}</p>
-                        <p className="text-white/60 text-xs mt-1 truncate">{rec.artist}</p>
-                      </div>
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="bg-primary/90 text-primary-foreground rounded-full p-3 shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
-                          <Play className="w-6 h-6 fill-current" />
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-                
-                <Button 
-                  variant="ghost" 
-                  className="mt-8 text-white/50 hover:text-white"
-                  onClick={() => setRecommendations([])}
-                >
-                  Cancel
-                </Button>
-              </div>
-            )}
-
-            {/* Player Error Overlay (Age-restricted, etc.) */}
-            {playerError && currentSong && (
-              <div className="absolute inset-0 flex items-center justify-center bg-card/95 rounded-lg backdrop-blur-sm z-10">
-                <div className="text-center p-6 max-w-md">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-destructive/20 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-semibold text-foreground mb-2">
-                    {playerError.isAgeRestricted ? 'Age-Restricted Video' : 'Video Unavailable'}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {playerError.message}
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                    <a
-                      href={`https://www.youtube.com/watch?v=${playerError.videoId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
-                      </svg>
-                      Watch on YouTube
-                    </a>
-                    {queue.length > 1 && (
-                      <button
-                        onClick={() => {
-                          clearError();
-                          handleVideoEnded();
-                        }}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors text-sm font-medium"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                        </svg>
-                        Skip to Next
-                      </button>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-3">
-                    {playerError.isAgeRestricted 
-                      ? 'Age-restricted videos can only be watched directly on YouTube'
-                      : 'This video cannot be played in an embedded player'}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-          
-          {/* Lyrics Display - Hide if option enabled and no lyrics found */}
-          {!(hideLyricsWhenNotFound && (lyricsError || lyrics.length === 0)) && (
-            <div className="card-karaoke h-[140px] shrink-0">
-              <LyricsDisplay 
-                lyrics={lyrics} 
-                currentLineIndex={currentLineIndex} 
-                currentTime={currentTime} 
-                isLoading={lyricsLoading} 
-                error={lyricsError}
-                offset={lyricsOffset}
-                onOffsetChange={setLyricsOffset}
-                onSeek={handleSeek}
-                areCaptionsEnabled={areCaptionsEnabled}
-                hasCaptionsAvailable={hasCaptionsAvailable}
-                onEnableCaptions={enableCaptions}
-                onDisableCaptions={disableCaptions}
-                source={lyricsSource}
-                hasMultipleMatches={allMatches.length > 1}
-                matchCount={allMatches.length}
-                onChangeLyrics={() => setShowLyricsSelector(true)}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Controls panel */}
-        <div className="lg:col-span-3 flex flex-col order-2 lg:order-3 h-full">
-          <RemoteControl
-            isPlaying={isPlaying}
-            isMuted={isMuted}
-            volume={volume}
-            currentTime={currentTime}
-            duration={duration}
-            isMicEnabled={isMicEnabled}
-            canGoPrevious={playbackState.currentSongIndex > 0}
-            canGoNext={playbackState.currentSongIndex < queue.length - 1}
-            onPlayPause={handlePlayPause}
-            onNext={handleNext}
-            onPrevious={handlePrevious}
-            onSeek={handleSeek}
-            onVolumeChange={handleVolumeChange}
-            onMuteToggle={isMuted ? unmute : mute}
-            onMicToggle={handleMicToggle}
-            onSync={requestSync}
-            isHost={canControl}
-            users={users}
-            queue={queue}
-            currentSongIndex={playbackState.currentSongIndex}
-            roomMode={roomMode}
-            battleFormat={battleFormat}
-            onForceSync={handleForceSync}
-            onSmartPlay={handlePlayPause}
-            onSmartPause={handlePlayPause}
-            onHostSeek={handleSeek}
-            onRemoveSong={handleRemoveSong}
-            onSelectSong={handleSelectSong}
-            currentSong={currentSong}
-            networkLatency={networkLatency}
-          />
-
-          {/* Reactions */}
-          <div className="mt-auto pt-4">
-            <ReactionBar onReact={sendReaction} isWaving={isWaving} onWaveToggle={toggleWaving} />
-          </div>
-        </div>
-      </div>
-
-      {/* User avatars */}
-      <div className="shrink-0 overflow-x-auto pb-2 -mx-4 px-4 lg:mx-0 lg:px-0">
-        <UserAvatarRow 
-          users={users} 
-          currentUserId={user.id} 
-          wavingUsers={wavingUsers} 
-          audioIntensity={audioIntensity} 
-          beatPhase={beatPhase} 
-          isBeat={isBeat} 
-          bpm={bpm}
-          onStartVoteKick={startVoteKick}
-          voteKickDisabled={!!activeVoteKick}
-          roomMode={roomMode}
-          battleFormat={battleFormat}
-          userVolumes={userVolumes}
-          onVolumeChange={handleUserVolumeChange}
-        />
-      </div>
-      
-      {roomMode === 'team-battle' && (
-        <TeamBattleOverlay 
-          users={users} 
-          isPlaying={playbackState.isPlaying} 
-          onContinue={handleNextRound}
-          showWinner={showWinnerScreen}
-          isHost={isHost}
-          currentUserId={user.id}
-        />
-      )}
-      
-      {/* Vote Kick Overlay - Animated center popup */}
-      {activeVoteKick && (
-        <VoteKickOverlay
-          voteKick={activeVoteKick}
-          currentUserId={user.id}
-          hasVoted={hasVoted}
-          onVoteYes={voteYes}
-          onVoteNo={voteNo}
-        />
-      )}
-
-      {/* Lyrics Selector - Show when multiple matches available */}
-      {showLyricsSelector && allMatches.length > 1 && (
-        <LyricsSelector
-          matches={allMatches}
-          selectedIndex={selectedMatchIndex}
-          onSelect={selectMatch}
-          onConfirm={handleLyricsConfirm}
-          onSkip={handleLyricsSkip}
-          songTitle={currentSong?.title || 'Unknown Song'}
-          autoConfirmSeconds={10}
-        />
-      )}
-    </div>
+    <DesktopRoomLayout
+      headerProps={headerProps}
+      stageProps={stageProps}
+      controlsProps={controlsProps}
+      overlaysProps={overlaysProps}
+      queuePanelProps={queuePanelProps}
+      avatarRowProps={avatarRowProps}
+      layoutFlags={layoutFlags}
+      celebration={celebration}
+      hostControlPanelProps={hostControlPanelProps}
+      showHostControlPanel={showHostControlPanel}
+      onCloseHostControlPanel={() => setShowHostControlPanel(false)}
+    />
   );
 };
 
