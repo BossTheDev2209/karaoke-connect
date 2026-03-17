@@ -11,29 +11,16 @@ import { useSyncV2 } from '@/hooks/useSyncV2';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/integrations/supabase/client';
 
-import { LyricsDisplay } from '@/components/LyricsDisplay';
-import { RemoteControl } from '@/components/RemoteControl';
 import { DesktopRoomLayout } from '@/components/room/DesktopRoomLayout';
-import { SongQueue } from '@/components/SongQueue';
-import { SongSearch } from '@/components/SongSearch';
-import { UserAvatarRow } from '@/components/UserAvatarRow';
-import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
-import { RoomMenu } from '@/components/RoomMenu';
-import { CelebrationOverlay, getCurrentCelebration } from '@/components/effects/CelebrationOverlay';
-import { ReactionBar, FloatingReactions, useReactions, useWaving } from '@/components/Reactions';
-import { SingReactOverlay } from '@/components/effects/SingReactOverlay';
-import { DustFallEffect } from '@/components/effects/SingerEffects';
+import { getCurrentCelebration } from '@/components/effects/CelebrationOverlay';
+import { useReactions, useWaving } from '@/components/Reactions';
 import { useAudioReactive } from '@/hooks/useAudioReactive';
-import { useVoteKick, VoteKickOverlay } from '@/components/VoteKick';
-import { TeamBattleOverlay } from '@/components/TeamBattleOverlay';
-import { LyricsSelector } from '@/components/LyricsSelector';
+import { useVoteKick } from '@/components/VoteKick';
 import { MobileRoomLayout } from '@/components/MobileRoomLayout';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { HostControlPanel } from '@/components/HostControlPanel';
 
-import { LogOut, Swords, Mic2, Sparkles, Play, Crown, Settings2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import { toast } from 'sonner';
 
 
