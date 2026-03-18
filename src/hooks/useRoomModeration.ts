@@ -1,56 +1,33 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { User, RoomMode, PlaybackState } from '@/types/karaoke';
-import { RealtimeChannel } from '@supabase/supabase-js';
-import { useVoteKick } from '@/components/VoteKick';
+import { PlaybackState } from '@/types/karaoke';
 import { toast } from 'sonner';
 
 interface UseRoomModerationProps {
-  channel: RealtimeChannel | null;
-  userId: string;
-  users: User[];
-  navigate: (path: string) => void;
-  playbackState: PlaybackState;
-  roomMode: RoomMode;
+  playbackStateCurrentSongIndex: number;
+  isMicEnabled: boolean;
+  toggleMic: (eqSettings: number[]) => void;
+  eqSettings: number[];
+  onLeave: () => void;
 }
 
+/**
+ * Manages moderation-related state: winner screen and host action ref.
+ * Vote kick remains in Room.tsx because it depends on channel/users from useRoom.
+ */
 export function useRoomModeration({
-  channel,
-  userId,
-  users,
-  navigate,
-  playbackState,
-  roomMode,
+  playbackStateCurrentSongIndex,
+  isMicEnabled,
+  toggleMic,
+  eqSettings,
+  onLeave,
 }: UseRoomModerationProps) {
   // State for Team Battle Winner Screen
   const [showWinnerScreen, setShowWinnerScreen] = useState(false);
 
-  // Close winner screen when song changes (for non-hosts reacting to host action)
+  // Close winner screen when song changes
   useEffect(() => {
     setShowWinnerScreen(false);
-  }, [playbackState.currentSongIndex]);
-
-  // Vote kick
-  const handleUserKicked = useCallback(() => {
-    sessionStorage.removeItem('karaoke_user');
-    navigate('/');
-  }, [navigate]);
-
-  const { activeVoteKick, startVoteKick, voteYes, voteNo, hasVoted } = useVoteKick(
-    channel,
-    userId,
-    users,
-    handleUserKicked
-  );
-
-  const handleVoteKick = useCallback(
-    (targetUserId: string) => {
-      const targetUser = users.find((u) => u.id === targetUserId);
-      if (targetUser) {
-        startVoteKick(targetUser);
-      }
-    },
-    [users, startVoteKick]
-  );
+  }, [playbackStateCurrentSongIndex]);
 
   // Ref for handling host actions (mute/kick) to avoid circular dependencies with useMicrophone
   const onHostActionRef = useRef<((action: 'mute' | 'kick' | 'control_access', payload?: any) => void) | null>(null);
@@ -59,18 +36,32 @@ export function useRoomModeration({
     onHostActionRef.current?.(action, payload);
   }, []);
 
+  // Wire up the ref to actual handlers
+  useEffect(() => {
+    onHostActionRef.current = (action, payload) => {
+      if (action === 'kick') {
+        toast.error('You have been kicked from the room.');
+        onLeave();
+      } else if (action === 'mute') {
+        if (isMicEnabled) {
+          toast.warning('Your microphone was muted by the host.');
+          toggleMic(eqSettings);
+        }
+      } else if (action === 'control_access') {
+        const { hasControlAccess } = payload || {};
+        if (hasControlAccess) {
+          toast.success('You have been granted control access!');
+        } else {
+          toast.info('Your control access has been revoked.');
+        }
+      }
+    };
+  }, [onLeave, isMicEnabled, toggleMic, eqSettings]);
+
   return {
     showWinnerScreen,
     setShowWinnerScreen,
-    activeVoteKick,
-    startVoteKick,
-    voteYes,
-    voteNo,
-    hasVoted,
-    handleVoteKick,
-    handleUserKicked,
     onHostActionRef,
     handleHostAction,
-    handleLeave: handleUserKicked, // same behavior
   };
 }
