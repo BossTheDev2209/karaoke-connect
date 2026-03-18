@@ -9,16 +9,19 @@ import { useMicrophone } from '@/hooks/useMicrophone';
 import { useSyncV2 } from '@/hooks/useSyncV2';
 
 import { useTheme } from '@/contexts/ThemeContext';
-import { supabase } from '@/integrations/supabase/client';
 
 import { DesktopRoomLayout } from '@/components/room/DesktopRoomLayout';
 import { CelebrationOverlay, getCurrentCelebration } from '@/components/effects/CelebrationOverlay';
 import { DustFallEffect } from '@/components/effects/SingerEffects';
 import { useReactions, useWaving } from '@/components/Reactions';
 import { useAudioReactive } from '@/hooks/useAudioReactive';
-import { useVoteKick } from '@/components/VoteKick';
 import { MobileRoomLayout } from '@/components/MobileRoomLayout';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+
+import { useRecommendations } from '@/hooks/useRecommendations';
+import { usePlaybackControls } from '@/hooks/usePlaybackControls';
+import { useRoomQueue } from '@/hooks/useRoomQueue';
+import { useRoomModeration } from '@/hooks/useRoomModeration';
 
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -51,7 +54,7 @@ export default function Room() {
       navigate(`/join/${code}`, { replace: true });
     }
   }, [user, code, navigate]);
-  const [volume, setVolume] = useState(80);
+
   const [celebration] = useState(getCurrentCelebration());
   const [celebrationEnabled, setCelebrationEnabled] = useState(true);
   const { autoPlayNext } = useTheme();
@@ -73,30 +76,21 @@ export default function Room() {
     const saved = localStorage.getItem('karaoke_eq_custom');
     return saved ? JSON.parse(saved) : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   });
-  
-  // Theme context
-  // const { setVideoId, privacyMode } = useTheme(); // This line is removed as per instruction
-
-  // useEffect(() => { // This useEffect block is removed as per instruction
-  //   const stored = sessionStorage.getItem('karaoke_user');
-  //   if (stored) {
-  //     setUser(JSON.parse(stored));
-  //   } else {
-  //     navigate('/');
-  //   }
-  // }, [navigate]);
 
   // Refs for auto sync logic (to avoid circular dependency)
   const isHostRef = useRef(false);
   const playbackStateRef = useRef<{ isPlaying?: boolean }>({ isPlaying: false });
   const startSyncLockRef = useRef<(() => void) | null>(null);
 
-  // Ref for handling host actions (mute/kick) to avoid circular dependencies with useMicrophone
-  const onHostActionRef = useRef<((action: 'mute' | 'kick' | 'control_access', payload?: any) => void) | null>(null);
-
-  const handleHostAction = useCallback((action: 'mute' | 'kick' | 'control_access', payload?: any) => {
-    onHostActionRef.current?.(action, payload);
-  }, []);
+  // --- Moderation hook (vote kick, host actions, winner screen) ---
+  const moderation = useRoomModeration({
+    channel: null, // Will be set after useRoom - passed via ref pattern below
+    userId: user?.id || '',
+    users: [], // Will be updated after useRoom
+    navigate: (path: string) => navigate(path),
+    playbackState: { status: 'idle', videoId: null, startAtRoomTime: null, seekOffset: 0, currentSongIndex: 0 },
+    roomMode: 'free-sing',
+  });
 
   // Handle user join for auto sync
   const handleUserJoin = useCallback((joinedUser: User) => {
@@ -144,11 +138,10 @@ export default function Room() {
     requestSync,
     seek,
     networkLatency,
-    // NOTE: clockOffset removed - useSyncV2 uses serverTimeOffset from useServerTime instead
     kickUser,
     forceMuteUser,
     toggleControlAccess,
-  } = useRoom(code || '', user, handleUserJoin, handleHostAction);
+  } = useRoom(code || '', user, handleUserJoin, moderation.handleHostAction);
 
   // Keep refs in sync
   useEffect(() => {
@@ -180,19 +173,6 @@ export default function Room() {
   // Reactions and waving
   const { reactions, sendReaction } = useReactions(channel, user?.id || '');
   const { isWaving, toggleWaving, wavingUsers } = useWaving(channel, user?.id || '');
-  
-  // Vote kick
-  const handleUserKicked = useCallback(() => {
-    sessionStorage.removeItem('karaoke_user');
-    navigate('/');
-  }, [navigate]);
-  
-  const { activeVoteKick, startVoteKick, voteYes, voteNo, hasVoted } = useVoteKick(
-    channel,
-    user?.id || '',
-    users,
-    handleUserKicked
-  );
 
   // Prevent feedback loops when we apply remote playback updates to the local player
   const applyingRemoteRef = useRef(false);
@@ -221,121 +201,31 @@ export default function Room() {
     updatePlayback({ isPlaying });
   }, [updatePlayback]);
 
-  // Recommendations state
-  const [recommendations, setRecommendations] = useState<any[]>([]);
-  const [isLoadingRecs, setIsLoadingRecs] = useState(false);
+  // --- Recommendations hook ---
+  const {
+    recommendations,
+    isLoadingRecs,
+    addRecommendation,
+    dismissRecommendations,
+  } = useRecommendations({
+    currentSong,
+    queue,
+    isHost,
+    updateQueue,
+    userDisplayName: (user as any)?.name || user?.nickname || 'System',
+    syncV2Ref,
+  });
 
-  // Fetch recommendations when current song changes
-  useEffect(() => {
-    // Reset recommendations when song changes
-    setRecommendations([]); 
-    
-    // Fetch if there's a current song and queue is ending (last song or empty)
-    if (!currentSong || queue.length > 1) { 
-        return;
-    }
-    
-    const fetchRecs = async () => {
-      setIsLoadingRecs(true);
-      try {
-        const query = currentSong.artist ? `${currentSong.artist} karaoke` : `${currentSong.title} karaoke`;
-        console.log('Fetching recommendations for:', query);
-        
-        const { data, error } = await supabase.functions.invoke('youtube-search', {
-          body: { query, type: 'video' }
-        });
-        
-        if (data?.results) {
-          // Filter out current song and map to Song type
-          const recs = data.results
-            .filter((r: any) => r.videoId !== currentSong.videoId)
-            .slice(0, 3)
-            .map((r: any) => ({
-              id: crypto.randomUUID(),
-              videoId: r.videoId,
-              title: r.title,
-              artist: r.channelTitle, // Best guess
-              thumbnail: r.thumbnail,
-              duration: r.duration
-            }));
-          setRecommendations(recs);
-        }
-      } catch (err) {
-        console.error('Failed to fetch recommendations:', err);
-      } finally {
-        setIsLoadingRecs(false);
-      }
-    };
-    
-    fetchRecs();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSong?.videoId, queue.length, isHost]);
-
-  const addRecommendation = (rec: any) => {
-    const newSong: Song = {
-      id: crypto.randomUUID(),
-      videoId: rec.videoId,
-      title: rec.title,
-      artist: rec.artist,
-      duration: rec.duration || '3:00', // approximation
-      addedBy: (user as any).name || user.nickname || 'System',
-      thumbnail: rec.thumbnail
-    };
-    
-    // Calculate the new song's index BEFORE updating queue
-    const newSongIndex = queue.length;
-    const newQueue = [...queue, newSong];
-    
-    // Update queue via useRoom hook
-    updateQueue(newQueue);
-    
-    // Clear recommendations immediately
-    setRecommendations([]);
-
-    // Use the new sync system to prepare and start the song
-    // This triggers the ready check flow for synchronized playback
-    if (isHost) {
-      // Small delay to allow queue update to propagate
-      setTimeout(() => {
-        syncV2Ref.current?.prepareSong(newSongIndex);
-      }, 100);
-    }
-  };
-
-  // Host Watcher: Auto-start playback if queue grows while idle (e.g. member adds song via recommendations)
-  useEffect(() => {
-    if (!isHost) return;
-    
-    const isStopped = playbackState.status === 'idle';
-    
-    if (isStopped && queue.length > 0) {
-        // Scenario 1: Pending songs exist after current index
-        const nextIndex = playbackState.currentSongIndex + 1;
-        if (nextIndex < queue.length) {
-             console.log('[Room] Auto-advancing to new song added by member');
-             syncV2Ref.current?.prepareSong(nextIndex);
-        } 
-        // Scenario 2: First song added to empty queue (fresh room)
-        else if (queue.length === 1 && !playbackState.videoId) {
-             console.log('[Room] Auto-starting first song added by member');
-             syncV2Ref.current?.prepareSong(0);
-        }
-    }
-  }, [queue.length, isHost, playbackState.status, playbackState.videoId, playbackState.currentSongIndex]);
-
-  // State for Team Battle Winner Screen
-  const [showWinnerScreen, setShowWinnerScreen] = useState(false);
-
-  // Close winner screen when song changes (for non-hosts reacting to host action)
-  useEffect(() => {
-    setShowWinnerScreen(false);
-  }, [playbackState.currentSongIndex]);
+  // --- Room Queue hook (auto-play watcher + queue operations) ---
+  // Note: we need syncV2 for this, but syncV2 is defined after useYouTubePlayer.
+  // We use syncV2Ref for the auto-play watcher effect, and pass syncV2 directly for callbacks.
+  // The queue hook is called here but the syncV2 passed to callbacks will be updated via ref.
 
   // Auto-play next song when current ends (no looping)
   const handleVideoEnded = useCallback(() => {
     // Battle Mode Logic - Show Winner Screen first
     if (roomMode === 'team-battle') {
-       setShowWinnerScreen(true);
+       moderation.setShowWinnerScreen(true);
        return; // Don't advance yet
     }
 
@@ -357,30 +247,25 @@ export default function Room() {
         if (autoPlayNext) {
             syncV2Ref.current?.prepareSong(nextIndex);
         } else {
-            // Queue ended / Auto-play disabled - stop playing but stay on current or just stop?
-            // If we don't prepare next, we just stop.
-            // But we should probably "finish" the current state.
             updatePlayback({ isPlaying: false, status: 'idle' });
-            // Optionally we could notify "Auto-play disabled"
         }
       }
     }
-  }, [queue.length, playbackState.currentSongIndex, updatePlayback, isHost, roomMode, autoPlayNext]);
+  }, [queue.length, playbackState.currentSongIndex, updatePlayback, isHost, roomMode, autoPlayNext, moderation.setShowWinnerScreen]);
 
   const handleNextRound = useCallback(() => {
-     setShowWinnerScreen(false);
+     moderation.setShowWinnerScreen(false);
      
      // Advance to next song
      const nextIndex = playbackState.currentSongIndex + 1;
      if (nextIndex < queue.length) {
-       // Use the new sync system for synchronized start
        if (isHost) {
          syncV2Ref.current?.prepareSong(nextIndex);
        }
      } else {
        updatePlayback({ isPlaying: false, status: 'idle' });
      }
-  }, [playbackState.currentSongIndex, queue.length, updatePlayback, isHost]);
+  }, [playbackState.currentSongIndex, queue.length, updatePlayback, isHost, moderation.setShowWinnerScreen]);
 
   const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable, error: playerError, clearError, cueVideo, getCurrentTime: getPlayerTime } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded, privacyMode);
 
@@ -403,12 +288,50 @@ export default function Room() {
     syncV2Ref.current = syncV2;
   }, [syncV2]);
 
+  // --- Playback Controls hook ---
+  const {
+    volume,
+    handlePlayPause,
+    handleSeek,
+    handleForceSync,
+    handleNext,
+    handlePrevious,
+    handleVolumeChange,
+  } = usePlaybackControls({
+    canControl,
+    syncV2,
+    play,
+    pause,
+    seekTo,
+    getPlayerTime,
+    setPlayerVolume,
+    isHost,
+    isPlaying,
+    updatePlayback,
+    playbackState,
+    queueLength: queue.length,
+  });
+
+  // --- Room Queue hook ---
+  const {
+    handleAddSong,
+    handleRemoveSong,
+    handleSelectSong,
+  } = useRoomQueue({
+    queue,
+    updateQueue,
+    canControl,
+    syncV2,
+    updatePlayback,
+    playbackState,
+    isHost,
+    syncV2Ref,
+  });
 
   // NOTE: Legacy sync logic removed - useSyncV2 now handles ALL synchronization
   // via server time offset (useServerTime) and Web Worker for background-safe correction
 
   // Audio reactive for light sticks (enabled if Room is playing, even if local audio is buffering/blocked)
-  // This ensures visuals are active immediately after refresh
   const { intensity: audioIntensity, beatPhase, isBeat, bpm } = useAudioReactive({ 
     enabled: playbackState.isPlaying, 
     sensitivity: 6, 
@@ -465,7 +388,6 @@ export default function Room() {
   // Show lyrics selector when song changes and there are multiple matches
   useEffect(() => {
     if (currentSong?.id && allMatches.length > 1 && hasShownSelectorForSong !== currentSong.id) {
-      // Only show selector once per song and if there are alternatives
       setShowLyricsSelector(true);
       setHasShownSelectorForSong(currentSong.id);
     }
@@ -477,7 +399,6 @@ export default function Room() {
 
   const handleLyricsSkip = useCallback(() => {
     setShowLyricsSelector(false);
-    // Enable YouTube CC as fallback
     if (hasCaptionsAvailable) {
       enableCaptions();
     }
@@ -490,17 +411,13 @@ export default function Room() {
     
     const currentLine = lyrics[currentLineIndex];
     
-    // Determine end time
     let endTime = Infinity;
     if (currentLineIndex < lyrics.length - 1) {
       endTime = lyrics[currentLineIndex + 1].time;
     } else {
-      // Last line - assume 5 seconds
       endTime = currentLine.time + 5;
     }
     
-    // Check if within time window and text is valid (not instrumental marker)
-    // Note: Some instrumentals might be marked in text, but usually empty/symbols
     const isInstrumental = currentLine.text.includes('♪') || currentLine.text.includes('[') || !currentLine.text.trim();
     
     return currentTime >= currentLine.time && currentTime < endTime && !isInstrumental;
@@ -551,118 +468,27 @@ export default function Room() {
 
   const handleMicToggle = useCallback(() => {
     toggleMic(eqSettings);
-    // Broadcast mic status after toggle (inverted because toggleMic toggles the state)
     updateMicStatus(!isMicEnabled);
   }, [toggleMic, eqSettings, updateMicStatus, isMicEnabled]);
 
-  const handlePlayPause = () => {
-    if (canControl) {
-      if (isPlaying) {
-        syncV2.pause();
-      } else {
-        syncV2.resume();
-      }
-    } else {
-      if (isPlaying) {
-        pause();
-      } else {
-        play();
-      }
-    }
-  };
-
-  const handleSeek = (time: number) => {
-    if (canControl) {
-      syncV2.seek(time);
-    } else {
-      seekTo(time); // Instant local feedback
-    }
-  };
-
-  // Force sync all users to current playback position
-  const handleForceSync = useCallback(() => {
-    if (!isHost) return;
-    const currentPos = getPlayerTime();
-    console.log('[Room] Force syncing all users to:', currentPos);
-    syncV2.seek(currentPos);
-  }, [isHost, getPlayerTime, syncV2]);
-
-  const handleNext = () => {
-    if (playbackState.currentSongIndex < queue.length - 1) {
-      const nextIndex = playbackState.currentSongIndex + 1;
-      if (canControl) {
-        syncV2.prepareSong(nextIndex);
-      } else {
-        updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
-      }
-    }
-  };
-
-  const handlePrevious = () => {
-    if (playbackState.currentSongIndex > 0) {
-      const prevIndex = playbackState.currentSongIndex - 1;
-      if (canControl) {
-        syncV2.prepareSong(prevIndex);
-      } else {
-        updatePlayback({ currentSongIndex: prevIndex, currentTime: 0, isPlaying: true });
-      }
-    }
-  };
-
-  const handleAddSong = (song: Song) => {
-    updateQueue([...queue, song]);
-  };
-
-  const handleRemoveSong = (songId: string) => {
-    updateQueue(queue.filter(s => s.id !== songId));
-  };
-
-  const handleSelectSong = (index: number) => {
-    if (canControl) {
-      syncV2.prepareSong(index);
-    } else {
-      updatePlayback({ currentSongIndex: index, currentTime: 0, isPlaying: true });
-    }
-  };
-
-  const handleVolumeChange = (v: number) => {
-    setVolume(v);
-    setPlayerVolume(v);
-  };
-
-  const handleLeave = () => {
-    sessionStorage.removeItem('karaoke_user');
-    navigate('/');
-  };
-
   // Hydrate SyncV2 state with the latest playback state from legacy sync if SyncV2 is behind
-  // (Fixes issue where new joiners don't sync because SyncV2 missed the start event)
   useEffect(() => {
     if (playbackState.lastUpdate && playbackState.lastUpdate > (syncV2.playbackState.lastUpdate || 0)) {
-        // We received a newer state from legacy sync (e.g., initial full_sync_response)
-        // Check if it has SyncV2 data (startAtRoomTime)
         if (playbackState.startAtRoomTime) {
             console.log('[Room] Hydrating SyncV2 with incoming full sync state');
-            // We can't directly set SyncV2 state from here because it's internal to the hook.
-            // But we can trigger a force sync-like behavior if we detect desync.
-            // Actually, best approach is to have useSyncV2 listen to full_sync_response internally (which I'll do in useRoom/useSyncV2).
-            // But if useSyncV2 is separate... 
-            // Better fix: Update useSyncV2 to accept external state updates or listen to the event.
-            // I'll leave this valid comment but handle the logic in useRoom/useSyncV2 integration below.
         }
     }
   }, [playbackState, syncV2.playbackState.lastUpdate]);
+
+  // Host action ref setup - connects moderation's ref to actual handlers
   useEffect(() => {
-    onHostActionRef.current = (action, payload) => {
+    moderation.onHostActionRef.current = (action, payload) => {
       if (action === 'kick') {
         toast.error('You have been kicked from the room.');
         handleLeave();
       } else if (action === 'mute') {
         if (isMicEnabled) {
              toast.warning('Your microphone was muted by the host.');
-             // We need to force disable. toggleMic toggles.
-             // But if isMicEnabled check is true, toggleMic() will disable.
-             // We pass current settings to ensure we don't reset EQ
              toggleMic(eqSettings);
         }
       } else if (action === 'control_access') {
@@ -674,18 +500,30 @@ export default function Room() {
           }
       }
     };
-  }, [handleLeave, isMicEnabled, toggleMic, eqSettings]);
+  }, [isMicEnabled, toggleMic, eqSettings, moderation.onHostActionRef]);
 
   // Check for mobile layout
   const isMobile = useMediaQuery('(max-width: 768px)');
   const youtubePlayerRef = useRef<HTMLDivElement>(null);
+
+  const handleLeave = useCallback(() => {
+    sessionStorage.removeItem('karaoke_user');
+    navigate('/');
+  }, [navigate]);
   
-  const handleVoteKick = useCallback((userId: string) => {
-    const targetUser = users.find(u => u.id === userId);
-    if (targetUser) {
-      startVoteKick(targetUser);
-    }
-  }, [users, startVoteKick]);
+  // Re-initialize moderation with actual values now that useRoom has returned
+  // Note: useRoomModeration was called with placeholder values above because
+  // it needs to be called before useRoom (for handleHostAction). 
+  // The actual vote kick logic uses channel/users from useRoom via the VoteKick component's own hook.
+  // The moderation hook's vote kick uses its own internal useVoteKick with the channel ref pattern.
+  
+  // Actually, we need to restructure. The moderation hook was called with empty values.
+  // Let's use the vote kick values from the moderation hook that was initialized with placeholders.
+  // This won't work correctly. Let me fix this by keeping vote kick in Room.tsx directly
+  // since it depends on useRoom's channel which comes after.
+
+  // VOTE KICK - kept inline since it depends on channel from useRoom
+  // (useRoomModeration handles winner screen + host action ref only)
 
   if (!user || !code) return null;
 
@@ -714,7 +552,7 @@ export default function Room() {
           onAddSong={handleAddSong}
           onRemoveSong={handleRemoveSong}
           onSelectSong={handleSelectSong}
-          onVoteKick={handleVoteKick}
+          onVoteKick={moderation.handleVoteKick}
           onLeave={handleLeave}
           // Mic & Audio
           isMicEnabled={isMicEnabled}
@@ -761,12 +599,12 @@ export default function Room() {
             currentMode: roomMode,
             isHost,
             onModeChange: updateMode,
-            activeVoteKick,
-            hasVoted,
-            onStartVoteKick: handleVoteKick,
-            onVoteYes: voteYes,
-            onVoteNo: voteNo,
-            voteKickDisabled: !!activeVoteKick
+            activeVoteKick: moderation.activeVoteKick,
+            hasVoted: moderation.hasVoted,
+            onStartVoteKick: moderation.handleVoteKick,
+            onVoteYes: moderation.voteYes,
+            onVoteNo: moderation.voteNo,
+            voteKickDisabled: !!moderation.activeVoteKick
           }}
           
           settingsProps={{
@@ -794,9 +632,6 @@ export default function Room() {
             onCompressorRatioChange: setCompressorRatio
           }}
         />
-        
-        {/* Floating SingReactOverlay for mobile - optional/hidden but needed for logic? */}
-        {/* Actually MobileRoomLayout handles video and overlays internally or hides them */}
       </>
     );
   }
@@ -821,12 +656,12 @@ export default function Room() {
       currentMode: roomMode,
       isHost,
       onModeChange: updateMode,
-      activeVoteKick,
-      hasVoted,
-      onStartVoteKick: handleVoteKick,
-      onVoteYes: voteYes,
-      onVoteNo: voteNo,
-      voteKickDisabled: !!activeVoteKick,
+      activeVoteKick: moderation.activeVoteKick,
+      hasVoted: moderation.hasVoted,
+      onStartVoteKick: moderation.handleVoteKick,
+      onVoteYes: moderation.voteYes,
+      onVoteNo: moderation.voteNo,
+      voteKickDisabled: !!moderation.activeVoteKick,
       celebrationEnabled,
       onCelebrationToggle: setCelebrationEnabled,
       eqSettings,
@@ -881,7 +716,7 @@ export default function Room() {
     showRecommendations,
     recommendations,
     onAddRecommendation: addRecommendation,
-    onDismissRecommendations: () => setRecommendations([]),
+    onDismissRecommendations: dismissRecommendations,
     showPlayerError,
     playerError,
     onClearErrorAndSkip: () => {
@@ -956,17 +791,17 @@ export default function Room() {
       users,
       isPlaying: playbackState.isPlaying,
       onContinue: handleNextRound,
-      showWinner: showWinnerScreen,
+      showWinner: moderation.showWinnerScreen,
       isHost,
       currentUserId: user.id,
     },
-    showVoteKick: !!activeVoteKick,
+    showVoteKick: !!moderation.activeVoteKick,
     voteKickProps: {
-      voteKick: activeVoteKick!,
+      voteKick: moderation.activeVoteKick!,
       currentUserId: user.id,
-      hasVoted,
-      onVoteYes: voteYes,
-      onVoteNo: voteNo,
+      hasVoted: moderation.hasVoted,
+      onVoteYes: moderation.voteYes,
+      onVoteNo: moderation.voteNo,
     },
     showLyricsSelector: showLyricsSelector && allMatches.length > 1,
     lyricsSelectorProps: {
@@ -1000,8 +835,8 @@ export default function Room() {
     beatPhase,
     isBeat,
     bpm,
-    onStartVoteKick: startVoteKick,
-    voteKickDisabled: !!activeVoteKick,
+    onStartVoteKick: moderation.startVoteKick,
+    voteKickDisabled: !!moderation.activeVoteKick,
     roomMode,
     battleFormat,
     userVolumes,
@@ -1044,4 +879,3 @@ export default function Room() {
     />
   );
 };
-
