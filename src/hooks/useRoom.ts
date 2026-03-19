@@ -440,18 +440,7 @@ export const useRoom = (
     };
   }, [isConnected, user]);
 
-  const updatePlayback = useCallback((state: Partial<PlaybackState>) => {
-    const newState = { ...playbackState, ...state, lastUpdate: Date.now() };
-    setPlaybackState(newState);
-    // FIX: Update ref immediately so heartbeats see it
-    playbackRef.current = newState;
-    
-    channelRef.current?.send({
-      type: 'broadcast',
-      event: 'room_event',
-      payload: { type: 'playback_update', payload: newState },
-    });
-  }, [playbackState]);
+  // updatePlayback removed — all playback mutations go through useSyncV2
 
   // seek() removed — useSyncV2 handles all seek operations
 
