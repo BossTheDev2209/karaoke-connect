@@ -1,13 +1,14 @@
 import { useEffect, useCallback } from 'react';
-import { Song, PlaybackState } from '@/types/karaoke';
+import { Song, PlaybackStatus } from '@/types/karaoke';
 
 interface UseRoomQueueProps {
   queue: Song[];
   updateQueue: (queue: Song[]) => void;
   canControl: boolean;
   syncV2: { prepareSong: (index: number) => void };
-  updatePlayback: (state: Partial<PlaybackState>) => void;
-  playbackState: PlaybackState;
+  playbackStatus: PlaybackStatus;
+  currentSongIndex: number;
+  currentVideoId: string | null;
   isHost: boolean;
   syncV2Ref: React.MutableRefObject<{ prepareSong: (index: number) => void } | null>;
 }
@@ -17,8 +18,9 @@ export function useRoomQueue({
   updateQueue,
   canControl,
   syncV2,
-  updatePlayback,
-  playbackState,
+  playbackStatus,
+  currentSongIndex,
+  currentVideoId,
   isHost,
   syncV2Ref,
 }: UseRoomQueueProps) {
@@ -26,22 +28,22 @@ export function useRoomQueue({
   useEffect(() => {
     if (!isHost) return;
 
-    const isStopped = playbackState.status === 'idle';
+    const isStopped = playbackStatus === 'idle';
 
     if (isStopped && queue.length > 0) {
       // Scenario 1: Pending songs exist after current index
-      const nextIndex = playbackState.currentSongIndex + 1;
+      const nextIndex = currentSongIndex + 1;
       if (nextIndex < queue.length) {
         console.log('[Room] Auto-advancing to new song added by member');
         syncV2Ref.current?.prepareSong(nextIndex);
       }
       // Scenario 2: First song added to empty queue (fresh room)
-      else if (queue.length === 1 && !playbackState.videoId) {
+      else if (queue.length === 1 && !currentVideoId) {
         console.log('[Room] Auto-starting first song added by member');
         syncV2Ref.current?.prepareSong(0);
       }
     }
-  }, [queue.length, isHost, playbackState.status, playbackState.videoId, playbackState.currentSongIndex, syncV2Ref]);
+  }, [queue.length, isHost, playbackStatus, currentVideoId, currentSongIndex, syncV2Ref]);
 
   const handleAddSong = useCallback(
     (song: Song) => {
@@ -61,11 +63,10 @@ export function useRoomQueue({
     (index: number) => {
       if (canControl) {
         syncV2.prepareSong(index);
-      } else {
-        updatePlayback({ currentSongIndex: index, currentTime: 0, isPlaying: true });
       }
+      // Non-control users cannot change the song for everyone
     },
-    [canControl, syncV2, updatePlayback]
+    [canControl, syncV2]
   );
 
   return {
