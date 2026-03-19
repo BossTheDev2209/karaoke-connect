@@ -275,9 +275,7 @@ export const useRoom = (
               console.log('Received full sync:', syncData);
               
               setQueue(syncData.queue);
-              setPlaybackState(syncData.playbackState);
-              // Update ref immediately 
-              playbackRef.current = syncData.playbackState;
+              // playbackState hydration handled by useSyncV2
               
               setRoomMode(syncData.roomMode);
               setBattleFormat(syncData.battleFormat);
