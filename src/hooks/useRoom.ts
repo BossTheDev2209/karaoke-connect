@@ -180,15 +180,6 @@ export const useRoom = (
         const data = payload as RealtimePayload;
         
         switch (data.type) {
-          case 'playback_update': {
-            const newState = data.payload as PlaybackState;
-            // Only accept updates that are newer than our current state
-            setPlaybackState(prev => {
-              if (newState.lastUpdate < prev.lastUpdate) return prev;
-              return newState;
-            });
-            break;
-          }
           case 'queue_update':
             setQueue(data.payload as Song[]);
             break;
