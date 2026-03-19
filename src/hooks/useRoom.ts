@@ -76,10 +76,6 @@ export const useRoom = (
   const queueRef = useRef<Song[]>([]);
   
 
-  // Keep clockOffset ref in sync
-  useEffect(() => {
-    clockOffsetRef.current = clockOffset;
-  }, [clockOffset]);
   const playbackRef = useRef<PlaybackState>(DEFAULT_PLAYBACK);
   const roomModeRef = useRef<RoomMode>('free-sing');
   const battleFormatRef = useRef<BattleFormat | undefined>();
