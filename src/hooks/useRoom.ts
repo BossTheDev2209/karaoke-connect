@@ -6,12 +6,10 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 interface UseRoomReturn {
   users: User[];
   queue: Song[];
-  playbackState: PlaybackState;
   currentUser: User | null;
   isConnected: boolean;
   isHost: boolean;
   channel: RealtimeChannel | null;
-  updatePlayback: (state: Partial<PlaybackState>) => void;
   updateQueue: (queue: Song[]) => void;
   updateSpeaking: (isSpeaking: boolean, audioLevel?: number, score?: number) => void;
   updateMicStatus: (isMicEnabled: boolean) => void;
