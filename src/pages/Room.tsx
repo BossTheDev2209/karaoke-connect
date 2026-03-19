@@ -109,7 +109,7 @@ export default function Room() {
     updatePlayback, updateQueue, updateSpeaking, updateMicStatus,
     updateMode, updateTeams, swapUserTeam,
     broadcastMatchStart, broadcastMatchEnd,
-    requestSync, seek, networkLatency,
+    requestSync, networkLatency,
     kickUser, forceMuteUser, toggleControlAccess,
   } = useRoom(code || '', user, handleUserJoin, handleHostAction);
 
@@ -336,14 +336,8 @@ export default function Room() {
     updateMicStatus(!isMicEnabled);
   }, [toggleMic, eqSettings, updateMicStatus, isMicEnabled]);
 
-  // Hydrate SyncV2 state
-  useEffect(() => {
-    if (playbackState.lastUpdate && playbackState.lastUpdate > (syncV2.playbackState.lastUpdate || 0)) {
-        if (playbackState.startAtRoomTime) {
-            console.log('[Room] Hydrating SyncV2 with incoming full sync state');
-        }
-    }
-  }, [playbackState, syncV2.playbackState.lastUpdate]);
+  // SyncV2 is now the single source of truth for playback sync.
+  // useRoom handles queue/mode hydration; useSyncV2 handles playback state.
 
   const handleLeave = useCallback(() => {
     sessionStorage.removeItem('karaoke_user');

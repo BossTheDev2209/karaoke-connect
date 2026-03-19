@@ -23,9 +23,7 @@ interface UseRoomReturn {
   roomMode: RoomMode;
   battleFormat?: BattleFormat;
   requestSync: () => void;
-  seek: (time: number) => void;
   networkLatency: number;
-  clockOffset: number;
   kickUser: (userId: string) => void;
   forceMuteUser: (userId: string) => void;
   toggleControlAccess: (userId: string) => void;
@@ -63,7 +61,7 @@ export const useRoom = (
   const [roomMode, setRoomMode] = useState<RoomMode>('free-sing');
   const [battleFormat, setBattleFormat] = useState<BattleFormat | undefined>();
   const [networkLatency, setNetworkLatency] = useState(0);
-  const [clockOffset, setClockOffset] = useState(0);
+  
   
   const channelRef = useRef<RealtimeChannel | null>(null);
   const isHostRef = useRef(false);
@@ -76,12 +74,8 @@ export const useRoom = (
 
   // Store latest state in refs for sync responses
   const queueRef = useRef<Song[]>([]);
-  const clockOffsetRef = useRef(0);
+  
 
-  // Keep clockOffset ref in sync
-  useEffect(() => {
-    clockOffsetRef.current = clockOffset;
-  }, [clockOffset]);
   const playbackRef = useRef<PlaybackState>(DEFAULT_PLAYBACK);
   const roomModeRef = useRef<RoomMode>('free-sing');
   const battleFormatRef = useRef<BattleFormat | undefined>();
@@ -100,33 +94,6 @@ export const useRoom = (
     return samples.reduce((a, b) => a + b, 0) / samples.length;
   }, []);
 
-  // When sending a full sync, compute an "effective" PlaybackState for joiners.
-  // For SyncV2 timeline-based sync, we need to include startAtRoomTime properly.
-  const getEffectivePlaybackForSync = useCallback((targetLatency: number = 0): PlaybackState => {
-    const base = playbackRef.current;
-    const now = Date.now();
-    const elapsed = base.isPlaying ? Math.max(0, (now - (base.lastUpdate || now)) / 1000) : 0;
-    // Add half the target's latency to compensate for network delay
-    const latencyCompensation = targetLatency / 2000; // Convert ms to seconds, use half for one-way
-    
-    // For SyncV2: if we have a startAtRoomTime, just pass it through
-    // The joining client will calculate their own target time from it
-    if (base.startAtRoomTime) {
-      return {
-        ...base,
-        // Don't modify startAtRoomTime - it's the anchor point
-        currentTime: (base.currentTime || 0) + elapsed + latencyCompensation,
-        lastUpdate: now,
-      };
-    }
-    
-    // Legacy fallback
-    return {
-      ...base,
-      currentTime: (base.currentTime || 0) + elapsed + latencyCompensation,
-      lastUpdate: now,
-    };
-  }, []);
 
   // Keep refs updated
   useEffect(() => {
@@ -197,7 +164,7 @@ export const useRoom = (
                 type: 'full_sync_response',
                 payload: {
                   queue: queueRef.current,
-                  playbackState: getEffectivePlaybackForSync(),
+                  playbackState: playbackRef.current,
                   roomMode: roomModeRef.current,
                   battleFormat: battleFormatRef.current,
                 },
@@ -213,15 +180,6 @@ export const useRoom = (
         const data = payload as RealtimePayload;
         
         switch (data.type) {
-          case 'playback_update': {
-            const newState = data.payload as PlaybackState;
-            // Only accept updates that are newer than our current state
-            setPlaybackState(prev => {
-              if (newState.lastUpdate < prev.lastUpdate) return prev;
-              return newState;
-            });
-            break;
-          }
           case 'queue_update':
             setQueue(data.payload as Song[]);
             break;
@@ -232,24 +190,6 @@ export const useRoom = (
             setUsers(prev => prev.map(u => 
               u.id === userId ? { ...u, isSpeaking, audioLevel, score: score ?? u.score } : u
             ));
-            break;
-          }
-          case 'seek_event': {
-            const { time, timestamp, seekerId, roomTime } = data.payload as { time: number; timestamp: number; seekerId: string; roomTime?: number };
-            // Ignore own seeks
-            if (seekerId === user?.id) break;
-            
-            // SyncV2 handles seeks via its own seek_song event
-            // This legacy handler now just updates currentTime for UI feedback
-            setPlaybackState(prev => {
-              const newState = {
-                ...prev,
-                currentTime: time,
-                // Use provided roomTime if available, else use timestamp from payload
-                lastUpdate: roomTime || timestamp || Date.now(),
-              };
-              return newState;
-            });
             break;
           }
           case 'mode_update': {
@@ -302,87 +242,8 @@ export const useRoom = (
             ));
             break;
           }
-          // SyncV2 Events Support
-          case 'prepare_song': {
-            const { videoId, songIndex } = data.payload as { videoId: string; songIndex: number };
-            const newState = {
-              ...playbackRef.current,
-              status: 'preparing' as const,
-              videoId,
-              currentSongIndex: songIndex,
-              isPlaying: false,
-            };
-            setPlaybackState(newState);
-            playbackRef.current = newState;
-            break;
-          }
-          case 'start_song': {
-            const { videoId, startAtRoomTime, seekOffset } = data.payload as { videoId: string; startAtRoomTime: number; seekOffset: number };
-            const newState = {
-              ...playbackRef.current,
-              status: 'playing' as const,
-              videoId,
-              startAtRoomTime,
-              seekOffset: seekOffset || 0,
-              isPlaying: true,
-              currentTime: seekOffset || 0,
-              lastUpdate: Date.now(),
-            };
-            setPlaybackState(newState);
-            playbackRef.current = newState;
-            break;
-          }
-          case 'pause_song': {
-            const { seekOffset } = data.payload as { seekOffset: number };
-            const newState = {
-              ...playbackRef.current,
-              status: 'paused' as const,
-              seekOffset,
-              startAtRoomTime: null,
-              isPlaying: false,
-              currentTime: seekOffset,
-              lastUpdate: Date.now(),
-            };
-            setPlaybackState(newState);
-            playbackRef.current = newState;
-            break;
-          }
-          case 'resume_song': {
-             const { startAtRoomTime, seekOffset } = data.payload as { startAtRoomTime: number; seekOffset: number };
-             const newState = {
-               ...playbackRef.current,
-               status: 'playing' as const,
-               startAtRoomTime,
-               seekOffset,
-               isPlaying: true,
-               lastUpdate: Date.now(),
-             };
-             setPlaybackState(newState);
-             playbackRef.current = newState;
-             break;
-          }
-          case 'seek_song': {
-            const { seekOffset, startAtRoomTime } = data.payload as { seekOffset: number; startAtRoomTime: number | null };
-            const newState = {
-              ...playbackRef.current,
-              seekOffset,
-              startAtRoomTime,
-              currentTime: seekOffset,
-              lastUpdate: Date.now(),
-            };
-            setPlaybackState(newState);
-            playbackRef.current = newState;
-            break;
-          }
-          case 'end_song': {
-             const newState = {
-               ...DEFAULT_PLAYBACK,
-               currentSongIndex: playbackRef.current.currentSongIndex,
-             };
-             setPlaybackState(newState);
-             playbackRef.current = newState;
-             break;
-          }
+          // SyncV2 events (prepare_song, start_song, pause_song, resume_song, seek_song, end_song)
+          // are handled by useSyncV2 — no duplicate handling here.
 
           case 'sync_request': {
             // If we're host, respond with full state
@@ -396,7 +257,7 @@ export const useRoom = (
                   type: 'full_sync_response',
                   payload: {
                     queue: queueRef.current,
-                    playbackState: getEffectivePlaybackForSync(targetLatency),
+                    playbackState: playbackRef.current,
                     roomMode: roomModeRef.current,
                     battleFormat: battleFormatRef.current,
                     serverTime: Date.now(),
@@ -417,13 +278,6 @@ export const useRoom = (
                 serverTime?: number;
               };
               console.log('Received full sync:', syncData);
-              
-              // Calculate clock offset if server time is provided
-              if (syncData.serverTime) {
-                const localTime = Date.now();
-                const offset = syncData.serverTime - localTime;
-                setClockOffset(offset);
-              }
               
               setQueue(syncData.queue);
               setPlaybackState(syncData.playbackState);
@@ -542,7 +396,7 @@ export const useRoom = (
         rttIntervalRef.current = null;
       }
     };
-  }, [roomCode, user, getEffectivePlaybackForSync]);
+  }, [roomCode, user]);
 
   // NOTE: Heartbeat sync removed - useSyncV2 now handles all synchronization
   // using useServerTime for clock offset and Web Worker for drift correction
@@ -606,36 +460,7 @@ export const useRoom = (
     });
   }, [playbackState]);
 
-  const seek = useCallback((time: number) => {
-    if (!user) return;
-    
-    // 1. Optimistic local update
-    const newState = { ...playbackState, currentTime: time, lastUpdate: Date.now() };
-    setPlaybackState(newState);
-    // FIX: Update ref immediately
-    playbackRef.current = newState;
-    
-    // 2. Broadcast prioritized seek event
-    channelRef.current?.send({
-      type: 'broadcast',
-      event: 'room_event',
-      payload: { 
-        type: 'seek_event', 
-        payload: { 
-          time, 
-          timestamp: Date.now(),
-          seekerId: user.id 
-        } 
-      },
-    });
-    
-    // 3. Also send standard playback update for redundancy (but seek_event handles priority)
-    channelRef.current?.send({
-      type: 'broadcast',
-      event: 'room_event',
-      payload: { type: 'playback_update', payload: newState },
-    });
-  }, [playbackState, user]);
+  // seek() removed — useSyncV2 handles all seek operations
 
   const updateQueue = useCallback((newQueue: Song[]) => {
     setQueue(newQueue);
@@ -842,9 +667,7 @@ export const useRoom = (
     broadcastMatchStart,
     broadcastMatchEnd,
     requestSync,
-    seek,
     networkLatency,
-    clockOffset,
     kickUser,
     forceMuteUser,
     toggleControlAccess,
