@@ -61,7 +61,7 @@ export const useRoom = (
   const [roomMode, setRoomMode] = useState<RoomMode>('free-sing');
   const [battleFormat, setBattleFormat] = useState<BattleFormat | undefined>();
   const [networkLatency, setNetworkLatency] = useState(0);
-  const [clockOffset, setClockOffset] = useState(0);
+  
   
   const channelRef = useRef<RealtimeChannel | null>(null);
   const isHostRef = useRef(false);
