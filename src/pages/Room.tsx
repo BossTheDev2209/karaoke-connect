@@ -109,7 +109,7 @@ export default function Room() {
     updatePlayback, updateQueue, updateSpeaking, updateMicStatus,
     updateMode, updateTeams, swapUserTeam,
     broadcastMatchStart, broadcastMatchEnd,
-    requestSync, seek, networkLatency,
+    requestSync, networkLatency,
     kickUser, forceMuteUser, toggleControlAccess,
   } = useRoom(code || '', user, handleUserJoin, handleHostAction);
 
