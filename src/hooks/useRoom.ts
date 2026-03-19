@@ -192,24 +192,6 @@ export const useRoom = (
             ));
             break;
           }
-          case 'seek_event': {
-            const { time, timestamp, seekerId, roomTime } = data.payload as { time: number; timestamp: number; seekerId: string; roomTime?: number };
-            // Ignore own seeks
-            if (seekerId === user?.id) break;
-            
-            // SyncV2 handles seeks via its own seek_song event
-            // This legacy handler now just updates currentTime for UI feedback
-            setPlaybackState(prev => {
-              const newState = {
-                ...prev,
-                currentTime: time,
-                // Use provided roomTime if available, else use timestamp from payload
-                lastUpdate: roomTime || timestamp || Date.now(),
-              };
-              return newState;
-            });
-            break;
-          }
           case 'mode_update': {
             const { mode, battleFormat } = data.payload as { mode: RoomMode; battleFormat?: BattleFormat };
             setRoomMode(mode);
