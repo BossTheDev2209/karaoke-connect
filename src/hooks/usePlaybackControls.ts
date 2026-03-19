@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { PlaybackState } from '@/types/karaoke';
 
 interface UsePlaybackControlsProps {
   canControl: boolean;
@@ -16,8 +15,7 @@ interface UsePlaybackControlsProps {
   setPlayerVolume: (v: number) => void;
   isHost: boolean;
   isPlaying: boolean;
-  updatePlayback: (state: Partial<PlaybackState>) => void;
-  playbackState: PlaybackState;
+  currentSongIndex: number;
   queueLength: number;
 }
 
@@ -31,8 +29,7 @@ export function usePlaybackControls({
   setPlayerVolume,
   isHost,
   isPlaying,
-  updatePlayback,
-  playbackState,
+  currentSongIndex,
   queueLength,
 }: UsePlaybackControlsProps) {
   const [volume, setVolume] = useState(80);
@@ -45,6 +42,7 @@ export function usePlaybackControls({
         syncV2.resume();
       }
     } else {
+      // Non-control users: local-only playback toggle
       if (isPlaying) {
         pause();
       } else {
@@ -73,26 +71,16 @@ export function usePlaybackControls({
   }, [isHost, getPlayerTime, syncV2]);
 
   const handleNext = useCallback(() => {
-    if (playbackState.currentSongIndex < queueLength - 1) {
-      const nextIndex = playbackState.currentSongIndex + 1;
-      if (canControl) {
-        syncV2.prepareSong(nextIndex);
-      } else {
-        updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
-      }
+    if (canControl && currentSongIndex < queueLength - 1) {
+      syncV2.prepareSong(currentSongIndex + 1);
     }
-  }, [playbackState.currentSongIndex, queueLength, canControl, syncV2, updatePlayback]);
+  }, [currentSongIndex, queueLength, canControl, syncV2]);
 
   const handlePrevious = useCallback(() => {
-    if (playbackState.currentSongIndex > 0) {
-      const prevIndex = playbackState.currentSongIndex - 1;
-      if (canControl) {
-        syncV2.prepareSong(prevIndex);
-      } else {
-        updatePlayback({ currentSongIndex: prevIndex, currentTime: 0, isPlaying: true });
-      }
+    if (canControl && currentSongIndex > 0) {
+      syncV2.prepareSong(currentSongIndex - 1);
     }
-  }, [playbackState.currentSongIndex, canControl, syncV2, updatePlayback]);
+  }, [currentSongIndex, canControl, syncV2]);
 
   const handleVolumeChange = useCallback(
     (v: number) => {

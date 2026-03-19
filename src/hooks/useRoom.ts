@@ -6,12 +6,10 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 interface UseRoomReturn {
   users: User[];
   queue: Song[];
-  playbackState: PlaybackState;
   currentUser: User | null;
   isConnected: boolean;
   isHost: boolean;
   channel: RealtimeChannel | null;
-  updatePlayback: (state: Partial<PlaybackState>) => void;
   updateQueue: (queue: Song[]) => void;
   updateSpeaking: (isSpeaking: boolean, audioLevel?: number, score?: number) => void;
   updateMicStatus: (isMicEnabled: boolean) => void;
@@ -51,11 +49,11 @@ export const useRoom = (
   roomCode: string, 
   user: User | null,
   onUserJoin?: (user: User) => void,
-  onHostAction?: (action: 'mute' | 'kick' | 'control_access', payload?: any) => void
+  onHostAction?: (action: 'mute' | 'kick' | 'control_access', payload?: any) => void,
+  getPlaybackState?: () => PlaybackState
 ): UseRoomReturn => {
   const [users, setUsers] = useState<User[]>([]);
   const [queue, setQueue] = useState<Song[]>([]);
-  const [playbackState, setPlaybackState] = useState<PlaybackState>(DEFAULT_PLAYBACK);
   const [isConnected, setIsConnected] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [roomMode, setRoomMode] = useState<RoomMode>('free-sing');
@@ -76,7 +74,7 @@ export const useRoom = (
   const queueRef = useRef<Song[]>([]);
   
 
-  const playbackRef = useRef<PlaybackState>(DEFAULT_PLAYBACK);
+  // playbackRef removed — playback state now lives in useSyncV2
   const roomModeRef = useRef<RoomMode>('free-sing');
   const battleFormatRef = useRef<BattleFormat | undefined>();
 
@@ -100,9 +98,6 @@ export const useRoom = (
     queueRef.current = queue;
   }, [queue]);
 
-  useEffect(() => {
-    playbackRef.current = playbackState;
-  }, [playbackState]);
 
   useEffect(() => {
     roomModeRef.current = roomMode;
@@ -164,7 +159,7 @@ export const useRoom = (
                 type: 'full_sync_response',
                 payload: {
                   queue: queueRef.current,
-                  playbackState: playbackRef.current,
+                    playbackState: getPlaybackState?.() ?? DEFAULT_PLAYBACK,
                   roomMode: roomModeRef.current,
                   battleFormat: battleFormatRef.current,
                 },
@@ -257,7 +252,7 @@ export const useRoom = (
                   type: 'full_sync_response',
                   payload: {
                     queue: queueRef.current,
-                    playbackState: playbackRef.current,
+                    playbackState: getPlaybackState?.() ?? DEFAULT_PLAYBACK,
                     roomMode: roomModeRef.current,
                     battleFormat: battleFormatRef.current,
                     serverTime: Date.now(),
@@ -280,9 +275,7 @@ export const useRoom = (
               console.log('Received full sync:', syncData);
               
               setQueue(syncData.queue);
-              setPlaybackState(syncData.playbackState);
-              // Update ref immediately 
-              playbackRef.current = syncData.playbackState;
+              // playbackState hydration handled by useSyncV2
               
               setRoomMode(syncData.roomMode);
               setBattleFormat(syncData.battleFormat);
@@ -368,9 +361,9 @@ export const useRoom = (
           // Request sync after joining with a small delay
           // Also request if we were previously synced but need to catch up (e.g., after reconnect)
           setTimeout(() => {
+            const currentPlayback = getPlaybackState?.();
             const shouldRequestSync = !hasSyncedRef.current || 
-              (playbackRef.current.isPlaying && !playbackRef.current.startAtRoomTime);
-            
+              (currentPlayback?.isPlaying && !currentPlayback?.startAtRoomTime);
             if (shouldRequestSync) {
               console.log('[Room] Requesting sync (first join or reconnect)');
               hasSyncedRef.current = false; // Reset to accept new sync
@@ -447,18 +440,7 @@ export const useRoom = (
     };
   }, [isConnected, user]);
 
-  const updatePlayback = useCallback((state: Partial<PlaybackState>) => {
-    const newState = { ...playbackState, ...state, lastUpdate: Date.now() };
-    setPlaybackState(newState);
-    // FIX: Update ref immediately so heartbeats see it
-    playbackRef.current = newState;
-    
-    channelRef.current?.send({
-      type: 'broadcast',
-      event: 'room_event',
-      payload: { type: 'playback_update', payload: newState },
-    });
-  }, [playbackState]);
+  // updatePlayback removed — all playback mutations go through useSyncV2
 
   // seek() removed — useSyncV2 handles all seek operations
 
@@ -650,14 +632,12 @@ export const useRoom = (
   return {
     users,
     queue,
-    playbackState,
     roomMode,
     battleFormat,
     currentUser: user,
     isConnected,
     isHost,
     channel: channelRef.current,
-    updatePlayback,
     updateQueue,
     updateSpeaking,
     updateMicStatus,

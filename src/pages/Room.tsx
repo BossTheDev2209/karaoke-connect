@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { User, RoomMode, BattleFormat, Song } from '@/types/karaoke';
+import { User, RoomMode, BattleFormat, Song, PlaybackState } from '@/types/karaoke';
 import { useRoom } from '@/hooks/useRoom';
 import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
 import { useLyrics } from '@/hooks/useLyrics';
@@ -74,7 +74,6 @@ export default function Room() {
 
   // Refs for auto sync logic
   const isHostRef = useRef(false);
-  const playbackStateRef = useRef<{ isPlaying?: boolean }>({ isPlaying: false });
   const startSyncLockRef = useRef<(() => void) | null>(null);
 
   // Host action ref (for moderation - mute/kick/control_access from host)
@@ -84,6 +83,28 @@ export default function Room() {
     onHostActionRef.current?.(action, payload);
   }, []);
 
+  // Ref for syncV2 — used by callbacks defined before syncV2 hook call
+  const syncV2Ref = useRef<{ 
+    prepareSong: (index: number) => void; 
+    endSong: () => void;
+    getTargetTime: () => number;
+    playbackState: PlaybackState;
+  } | null>(null);
+
+  // Provide playback state to useRoom for host auto-push to joiners
+  const getPlaybackState = useCallback(() => {
+    return syncV2Ref.current?.playbackState ?? {
+      status: 'idle' as const,
+      videoId: null,
+      startAtRoomTime: null,
+      seekOffset: 0,
+      currentSongIndex: 0,
+      isPlaying: false,
+      currentTime: 0,
+      lastUpdate: Date.now(),
+    };
+  }, []);
+
   // Handle user join for auto sync
   const handleUserJoin = useCallback((joinedUser: User) => {
     console.log('User joined - checking auto sync settings:', autoSyncOnJoin);
@@ -91,70 +112,37 @@ export default function Room() {
 
     if (!isHostRef.current) return;
     
-    if (autoSyncOnJoin === 'immediate' && playbackStateRef.current.isPlaying) {
+    const currentPlayback = syncV2Ref.current?.playbackState;
+    if (autoSyncOnJoin === 'immediate' && currentPlayback?.isPlaying) {
       console.log('Triggering immediate sync for new user');
       setPendingSyncOnSongEnd(false);
       setTimeout(() => {
         startSyncLockRef.current?.();
       }, 1000);
-    } else if (autoSyncOnJoin === 'after-song' && playbackStateRef.current.isPlaying) {
+    } else if (autoSyncOnJoin === 'after-song' && currentPlayback?.isPlaying) {
       console.log('Queuing sync for after current song ends');
       setPendingSyncOnSongEnd(true);
     }
   }, [autoSyncOnJoin]);
 
   const { 
-    users, queue, playbackState, roomMode, battleFormat,
+    users, queue, roomMode, battleFormat,
     isConnected, isHost, channel, 
-    updatePlayback, updateQueue, updateSpeaking, updateMicStatus,
+    updateQueue, updateSpeaking, updateMicStatus,
     updateMode, updateTeams, swapUserTeam,
     broadcastMatchStart, broadcastMatchEnd,
     requestSync, networkLatency,
     kickUser, forceMuteUser, toggleControlAccess,
-  } = useRoom(code || '', user, handleUserJoin, handleHostAction);
+  } = useRoom(code || '', user, handleUserJoin, handleHostAction, getPlaybackState);
 
   // Keep refs in sync
   useEffect(() => { isHostRef.current = isHost; }, [isHost]);
-  useEffect(() => { playbackStateRef.current = playbackState; }, [playbackState]);
 
-  // Derived state
-  const currentSong = useMemo(() => 
-    queue[playbackState.currentSongIndex], 
-    [queue, playbackState.currentSongIndex]
-  );
-  
   const canControl = useMemo(() => {
     if (isHost) return true;
     const currentUserData = users.find(u => u.id === user?.id);
     return !!currentUserData?.hasControlAccess;
   }, [isHost, users, user?.id]);
-  
-  useEffect(() => {
-    setVideoId(currentSong?.videoId || null);
-  }, [currentSong?.videoId, setVideoId]);
-
-  // Reactions and waving
-  const { reactions, sendReaction } = useReactions(channel, user?.id || '');
-  const { isWaving, toggleWaving, wavingUsers } = useWaving(channel, user?.id || '');
-  
-  // Vote kick (kept inline - depends on channel/users from useRoom)
-  const handleUserKicked = useCallback(() => {
-    sessionStorage.removeItem('karaoke_user');
-    navigate('/');
-  }, [navigate]);
-  
-  const { activeVoteKick, startVoteKick, voteYes, voteNo, hasVoted } = useVoteKick(
-    channel, user?.id || '', users, handleUserKicked
-  );
-
-  const handleVoteKick = useCallback((userId: string) => {
-    const targetUser = users.find(u => u.id === userId);
-    if (targetUser) startVoteKick(targetUser);
-  }, [users, startVoteKick]);
-
-  // Winner screen state
-  const [showWinnerScreen, setShowWinnerScreen] = useState(false);
-  useEffect(() => { setShowWinnerScreen(false); }, [playbackState.currentSongIndex]);
 
   // Prevent feedback loops
   const applyingRemoteRef = useRef(false);
@@ -163,27 +151,23 @@ export default function Room() {
     window.setTimeout(() => { applyingRemoteRef.current = false; }, 300);
   }, []);
 
-  const syncV2Ref = useRef<{ 
-    prepareSong: (index: number) => void; 
-    endSong: () => void;
-    getTargetTime: () => number;
-  } | null>(null);
-
-  useEffect(() => {
-    if (!currentSong?.videoId) return;
-    markApplyingRemote();
-  }, [currentSong?.videoId, markApplyingRemote]);
-
+  // handleStateChange: only for direct YouTube player interactions (not SyncV2 controlled)
   const handleStateChange = useCallback((isPlaying: boolean) => {
     if (applyingRemoteRef.current) return;
-    updatePlayback({ isPlaying });
-  }, [updatePlayback]);
+    // No-op for now — SyncV2 controls all playback state
+  }, []);
 
   // --- Recommendations hook ---
+  // currentSong derived from syncV2Ref for pre-syncV2 code
+  const getCurrentSong = useCallback(() => {
+    const idx = syncV2Ref.current?.playbackState.currentSongIndex ?? 0;
+    return queue[idx];
+  }, [queue]);
+
   const {
     recommendations, isLoadingRecs, addRecommendation, dismissRecommendations,
   } = useRecommendations({
-    currentSong, queue, isHost, updateQueue,
+    currentSong: getCurrentSong(), queue, isHost, updateQueue,
     userDisplayName: (user as any)?.name || user?.nickname || 'System',
     syncV2Ref,
   });
@@ -195,12 +179,12 @@ export default function Room() {
        return;
     }
 
-    const nextIndex = playbackState.currentSongIndex + 1;
+    const currentIndex = syncV2Ref.current?.playbackState.currentSongIndex ?? 0;
+    const nextIndex = currentIndex + 1;
     
     if (queue.length === 0 || nextIndex >= queue.length) {
        console.log('Queue ended, stopping playback');
        if (isHost) syncV2Ref.current?.endSong();
-       updatePlayback({ isPlaying: false, status: 'idle' });
        return;
     }
 
@@ -209,23 +193,27 @@ export default function Room() {
         if (autoPlayNext) {
             syncV2Ref.current?.prepareSong(nextIndex);
         } else {
-            updatePlayback({ isPlaying: false, status: 'idle' });
+            syncV2Ref.current?.endSong();
         }
       }
     }
-  }, [queue.length, playbackState.currentSongIndex, updatePlayback, isHost, roomMode, autoPlayNext]);
+  }, [queue.length, isHost, roomMode, autoPlayNext]);
 
   const handleNextRound = useCallback(() => {
      setShowWinnerScreen(false);
-     const nextIndex = playbackState.currentSongIndex + 1;
+     const currentIndex = syncV2Ref.current?.playbackState.currentSongIndex ?? 0;
+     const nextIndex = currentIndex + 1;
      if (nextIndex < queue.length) {
        if (isHost) syncV2Ref.current?.prepareSong(nextIndex);
      } else {
-       updatePlayback({ isPlaying: false, status: 'idle' });
+       syncV2Ref.current?.endSong();
      }
-  }, [playbackState.currentSongIndex, queue.length, updatePlayback, isHost]);
+  }, [queue.length, isHost]);
 
-  const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable, error: playerError, clearError, cueVideo, getCurrentTime: getPlayerTime } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded, privacyMode);
+  // initialVideoId: used by useYouTubePlayer for first render. SyncV2 handles actual cuing.
+  const initialVideoId = queue[0]?.videoId || null;
+
+  const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable, error: playerError, clearError, cueVideo, getCurrentTime: getPlayerTime } = useYouTubePlayer('youtube-player', initialVideoId, handleStateChange, handleVideoEnded, privacyMode);
 
   const syncV2 = useSyncV2({
     channel, userId: user?.id || null, isHost, queue,
@@ -233,7 +221,22 @@ export default function Room() {
     onCueVideo: cueVideo, getCurrentVideoTime: getPlayerTime, isPlayerReady: isReady,
   });
 
+  // Keep syncV2Ref updated (used by pre-syncV2 callbacks)
   useEffect(() => { syncV2Ref.current = syncV2; }, [syncV2]);
+
+  // === SyncV2 is now the single source of truth for playback state ===
+  const playbackState = syncV2.playbackState;
+  const currentSongIndex = playbackState.currentSongIndex;
+  const currentSong = useMemo(() => queue[currentSongIndex], [queue, currentSongIndex]);
+
+  useEffect(() => {
+    setVideoId(currentSong?.videoId || null);
+  }, [currentSong?.videoId, setVideoId]);
+
+  useEffect(() => {
+    if (!currentSong?.videoId) return;
+    markApplyingRemote();
+  }, [currentSong?.videoId, markApplyingRemote]);
 
   // --- Playback Controls hook ---
   const {
@@ -241,21 +244,24 @@ export default function Room() {
     handleNext, handlePrevious, handleVolumeChange,
   } = usePlaybackControls({
     canControl, syncV2, play, pause, seekTo, getPlayerTime,
-    setPlayerVolume, isHost, isPlaying, updatePlayback,
-    playbackState, queueLength: queue.length,
+    setPlayerVolume, isHost, isPlaying,
+    currentSongIndex, queueLength: queue.length,
   });
 
   // --- Room Queue hook ---
   const {
     handleAddSong, handleRemoveSong, handleSelectSong,
   } = useRoomQueue({
-    queue, updateQueue, canControl, syncV2, updatePlayback,
-    playbackState, isHost, syncV2Ref,
+    queue, updateQueue, canControl, syncV2,
+    playbackStatus: playbackState.status,
+    currentSongIndex,
+    currentVideoId: playbackState.videoId,
+    isHost, syncV2Ref,
   });
 
   // Audio reactive
   const { intensity: audioIntensity, beatPhase, isBeat, bpm } = useAudioReactive({ 
-    enabled: playbackState.isPlaying, sensitivity: 6, targetBpm: 120 
+    enabled: isPlaying, sensitivity: 6, targetBpm: 120 
   });
 
   const maxUserAudioLevel = useMemo(() => {
@@ -267,7 +273,7 @@ export default function Room() {
   const remainingSeconds = duration > 0 ? Math.ceil(duration - currentTime) : null;
   const showCountdown = isPlaying && remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 5;
 
-  const { getStatusForSong, getLyricsForSong } = useLyricsPreload(queue, playbackState.currentSongIndex);
+  const { getStatusForSong, getLyricsForSong } = useLyricsPreload(queue, currentSongIndex);
   const preloadedLyrics = currentSong ? getLyricsForSong(currentSong.id) : undefined;
 
   const syncedCurrentTime = useMemo(() => {
@@ -317,6 +323,29 @@ export default function Room() {
     updateSpeaking(isSpeaking, level, score);
   }, [updateSpeaking]);
 
+  // Reactions and waving
+  const { reactions, sendReaction } = useReactions(channel, user?.id || '');
+  const { isWaving, toggleWaving, wavingUsers } = useWaving(channel, user?.id || '');
+  
+  // Vote kick (kept inline - depends on channel/users from useRoom)
+  const handleUserKicked = useCallback(() => {
+    sessionStorage.removeItem('karaoke_user');
+    navigate('/');
+  }, [navigate]);
+  
+  const { activeVoteKick, startVoteKick, voteYes, voteNo, hasVoted } = useVoteKick(
+    channel, user?.id || '', users, handleUserKicked
+  );
+
+  const handleVoteKick = useCallback((userId: string) => {
+    const targetUser = users.find(u => u.id === userId);
+    if (targetUser) startVoteKick(targetUser);
+  }, [users, startVoteKick]);
+
+  // Winner screen state
+  const [showWinnerScreen, setShowWinnerScreen] = useState(false);
+  useEffect(() => { setShowWinnerScreen(false); }, [currentSongIndex]);
+
   const { 
     isEnabled: isMicEnabled, toggleMic, applyEQ, remoteAudioLevels, webrtcStats,
     threshold, setThreshold, isMonitorEnabled, setMonitorEnabled,
@@ -335,9 +364,6 @@ export default function Room() {
     toggleMic(eqSettings);
     updateMicStatus(!isMicEnabled);
   }, [toggleMic, eqSettings, updateMicStatus, isMicEnabled]);
-
-  // SyncV2 is now the single source of truth for playback sync.
-  // useRoom handles queue/mode hydration; useSyncV2 handles playback state.
 
   const handleLeave = useCallback(() => {
     sessionStorage.removeItem('karaoke_user');
@@ -469,7 +495,7 @@ export default function Room() {
     },
   };
 
-  const showReadyCheck = syncV2.playbackState.status === 'preparing' || syncV2.playbackState.status === 'ready';
+  const showReadyCheck = playbackState.status === 'preparing' || playbackState.status === 'ready';
   const readyCheckUsers = users.map(u => ({
     id: u.id, nickname: u.nickname, isReady: !!syncV2.playerReadyStates[u.id],
   }));
@@ -506,13 +532,13 @@ export default function Room() {
   const controlsProps = {
     remoteControlProps: {
       isPlaying, isMuted, volume, currentTime, duration, isMicEnabled,
-      canGoPrevious: playbackState.currentSongIndex > 0,
-      canGoNext: playbackState.currentSongIndex < queue.length - 1,
+      canGoPrevious: currentSongIndex > 0,
+      canGoNext: currentSongIndex < queue.length - 1,
       onPlayPause: handlePlayPause, onNext: handleNext, onPrevious: handlePrevious,
       onSeek: handleSeek, onVolumeChange: handleVolumeChange,
       onMuteToggle: isMuted ? unmute : mute, onMicToggle: handleMicToggle,
       onSync: requestSync, isHost: canControl, users, queue,
-      currentSongIndex: playbackState.currentSongIndex, roomMode, battleFormat,
+      currentSongIndex, roomMode, battleFormat,
       onForceSync: handleForceSync, onSmartPlay: handlePlayPause,
       onSmartPause: handlePlayPause, onHostSeek: handleSeek,
       onRemoveSong: handleRemoveSong, onSelectSong: handleSelectSong,
@@ -543,7 +569,7 @@ export default function Room() {
   };
 
   const queuePanelProps = {
-    isHost, queue, currentSongIndex: playbackState.currentSongIndex, canControl,
+    isHost, queue, currentSongIndex, canControl,
     onAddSong: handleAddSong, onRemoveSong: handleRemoveSong,
     onSelectSong: handleSelectSong, userId: user.id, getStatusForSong,
   };
