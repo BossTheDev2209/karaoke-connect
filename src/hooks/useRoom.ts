@@ -74,7 +74,7 @@ export const useRoom = (
 
   // Store latest state in refs for sync responses
   const queueRef = useRef<Song[]>([]);
-  const clockOffsetRef = useRef(0);
+  
 
   // Keep clockOffset ref in sync
   useEffect(() => {
