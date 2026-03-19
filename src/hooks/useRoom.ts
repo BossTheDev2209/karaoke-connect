@@ -49,11 +49,11 @@ export const useRoom = (
   roomCode: string, 
   user: User | null,
   onUserJoin?: (user: User) => void,
-  onHostAction?: (action: 'mute' | 'kick' | 'control_access', payload?: any) => void
+  onHostAction?: (action: 'mute' | 'kick' | 'control_access', payload?: any) => void,
+  getPlaybackState?: () => PlaybackState
 ): UseRoomReturn => {
   const [users, setUsers] = useState<User[]>([]);
   const [queue, setQueue] = useState<Song[]>([]);
-  const [playbackState, setPlaybackState] = useState<PlaybackState>(DEFAULT_PLAYBACK);
   const [isConnected, setIsConnected] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [roomMode, setRoomMode] = useState<RoomMode>('free-sing');
