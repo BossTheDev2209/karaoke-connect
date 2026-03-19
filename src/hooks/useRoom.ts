@@ -460,36 +460,7 @@ export const useRoom = (
     });
   }, [playbackState]);
 
-  const seek = useCallback((time: number) => {
-    if (!user) return;
-    
-    // 1. Optimistic local update
-    const newState = { ...playbackState, currentTime: time, lastUpdate: Date.now() };
-    setPlaybackState(newState);
-    // FIX: Update ref immediately
-    playbackRef.current = newState;
-    
-    // 2. Broadcast prioritized seek event
-    channelRef.current?.send({
-      type: 'broadcast',
-      event: 'room_event',
-      payload: { 
-        type: 'seek_event', 
-        payload: { 
-          time, 
-          timestamp: Date.now(),
-          seekerId: user.id 
-        } 
-      },
-    });
-    
-    // 3. Also send standard playback update for redundancy (but seek_event handles priority)
-    channelRef.current?.send({
-      type: 'broadcast',
-      event: 'room_event',
-      payload: { type: 'playback_update', payload: newState },
-    });
-  }, [playbackState, user]);
+  // seek() removed — useSyncV2 handles all seek operations
 
   const updateQueue = useCallback((newQueue: Song[]) => {
     setQueue(newQueue);
