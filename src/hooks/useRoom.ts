@@ -361,9 +361,9 @@ export const useRoom = (
           // Request sync after joining with a small delay
           // Also request if we were previously synced but need to catch up (e.g., after reconnect)
           setTimeout(() => {
+            const currentPlayback = getPlaybackState?.();
             const shouldRequestSync = !hasSyncedRef.current || 
-              (playbackRef.current.isPlaying && !playbackRef.current.startAtRoomTime);
-            
+              (currentPlayback?.isPlaying && !currentPlayback?.startAtRoomTime);
             if (shouldRequestSync) {
               console.log('[Room] Requesting sync (first join or reconnect)');
               hasSyncedRef.current = false; // Reset to accept new sync
