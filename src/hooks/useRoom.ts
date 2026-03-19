@@ -396,7 +396,7 @@ export const useRoom = (
         rttIntervalRef.current = null;
       }
     };
-  }, [roomCode, user, getEffectivePlaybackForSync]);
+  }, [roomCode, user]);
 
   // NOTE: Heartbeat sync removed - useSyncV2 now handles all synchronization
   // using useServerTime for clock offset and Web Worker for drift correction
