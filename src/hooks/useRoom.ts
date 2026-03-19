@@ -98,9 +98,6 @@ export const useRoom = (
     queueRef.current = queue;
   }, [queue]);
 
-  useEffect(() => {
-    playbackRef.current = playbackState;
-  }, [playbackState]);
 
   useEffect(() => {
     roomModeRef.current = roomMode;
