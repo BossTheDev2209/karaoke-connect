@@ -94,33 +94,6 @@ export const useRoom = (
     return samples.reduce((a, b) => a + b, 0) / samples.length;
   }, []);
 
-  // When sending a full sync, compute an "effective" PlaybackState for joiners.
-  // For SyncV2 timeline-based sync, we need to include startAtRoomTime properly.
-  const getEffectivePlaybackForSync = useCallback((targetLatency: number = 0): PlaybackState => {
-    const base = playbackRef.current;
-    const now = Date.now();
-    const elapsed = base.isPlaying ? Math.max(0, (now - (base.lastUpdate || now)) / 1000) : 0;
-    // Add half the target's latency to compensate for network delay
-    const latencyCompensation = targetLatency / 2000; // Convert ms to seconds, use half for one-way
-    
-    // For SyncV2: if we have a startAtRoomTime, just pass it through
-    // The joining client will calculate their own target time from it
-    if (base.startAtRoomTime) {
-      return {
-        ...base,
-        // Don't modify startAtRoomTime - it's the anchor point
-        currentTime: (base.currentTime || 0) + elapsed + latencyCompensation,
-        lastUpdate: now,
-      };
-    }
-    
-    // Legacy fallback
-    return {
-      ...base,
-      currentTime: (base.currentTime || 0) + elapsed + latencyCompensation,
-      lastUpdate: now,
-    };
-  }, []);
 
   // Keep refs updated
   useEffect(() => {
