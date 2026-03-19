@@ -257,7 +257,7 @@ export const useRoom = (
                   type: 'full_sync_response',
                   payload: {
                     queue: queueRef.current,
-                    playbackState: getEffectivePlaybackForSync(targetLatency),
+                    playbackState: playbackRef.current,
                     roomMode: roomModeRef.current,
                     battleFormat: battleFormatRef.current,
                     serverTime: Date.now(),
