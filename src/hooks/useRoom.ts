@@ -159,7 +159,7 @@ export const useRoom = (
                 type: 'full_sync_response',
                 payload: {
                   queue: queueRef.current,
-                  playbackState: playbackRef.current,
+                    playbackState: getPlaybackState?.() ?? DEFAULT_PLAYBACK,
                   roomMode: roomModeRef.current,
                   battleFormat: battleFormatRef.current,
                 },
