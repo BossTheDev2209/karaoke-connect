@@ -74,7 +74,7 @@ export const useRoom = (
   const queueRef = useRef<Song[]>([]);
   
 
-  const playbackRef = useRef<PlaybackState>(DEFAULT_PLAYBACK);
+  // playbackRef removed — playback state now lives in useSyncV2
   const roomModeRef = useRef<RoomMode>('free-sing');
   const battleFormatRef = useRef<BattleFormat | undefined>();
 
