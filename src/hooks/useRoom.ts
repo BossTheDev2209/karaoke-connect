@@ -279,13 +279,6 @@ export const useRoom = (
               };
               console.log('Received full sync:', syncData);
               
-              // Calculate clock offset if server time is provided
-              if (syncData.serverTime) {
-                const localTime = Date.now();
-                const offset = syncData.serverTime - localTime;
-                setClockOffset(offset);
-              }
-              
               setQueue(syncData.queue);
               setPlaybackState(syncData.playbackState);
               // Update ref immediately 
