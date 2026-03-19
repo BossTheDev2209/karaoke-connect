@@ -23,9 +23,7 @@ interface UseRoomReturn {
   roomMode: RoomMode;
   battleFormat?: BattleFormat;
   requestSync: () => void;
-  seek: (time: number) => void;
   networkLatency: number;
-  clockOffset: number;
   kickUser: (userId: string) => void;
   forceMuteUser: (userId: string) => void;
   toggleControlAccess: (userId: string) => void;
