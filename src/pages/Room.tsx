@@ -604,8 +604,6 @@ export default function Room() {
       layoutFlags={layoutFlags}
       celebration={celebration}
       hostControlPanelProps={hostControlPanelProps}
-      showHostControlPanel={showHostControlPanel}
-      onCloseHostControlPanel={() => setShowHostControlPanel(false)}
     />
   );
 };
