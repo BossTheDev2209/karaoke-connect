@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Song, PlaybackState, RealtimePayload, RoomMode, BattleFormat } from '@/types/karaoke';
+import { DEFAULT_PLAYBACK } from '@/lib/playbackDefaults';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface UseRoomReturn {
