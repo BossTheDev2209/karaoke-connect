@@ -1,52 +1,35 @@
 
 
-# Discord-Style Instant Speaking Ring
+# Targeted Fixes: CRITICAL-1 + HIGH-2
 
-## Overview
-Replace the current animated speaking indicator system with a fast, instant on/off green ring that immediately responds to speaking state - just like Discord's voice channels.
+## Fix 1: Deduplicate `DEFAULT_PLAYBACK` (CRITICAL-1)
 
-## Current Problems
-1. `avatar-speaking` CSS class uses a 0.5s pulsing animation (slow, laggy feel)
-2. The speaking ring in UserAvatarRow has `transition-opacity duration-150` and dynamic box-shadow calculations
-3. Mic icon in UserAvatar has `animate-pulse` animation
-4. Multiple overlapping visual effects create visual noise
+**Create** `src/lib/playbackDefaults.ts` — a small shared constants module containing the single `DEFAULT_PLAYBACK` constant.
 
-## Solution: Clean Discord-Style Implementation
+**Edit** `src/hooks/useSyncV2.ts` — delete local `DEFAULT_PLAYBACK` (lines 17-28), import from `src/lib/playbackDefaults`.
 
-### Changes to `src/index.css`
-Remove the pulsing animation, replace with instant static glow:
-```css
-.avatar-speaking {
-  /* No animation - instant static glow */
-  box-shadow: 0 0 0 3px hsl(var(--neon-green));
-}
-```
+**Edit** `src/hooks/useRoom.ts` — delete local `DEFAULT_PLAYBACK` (lines 30-41), import from `src/lib/playbackDefaults`.
 
-### Changes to `src/components/UserAvatarRow.tsx`
-Simplify the speaking ring to be instant on/off:
-- Remove `transition-opacity duration-150`
-- Remove dynamic `boxShadow` calculation based on audio level
-- Use simple conditional class for instant visibility
+No circular imports: a plain constants file depends only on `@/types/karaoke` (the `PlaybackState` type). Both hooks import from it — clean dependency direction.
 
-### Changes to `src/components/UserAvatar.tsx`
-- Remove `animate-pulse` from the mic icon when speaking
-- Remove the `avatar-speaking` class usage (will be handled by parent)
-- Remove the green overlay pulse on custom avatars
+## Fix 2: Remove `hostControlPanelProps` duplication (HIGH-2)
 
-### Changes to `src/components/HumanAvatar.tsx`
-- Remove `avatar-speaking` class usage (handled by parent ring)
+Verified: `showHostControlPanel` and `onCloseHostControlPanel` are consumed ONLY in `DesktopRoomLayout.tsx`. No other component references them.
 
-## Technical Summary
+**Edit** `src/pages/Room.tsx` (lines 606-608) — remove the two redundant props from the JSX. `hostControlPanelProps` already contains `isOpen` and `onClose` with the same values.
 
-| File | Change |
-|------|--------|
-| `src/index.css` | Replace `pulse-glow` animation with static border/shadow |
-| `src/components/UserAvatarRow.tsx` | Instant ring visibility, no transitions |
-| `src/components/UserAvatar.tsx` | Remove pulse animations and avatar-speaking class |
-| `src/components/HumanAvatar.tsx` | Remove avatar-speaking class |
+**Edit** `src/components/room/DesktopRoomLayout.tsx`:
+- Remove `showHostControlPanel` and `onCloseHostControlPanel` from the `DesktopRoomLayoutProps` interface (lines 47-48)
+- Remove from destructure (lines 61-62)
+- Change `HostControlPanel` render from spread+override to just spread: `<HostControlPanel {...hostControlPanelProps} />` (lines 70-74)
 
-## Result
-- Green ring appears/disappears instantly when `user.isSpeaking` changes
-- No animations, no delays, no smooth transitions
-- Matches Discord's snappy voice activity indicator
+### Contract changes for HIGH-2
+- `DesktopRoomLayoutProps` interface loses 2 fields (`showHostControlPanel`, `onCloseHostControlPanel`)
+- `HostControlPanel` contract unchanged — it still receives `isOpen`/`onClose` via the spread of `hostControlPanelProps`
+- No other file references the removed props (confirmed by search)
+
+### Technical details
+- 4 files touched total: 1 new (`src/lib/playbackDefaults.ts`), 3 edited
+- No realtime/sync logic modified
+- No circular imports introduced
 
