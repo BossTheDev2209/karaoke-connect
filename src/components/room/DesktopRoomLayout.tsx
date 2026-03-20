@@ -44,8 +44,6 @@ export interface DesktopRoomLayoutProps {
   layoutFlags: LayoutFlags;
   celebration: any;
   hostControlPanelProps: React.ComponentProps<typeof HostControlPanel>;
-  showHostControlPanel: boolean;
-  onCloseHostControlPanel: () => void;
 }
 
 export const DesktopRoomLayout: React.FC<DesktopRoomLayoutProps> = ({
