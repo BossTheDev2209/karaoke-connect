@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Song, PlaybackState, RealtimePayload, RoomMode, BattleFormat } from '@/types/karaoke';
+import { DEFAULT_PLAYBACK } from '@/lib/playbackDefaults';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface UseRoomReturn {
@@ -27,18 +28,6 @@ interface UseRoomReturn {
   toggleControlAccess: (userId: string) => void;
 }
 
-const DEFAULT_PLAYBACK: PlaybackState = {
-  // New sync system fields
-  status: 'idle',
-  videoId: null,
-  startAtRoomTime: null,
-  seekOffset: 0,
-  currentSongIndex: 0,
-  // Legacy fields (for backward compatibility)
-  isPlaying: false,
-  currentTime: 0,
-  lastUpdate: Date.now(),
-};
 
 // RTT constants (for latency display only - not used for sync)
 const RTT_PING_INTERVAL = 10000; // Measure RTT every 10 seconds

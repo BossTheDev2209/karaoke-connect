@@ -44,8 +44,6 @@ export interface DesktopRoomLayoutProps {
   layoutFlags: LayoutFlags;
   celebration: any;
   hostControlPanelProps: React.ComponentProps<typeof HostControlPanel>;
-  showHostControlPanel: boolean;
-  onCloseHostControlPanel: () => void;
 }
 
 export const DesktopRoomLayout: React.FC<DesktopRoomLayoutProps> = ({
@@ -58,20 +56,14 @@ export const DesktopRoomLayout: React.FC<DesktopRoomLayoutProps> = ({
   layoutFlags,
   celebration,
   hostControlPanelProps,
-  showHostControlPanel,
-  onCloseHostControlPanel,
 }) => {
   return (
     <div className="h-screen flex flex-col p-4 gap-3 overflow-hidden">
       {/* Celebration effects */}
       {layoutFlags.celebrationEnabled && <CelebrationOverlay theme={celebration} />}
       
-      {/* Host Control Panel (Modrinth-style popup) */}
-      <HostControlPanel
-        {...hostControlPanelProps}
-        isOpen={showHostControlPanel}
-        onClose={onCloseHostControlPanel}
-      />
+      {/* Host Control Panel */}
+      <HostControlPanel {...hostControlPanelProps} />
 
       {/* Dust fall effect when singing EXTRA loudly (Level 2) */}
       <DustFallEffect isActive={layoutFlags.isExtraLoudSinging && layoutFlags.isPlaying} intensity={layoutFlags.maxUserAudioLevel} />

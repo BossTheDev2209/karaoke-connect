@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { PlaybackState, PlaybackStatus, PlayerReadyStates, Song } from '@/types/karaoke';
+import { DEFAULT_PLAYBACK } from '@/lib/playbackDefaults';
 import { useServerTime } from './useServerTime';
 
 /**
@@ -13,19 +14,6 @@ import { useServerTime } from './useServerTime';
  * 4. Web Worker for background-safe drift correction (not throttled in background tabs)
  * 5. Single source of truth - no legacy sync conflicts
  */
-
-// Default playback state with new structure
-const DEFAULT_PLAYBACK: PlaybackState = {
-  status: 'idle',
-  videoId: null,
-  startAtRoomTime: null,
-  seekOffset: 0,
-  currentSongIndex: 0,
-  // Legacy compat
-  isPlaying: false,
-  currentTime: 0,
-  lastUpdate: Date.now(),
-};
 
 // How long to wait for all players to be ready before force-starting
 const READY_CHECK_TIMEOUT_MS = 10000;
