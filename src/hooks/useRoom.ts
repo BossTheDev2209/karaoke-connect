@@ -392,7 +392,7 @@ export const useRoom = (
               (currentPlayback?.isPlaying && !currentPlayback?.startAtRoomTime);
             if (shouldRequestSync) {
               const requestId = crypto.randomUUID();
-              console.log('[Room] Requesting sync (requestId:', requestId, ')');
+              console.log('[RoomSync] sync_request SENT', { requestId, at: Date.now() });
               hasSyncedRef.current = false;
               pendingSyncRequestIdRef.current = requestId;
               syncFulfilledIdRef.current = null;
