@@ -388,12 +388,15 @@ export const useRoom = (
             const shouldRequestSync = !hasSyncedRef.current || 
               (currentPlayback?.isPlaying && !currentPlayback?.startAtRoomTime);
             if (shouldRequestSync) {
-              console.log('[Room] Requesting sync (first join or reconnect)');
-              hasSyncedRef.current = false; // Reset to accept new sync
+              const requestId = crypto.randomUUID();
+              console.log('[Room] Requesting sync (requestId:', requestId, ')');
+              hasSyncedRef.current = false;
+              pendingSyncRequestIdRef.current = requestId;
+              syncFulfilledIdRef.current = null;
               channel.send({
                 type: 'broadcast',
                 event: 'room_event',
-                payload: { type: 'sync_request', payload: null },
+                payload: { type: 'sync_request', payload: { requestId, requesterId: user?.id } },
               });
             }
           }, 300);
