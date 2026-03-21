@@ -168,7 +168,7 @@ export function useSyncV2({
   useEffect(() => {
     if (!workerRef.current || !isCalibrated) return;
     
-    if (playbackState.status === 'playing') {
+    if (playbackState.status === 'playing' && isPlayerReady) {
       workerRef.current.postMessage({ 
         type: 'start', 
         intervalMs: SYNC_CORRECTION_INTERVAL_MS 
@@ -176,7 +176,7 @@ export function useSyncV2({
     } else {
       workerRef.current.postMessage({ type: 'stop' });
     }
-  }, [playbackState.status, isCalibrated]);
+  }, [playbackState.status, isCalibrated, isPlayerReady]);
 
   /**
    * Calculate the target video time based on room clock.
