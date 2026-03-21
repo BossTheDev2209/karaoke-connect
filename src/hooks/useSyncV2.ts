@@ -58,6 +58,8 @@ interface UseSyncV2Return {
   serverTimeOffset: number;
   /** Whether server time is calibrated */
   isTimeCalibrated: boolean;
+  /** Apply full sync playback state from useRoom (called after validation) */
+  applyFullSyncPlayback: (incomingState: PlaybackState) => void;
 }
 
 export function useSyncV2({
