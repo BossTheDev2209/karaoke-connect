@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { User, Song, PlaybackState, RealtimePayload, RoomMode, BattleFormat } from '@/types/karaoke';
 import { DEFAULT_PLAYBACK } from '@/lib/playbackDefaults';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { toast } from 'sonner';
 
 interface UseRoomReturn {
   users: User[];

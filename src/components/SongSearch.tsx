@@ -102,7 +102,9 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
     setChannelVideos([]);
   };
 
-  const handleAddSong = (result: YouTubeSearchResult) => {
+  const handleAddSong = useCallback((result: YouTubeSearchResult) => {
+    if (recentlyAdded.has(result.videoId)) return;
+    
     const song: Song = {
       id: crypto.randomUUID(),
       videoId: result.videoId,
@@ -113,8 +115,17 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
       addedBy: userId,
     };
     onAddSong(song);
-    // Don't close anything - let user continue browsing/adding songs
-  };
+    
+    // Prevent double-add for 2 seconds
+    setRecentlyAdded(prev => new Set(prev).add(result.videoId));
+    setTimeout(() => {
+      setRecentlyAdded(prev => {
+        const next = new Set(prev);
+        next.delete(result.videoId);
+        return next;
+      });
+    }, 2000);
+  }, [recentlyAdded, onAddSong, userId]);
 
   const handleClose = () => {
     setIsOpen(false);
