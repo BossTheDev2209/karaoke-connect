@@ -716,5 +716,6 @@ export function useSyncV2({
     reportBuffering,
     serverTimeOffset,
     isTimeCalibrated: isCalibrated,
+    applyFullSyncPlayback,
   };
 }
