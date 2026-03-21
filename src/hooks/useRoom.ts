@@ -5,6 +5,8 @@ import { DEFAULT_PLAYBACK } from '@/lib/playbackDefaults';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 
+export type SyncStatus = 'synced' | 'syncing' | 'reconnecting' | 'host-changed' | 'idle';
+
 interface UseRoomReturn {
   users: User[];
   queue: Song[];
@@ -12,6 +14,7 @@ interface UseRoomReturn {
   isConnected: boolean;
   isHost: boolean;
   channel: RealtimeChannel | null;
+  syncStatus: SyncStatus;
   updateQueue: (queue: Song[]) => void;
   updateSpeaking: (isSpeaking: boolean, audioLevel?: number, score?: number) => void;
   updateMicStatus: (isMicEnabled: boolean) => void;
@@ -50,6 +53,7 @@ export const useRoom = (
   const [roomMode, setRoomMode] = useState<RoomMode>('free-sing');
   const [battleFormat, setBattleFormat] = useState<BattleFormat | undefined>();
   const [networkLatency, setNetworkLatency] = useState(0);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   
   
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -129,8 +133,34 @@ export const useRoom = (
             (a, b) => (a.joinedAt || 0) - (b.joinedAt || 0)
           );
           const newIsHost = sortedByJoinTime[0]?.id === user.id;
+          const wasHost = isHostRef.current;
           isHostRef.current = newIsHost;
           setIsHost(newIsHost);
+
+          // Host migration: if we just became host, push authoritative state
+          if (newIsHost && !wasHost) {
+            console.log('[RoomSync] Host migration detected — this client is now host');
+            setSyncStatus('host-changed');
+            setTimeout(() => {
+              setSyncStatus('synced');
+              // Push authoritative state to all peers
+              channel.send({
+                type: 'broadcast',
+                event: 'room_event',
+                payload: {
+                  type: 'full_sync_response',
+                  payload: {
+                    requestId: 'host-migration',
+                    senderId: user?.id,
+                    queue: queueRef.current,
+                    playbackState: getPlaybackState?.() ?? DEFAULT_PLAYBACK,
+                    roomMode: roomModeRef.current,
+                    battleFormat: battleFormatRef.current,
+                  },
+                },
+              });
+            }, 1000);
+          }
         } else {
           isHostRef.current = false;
           setIsHost(false);
@@ -285,21 +315,24 @@ export const useRoom = (
             const pendingId = pendingSyncRequestIdRef.current;
             const fulfilledId = syncFulfilledIdRef.current;
 
-            // Gate: accept only if requestId matches our pending request OR is a proactive push,
+            // Gate: accept only if requestId matches our pending request OR is a proactive/migration push,
             // AND we haven't already fulfilled this exact requestId
             const isProactive = incomingRequestId === 'proactive-join' && !pendingId;
+            const isMigration = incomingRequestId === 'host-migration';
             const matchesPending = pendingId && incomingRequestId === pendingId;
-            const isAcceptable = (isProactive || matchesPending) && incomingRequestId !== fulfilledId;
+            const isAcceptable = (isProactive || matchesPending || isMigration) && incomingRequestId !== fulfilledId;
 
-            // Also gate on hasSynced (original logic preserved)
-            if (isAcceptable && (!hasSyncedRef.current || queueRef.current.length === 0)) {
-              console.log('[RoomSync] full_sync_response ACCEPTED', { requestId: incomingRequestId, source: isProactive ? 'proactive' : 'requested', at: Date.now() });
+            // Also gate on hasSynced (original logic preserved) — migration always accepted
+            if (isAcceptable && (isMigration || !hasSyncedRef.current || queueRef.current.length === 0)) {
+              const source = isProactive ? 'proactive' : isMigration ? 'migration' : 'requested';
+              console.log('[RoomSync] full_sync_response ACCEPTED', { requestId: incomingRequestId, source, at: Date.now() });
 
               setQueue(syncData.queue);
               setRoomMode(syncData.roomMode);
               setBattleFormat(syncData.battleFormat);
               hasSyncedRef.current = true;
               syncFulfilledIdRef.current = incomingRequestId;
+              setSyncStatus('synced');
 
               // Clear retry timer on successful sync
               if ((channel as any).__syncRetryTimer) {
@@ -392,7 +425,6 @@ export const useRoom = (
           setIsConnected(true);
           
           // Request sync after joining with a small delay
-          // Also request if we were previously synced but need to catch up (e.g., after reconnect)
           setTimeout(() => {
             const currentPlayback = getPlaybackState?.();
             const shouldRequestSync = !hasSyncedRef.current || 
@@ -403,6 +435,7 @@ export const useRoom = (
               hasSyncedRef.current = false;
               pendingSyncRequestIdRef.current = requestId;
               syncFulfilledIdRef.current = null;
+              setSyncStatus('syncing');
               channel.send({
                 type: 'broadcast',
                 event: 'room_event',
@@ -414,6 +447,7 @@ export const useRoom = (
                 if (!hasSyncedRef.current && pendingSyncRequestIdRef.current === requestId) {
                   console.log('[RoomSync] sync_request RETRY', { requestId, at: Date.now(), elapsedMs: 5000 });
                   toast.info('Syncing with room host...', { duration: 3000 });
+                  setSyncStatus('reconnecting');
                   channel.send({
                     type: 'broadcast',
                     event: 'room_event',
@@ -424,6 +458,8 @@ export const useRoom = (
 
               // Store for cleanup
               (channel as any).__syncRetryTimer = retryTimer;
+            } else {
+              setSyncStatus('synced');
             }
           }, 300);
         }
@@ -540,13 +576,18 @@ export const useRoom = (
   }, [user]);
 
   const requestSync = useCallback(() => {
-    hasSyncedRef.current = false; // Allow re-sync
+    const requestId = crypto.randomUUID();
+    hasSyncedRef.current = false;
+    pendingSyncRequestIdRef.current = requestId;
+    syncFulfilledIdRef.current = null;
+    setSyncStatus('syncing');
     channelRef.current?.send({
       type: 'broadcast',
       event: 'room_event',
       payload: { 
         type: 'sync_request', 
         payload: { 
+          requestId,
           requesterId: user?.id, 
           latency: getAverageRTT() 
         } 
@@ -693,6 +734,7 @@ export const useRoom = (
     isConnected,
     isHost,
     channel: channelRef.current,
+    syncStatus,
     updateQueue,
     updateSpeaking,
     updateMicStatus,

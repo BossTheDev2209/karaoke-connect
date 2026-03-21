@@ -58,7 +58,7 @@ export const DesktopRoomLayout: React.FC<DesktopRoomLayoutProps> = ({
   hostControlPanelProps,
 }) => {
   return (
-    <div className="h-screen flex flex-col p-4 gap-3 overflow-hidden">
+    <div className="h-[100dvh] flex flex-col p-4 gap-3 overflow-hidden">
       {/* Celebration effects */}
       {layoutFlags.celebrationEnabled && <CelebrationOverlay theme={celebration} />}
       

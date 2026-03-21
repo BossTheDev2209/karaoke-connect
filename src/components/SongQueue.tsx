@@ -14,8 +14,8 @@ import {
 interface SongQueueProps {
   queue: Song[];
   currentIndex: number;
-  onRemove: (songId: string) => void;
-  onSelect: (index: number) => void;
+  onRemove?: (songId: string) => void;
+  onSelect?: (index: number) => void;
   getLyricStatus?: (songId: string) => LyricStatus;
   isCompact?: boolean;
 }
@@ -119,12 +119,13 @@ export const SongQueue: React.FC<SongQueueProps> = ({
             <div
               key={song.id}
               className={cn(
-                'flex items-center gap-3 p-2 rounded-lg transition-all cursor-pointer group',
+                'flex items-center gap-3 p-2 rounded-lg transition-all',
+                onSelect ? 'cursor-pointer' : 'cursor-default',
                 index === currentIndex 
                   ? 'bg-primary/20 neon-border' 
-                  : 'hover:bg-muted/50'
+                  : onSelect ? 'hover:bg-muted/50' : ''
               )}
-              onClick={() => onSelect(index)}
+              onClick={() => onSelect?.(index)}
             >
               <span className={cn(
                 'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
@@ -166,17 +167,19 @@ export const SongQueue: React.FC<SongQueueProps> = ({
                 <span className="text-xs text-muted-foreground font-mono">
                   {song.duration}
                 </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemove(song.id);
-                  }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                {onRemove && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove(song.id);
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
             </div>
           );

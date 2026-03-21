@@ -513,6 +513,10 @@ export function useSyncV2({
   useEffect(() => {
     if (!channel) return;
     
+    // Guard against duplicate handler registrations
+    if ((channel as any).__syncV2Registered) return;
+    (channel as any).__syncV2Registered = true;
+    
     const handleSyncEvent = ({ payload }: { payload: any }) => {
       const data = payload;
       
@@ -682,7 +686,7 @@ export function useSyncV2({
     channel.on('broadcast', { event: 'room_event' }, handleSyncEvent);
     
     return () => {
-      // Cleanup handled by useRoom when channel is destroyed
+      (channel as any).__syncV2Registered = false;
     };
   }, [channel, onCueVideo, onPauseRequired, onSeekRequired, onPlayRequired, getRoomTime, serverTimeOffset]);
 

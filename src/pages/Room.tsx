@@ -133,7 +133,7 @@ export default function Room() {
 
   const { 
     users, queue, roomMode, battleFormat,
-    isConnected, isHost, channel, 
+    isConnected, isHost, channel, syncStatus,
     updateQueue, updateSpeaking, updateMicStatus,
     updateMode, updateTeams, swapUserTeam,
     broadcastMatchStart, broadcastMatchEnd,
@@ -178,8 +178,16 @@ export default function Room() {
     syncV2Ref,
   });
 
+  // Transition lock to prevent double-advance
+  const transitionLockRef = useRef(false);
+
   // Auto-play next song when current ends
   const handleVideoEnded = useCallback(() => {
+    // Prevent double-advance from overlapping onEnded + skip
+    if (transitionLockRef.current) return;
+    transitionLockRef.current = true;
+    setTimeout(() => { transitionLockRef.current = false; }, 1000);
+
     if (roomMode === 'team-battle') {
        setShowWinnerScreen(true);
        return;
@@ -482,7 +490,7 @@ export default function Room() {
 
   const headerProps = {
     code, isHost, isConnected, userCount: users.length, networkLatency,
-    isMicEnabled, webrtcStats, roomMode,
+    isMicEnabled, webrtcStats, roomMode, syncStatus,
     onShowHostControlPanel: () => setShowHostControlPanel(true),
     onLeave: handleLeave,
     roomMenuProps: {
