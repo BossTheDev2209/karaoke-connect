@@ -227,8 +227,11 @@ export default function Room() {
     onCueVideo: cueVideo, getCurrentVideoTime: getPlayerTime, isPlayerReady: isReady,
   });
 
-  // Keep syncV2Ref updated (used by pre-syncV2 callbacks)
-  useEffect(() => { syncV2Ref.current = syncV2; }, [syncV2]);
+  // Keep syncV2Ref and applyFullSyncPlaybackRef updated
+  useEffect(() => {
+    syncV2Ref.current = syncV2;
+    applyFullSyncPlaybackRef.current = syncV2.applyFullSyncPlayback;
+  }, [syncV2]);
 
   // === SyncV2 is now the single source of truth for playback state ===
   const playbackState = syncV2.playbackState;
