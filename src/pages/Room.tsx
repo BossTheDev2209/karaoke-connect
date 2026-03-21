@@ -133,7 +133,7 @@ export default function Room() {
 
   const { 
     users, queue, roomMode, battleFormat,
-    isConnected, isHost, channel, 
+    isConnected, isHost, channel, syncStatus,
     updateQueue, updateSpeaking, updateMicStatus,
     updateMode, updateTeams, swapUserTeam,
     broadcastMatchStart, broadcastMatchEnd,
