@@ -467,7 +467,7 @@ export default function Room() {
           onVolumeChange={handleVolumeChange}
           eqSettings={eqSettings}
           onEqChange={handleEqChange}
-          youtubePlayerRef={youtubePlayerRef}
+          playerHost={playerHost}
           currentTime={currentTime}
           duration={duration}
           
