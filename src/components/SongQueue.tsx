@@ -142,12 +142,20 @@ export const SongQueue: React.FC<SongQueueProps> = ({
               />
               
               <div className="flex-1 min-w-0">
-                <p className={cn(
-                  'text-sm font-medium truncate',
-                  index === currentIndex && 'text-neon-pink'
-                )}>
-                  {song.title}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className={cn(
+                    'text-sm font-medium truncate',
+                    index === currentIndex && 'text-neon-pink'
+                  )}>
+                    {song.title}
+                  </p>
+                  {index === currentIndex && (
+                    <span className="text-[9px] uppercase tracking-wider text-neon-pink font-bold shrink-0">Now</span>
+                  )}
+                  {index === currentIndex + 1 && (
+                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground shrink-0">Next</span>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground truncate">
                   {song.artist}
                 </p>
