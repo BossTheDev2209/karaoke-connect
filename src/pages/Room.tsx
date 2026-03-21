@@ -527,6 +527,8 @@ export default function Room() {
     showPlayerError, playerError,
     onClearErrorAndSkip: () => { clearError(); handleVideoEnded(); },
     hasMoreSongs: queue.length > 1,
+    isPlaying,
+    isPaused: !isPlaying && playbackState.status === 'paused',
     showLyrics,
     lyricsDisplayProps: {
       lyrics, currentLineIndex, currentTime, isLoading: lyricsLoading,
