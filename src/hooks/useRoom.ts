@@ -421,6 +421,9 @@ export const useRoom = (
     channelRef.current = channel;
 
     return () => {
+      if ((channel as any).__syncRetryTimer) {
+        clearTimeout((channel as any).__syncRetryTimer);
+      }
       channel.unsubscribe();
       channelRef.current = null;
       isHostRef.current = false;
