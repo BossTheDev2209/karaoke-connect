@@ -87,10 +87,31 @@ export const RoomStage: React.FC<RoomStageProps> = ({
   showLyrics,
   lyricsDisplayProps,
 }) => {
+  const phaseBadge = showReadyCheck
+    ? { label: 'Ready Check', className: 'bg-primary/20 text-primary border-primary/30 animate-pulse' }
+    : showCountdown
+    ? { label: 'Countdown', className: 'bg-orange-500/20 text-orange-400 border-orange-500/30' }
+    : showNoSong
+    ? { label: 'Idle', className: 'bg-muted text-muted-foreground border-border' }
+    : isPaused
+    ? { label: 'Paused', className: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' }
+    : isPlaying
+    ? { label: 'Playing', className: 'bg-neon-green/20 text-neon-green border-neon-green/30' }
+    : null;
+
   return (
     <div className="lg:col-span-6 flex flex-col gap-3 min-h-0 order-1 lg:order-2">
       <div className="card-karaoke relative flex-1 min-h-0">
         <div id="youtube-player" className="w-full h-full rounded-lg overflow-hidden" />
+
+        {/* Phase badge */}
+        {phaseBadge && (
+          <div className="absolute top-2 left-2 z-10">
+            <Badge variant="outline" className={cn('text-[10px] px-2 py-0.5 backdrop-blur-sm', phaseBadge.className)}>
+              {phaseBadge.label}
+            </Badge>
+          </div>
+        )}
 
         {/* Sing React overlay with light sticks */}
         {showSingReactOverlay && (
