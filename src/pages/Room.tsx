@@ -431,7 +431,9 @@ export default function Room() {
   }, [handleLeave, isMicEnabled, toggleMic, eqSettings]);
 
   const isMobile = useMediaQuery('(max-width: 1024px) and (pointer: coarse)');
-  const youtubePlayerRef = useRef<HTMLDivElement>(null);
+  const playerHost = useMemo(() => (
+    <div id="youtube-player" className="w-full h-full rounded-[inherit] overflow-hidden bg-black" />
+  ), []);
 
   if (!user || !code) return null;
 
