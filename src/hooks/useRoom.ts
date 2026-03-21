@@ -152,6 +152,7 @@ export const useRoom = (
         if (isHostRef.current) {
           setTimeout(() => {
             const proactiveRequestId = 'proactive-join';
+            console.log('[RoomSync] full_sync_response SENT (proactive)', { requestId: proactiveRequestId, at: Date.now() });
             channel.send({
               type: 'broadcast',
               event: 'room_event',
