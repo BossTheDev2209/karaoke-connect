@@ -227,12 +227,33 @@ export default function Room() {
   // initialVideoId: used by useYouTubePlayer for first render. SyncV2 handles actual cuing.
   const initialVideoId = queue[0]?.videoId || null;
 
-  const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable, error: playerError, clearError, cueVideo, getCurrentTime: getPlayerTime } = useYouTubePlayer('youtube-player', initialVideoId, handleStateChange, handleVideoEnded, privacyMode);
+  const {
+    isReady,
+    isSafe: isPlayerSafe,
+    currentTime,
+    duration,
+    isPlaying,
+    play,
+    pause,
+    seekTo,
+    setVolume: setPlayerVolume,
+    mute,
+    unmute,
+    isMuted,
+    enableCaptions,
+    disableCaptions,
+    areCaptionsEnabled,
+    hasCaptionsAvailable,
+    error: playerError,
+    clearError,
+    cueVideo,
+    getCurrentTime: getPlayerTime,
+  } = useYouTubePlayer('youtube-player', initialVideoId, handleStateChange, handleVideoEnded, privacyMode);
 
   const syncV2 = useSyncV2({
     channel, userId: user?.id || null, isHost, queue,
     onSeekRequired: seekTo, onPlayRequired: play, onPauseRequired: pause,
-    onCueVideo: cueVideo, getCurrentVideoTime: getPlayerTime, isPlayerReady: isReady,
+    onCueVideo: cueVideo, getCurrentVideoTime: getPlayerTime, isPlayerReady: isPlayerSafe,
   });
 
   // Keep syncV2Ref and applyFullSyncPlaybackRef updated
@@ -410,7 +431,9 @@ export default function Room() {
   }, [handleLeave, isMicEnabled, toggleMic, eqSettings]);
 
   const isMobile = useMediaQuery('(max-width: 1024px) and (pointer: coarse)');
-  const youtubePlayerRef = useRef<HTMLDivElement>(null);
+  const playerHost = useMemo(() => (
+    <div id="youtube-player" className="w-full h-full rounded-[inherit] overflow-hidden bg-black" />
+  ), []);
 
   if (!user || !code) return null;
 
@@ -444,7 +467,7 @@ export default function Room() {
           onVolumeChange={handleVolumeChange}
           eqSettings={eqSettings}
           onEqChange={handleEqChange}
-          youtubePlayerRef={youtubePlayerRef}
+          playerHost={playerHost}
           currentTime={currentTime}
           duration={duration}
           
@@ -538,6 +561,7 @@ export default function Room() {
     isPlaying,
     isPaused: !isPlaying && playbackState.status === 'paused',
     showLyrics,
+    playerHost,
     lyricsDisplayProps: {
       lyrics, currentLineIndex, currentTime, isLoading: lyricsLoading,
       error: lyricsError, offset: lyricsOffset, onOffsetChange: setLyricsOffset,

@@ -95,12 +95,19 @@ export function useSyncV2({
   const getTargetTimeRef = useRef<() => number>(() => 0);
   const getCurrentVideoTimeRef = useRef(getCurrentVideoTime);
   const onSeekRequiredRef = useRef(onSeekRequired);
+  const onPlayRequiredRef = useRef(onPlayRequired);
+  const onPauseRequiredRef = useRef(onPauseRequired);
+  const playerSafeRef = useRef(isPlayerReady);
+  const unsafeSyncLoggedRef = useRef(false);
   
   // Keep callback refs updated
   useEffect(() => {
     getCurrentVideoTimeRef.current = getCurrentVideoTime;
     onSeekRequiredRef.current = onSeekRequired;
-  }, [getCurrentVideoTime, onSeekRequired]);
+    onPlayRequiredRef.current = onPlayRequired;
+    onPauseRequiredRef.current = onPauseRequired;
+    playerSafeRef.current = isPlayerReady;
+  }, [getCurrentVideoTime, onSeekRequired, onPlayRequired, onPauseRequired, isPlayerReady]);
 
   /**
    * Initialize Web Worker for background-safe timing
@@ -116,11 +123,21 @@ export function useSyncV2({
       const { type } = event.data;
       
       if (type === 'tick') {
-        // Worker tick - perform drift correction
-        // Use refs to avoid stale closure issues
         const state = playbackRef.current;
         if (state.status !== 'playing') return;
-        
+        if (!playerSafeRef.current) {
+          if (!unsafeSyncLoggedRef.current && import.meta.env.DEV) {
+            console.log('[SyncV2] Drift correction paused: player unsafe');
+            unsafeSyncLoggedRef.current = true;
+          }
+          return;
+        }
+
+        if (unsafeSyncLoggedRef.current && import.meta.env.DEV) {
+          console.log('[SyncV2] Drift correction resumed: player safe');
+          unsafeSyncLoggedRef.current = false;
+        }
+
         const targetTime = getTargetTimeRef.current();
         const currentTime = getCurrentVideoTimeRef.current();
         const drift = Math.abs(targetTime - currentTime);
@@ -151,7 +168,7 @@ export function useSyncV2({
   useEffect(() => {
     if (!workerRef.current || !isCalibrated) return;
     
-    if (playbackState.status === 'playing') {
+    if (playbackState.status === 'playing' && isPlayerReady) {
       workerRef.current.postMessage({ 
         type: 'start', 
         intervalMs: SYNC_CORRECTION_INTERVAL_MS 
@@ -159,7 +176,7 @@ export function useSyncV2({
     } else {
       workerRef.current.postMessage({ type: 'stop' });
     }
-  }, [playbackState.status, isCalibrated]);
+  }, [playbackState.status, isCalibrated, isPlayerReady]);
 
   /**
    * Calculate the target video time based on room clock.
@@ -469,13 +486,12 @@ export function useSyncV2({
   const applyFullSyncPlayback = useCallback((incomingState: PlaybackState) => {
     console.log('[SyncV2] applyFullSyncPlayback', { status: incomingState.status, isPlaying: incomingState.isPlaying, videoId: incomingState.videoId, startAtRoomTime: incomingState.startAtRoomTime, seekOffset: incomingState.seekOffset });
     
-    // Handle preparing/ready phases (ready-check hydration for late joiners)
     if (incomingState.status === 'preparing' || incomingState.status === 'ready') {
       const newState: PlaybackState = { ...incomingState };
       setPlaybackState(newState);
       playbackRef.current = newState;
       
-      if (incomingState.videoId) {
+      if (incomingState.videoId && playerSafeRef.current) {
         console.log(`[SyncV2] Hydrating preparing/ready phase, cueing video: ${incomingState.videoId}`);
         onCueVideo(incomingState.videoId);
       }
@@ -490,7 +506,7 @@ export function useSyncV2({
       setPlaybackState(newState);
       playbackRef.current = newState;
       
-      if (incomingState.isPlaying && incomingState.startAtRoomTime) {
+      if (incomingState.isPlaying && incomingState.startAtRoomTime && playerSafeRef.current) {
         const roomTime = getRoomTime();
         const elapsed = (roomTime - incomingState.startAtRoomTime) / 1000;
         const targetTime = Math.max(0, elapsed + (incomingState.seekOffset || 0));
@@ -502,6 +518,7 @@ export function useSyncV2({
         }
         
         setTimeout(() => {
+          if (!playerSafeRef.current) return;
           onSeekRequired(targetTime);
           onPlayRequired();
         }, 500);
@@ -573,16 +590,17 @@ export function useSyncV2({
           if (delayMs > 50) {
             console.log(`[SyncV2] Scheduling playback in ${delayMs}ms`);
             setTimeout(() => {
+              if (!playerSafeRef.current) return;
               const targetTime = (Date.now() + serverTimeOffset - startAtRoomTime) / 1000 + (seekOffset || 0);
-              onSeekRequired(Math.max(0, targetTime));
-              onPlayRequired();
+              onSeekRequiredRef.current(Math.max(0, targetTime));
+              onPlayRequiredRef.current();
             }, delayMs);
-          } else {
+          } else if (playerSafeRef.current) {
             const elapsed = (roomTime - startAtRoomTime) / 1000;
             const targetTime = Math.max(0, elapsed + (seekOffset || 0));
             console.log(`[SyncV2] Starting immediately at ${targetTime.toFixed(2)}s`);
-            onSeekRequired(targetTime);
-            onPlayRequired();
+            onSeekRequiredRef.current(targetTime);
+            onPlayRequiredRef.current();
           }
           break;
         }
@@ -601,7 +619,9 @@ export function useSyncV2({
             lastUpdate: Date.now(),
           }));
           
-          onPauseRequired();
+          if (playerSafeRef.current) {
+            onPauseRequiredRef.current();
+          }
           break;
         }
         
@@ -626,15 +646,16 @@ export function useSyncV2({
           if (delayMs > 50) {
             console.log(`[SyncV2] Scheduling resume in ${delayMs}ms`);
             setTimeout(() => {
-              onSeekRequired(seekOffset);
-              onPlayRequired();
+              if (!playerSafeRef.current) return;
+              onSeekRequiredRef.current(seekOffset);
+              onPlayRequiredRef.current();
             }, delayMs);
-          } else {
+          } else if (playerSafeRef.current) {
             const elapsed = (roomTime - startAtRoomTime) / 1000;
             const targetTime = Math.max(0, elapsed + seekOffset);
             console.log(`[SyncV2] Resuming immediately at ${targetTime.toFixed(2)}s`);
-            onSeekRequired(targetTime);
-            onPlayRequired();
+            onSeekRequiredRef.current(targetTime);
+            onPlayRequiredRef.current();
           }
           break;
         }
@@ -651,7 +672,9 @@ export function useSyncV2({
             lastUpdate: Date.now(),
           }));
           
-          onSeekRequired(seekOffset);
+          if (playerSafeRef.current) {
+            onSeekRequiredRef.current(seekOffset);
+          }
           break;
         }
         
@@ -677,7 +700,9 @@ export function useSyncV2({
               lastUpdate: Date.now(),
             }));
           }
-          onSeekRequired(currentTime);
+          if (playerSafeRef.current) {
+            onSeekRequiredRef.current(currentTime);
+          }
           break;
         }
       }
