@@ -467,7 +467,7 @@ export function useSyncV2({
    * useRoom validates requestId/dedup before calling this.
    */
   const applyFullSyncPlayback = useCallback((incomingState: PlaybackState) => {
-    console.log('[SyncV2] applyFullSyncPlayback called:', incomingState);
+    console.log('[SyncV2] applyFullSyncPlayback', { status: incomingState.status, isPlaying: incomingState.isPlaying, videoId: incomingState.videoId, startAtRoomTime: incomingState.startAtRoomTime, seekOffset: incomingState.seekOffset });
     
     if (incomingState.status === 'playing' || incomingState.startAtRoomTime) {
       const newState: PlaybackState = {
