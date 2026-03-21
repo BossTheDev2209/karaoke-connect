@@ -14,8 +14,8 @@ import {
 interface SongQueueProps {
   queue: Song[];
   currentIndex: number;
-  onRemove: (songId: string) => void;
-  onSelect: (index: number) => void;
+  onRemove?: (songId: string) => void;
+  onSelect?: (index: number) => void;
   getLyricStatus?: (songId: string) => LyricStatus;
   isCompact?: boolean;
 }
