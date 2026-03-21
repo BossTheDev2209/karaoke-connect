@@ -56,6 +56,9 @@ export interface RoomStageProps {
   playerError: PlayerError | null;
   onClearErrorAndSkip: () => void;
   hasMoreSongs: boolean;
+  // Playback phase
+  isPlaying: boolean;
+  isPaused: boolean;
   // Lyrics
   showLyrics: boolean;
   lyricsDisplayProps: React.ComponentProps<typeof LyricsDisplay>;
