@@ -1,102 +1,75 @@
 
 
-# Phase 6: Protocol-Safe Fix for HIGH-1 (dual full_sync_response race)
+# Phase 6.6: Verification Report + Minimal Hardening
 
-## 1. Problem Confirmation
+## 1. Runtime Verification Status
 
-**Exact cause**: A joining client triggers TWO `full_sync_response` messages:
-1. **Proactive push** (useRoom.ts:142-158): Host detects presence join → sends full state after 500ms delay
-2. **sync_request response** (useRoom.ts:232-251): Joiner broadcasts `sync_request` after 300ms → host responds with full state
+**Single-client verification**: COMPLETED. Room creation works, host view renders correctly, no sync-related errors in console. The app loads, creates rooms, and shows all expected UI.
 
-Both responses arrive independently. Both `useRoom` (line 254-273) and `useSyncV2` (line 471-513) process each one. Result: 2×2 = up to 4 state hydration calls, with `onCueVideo`, `onSeekRequired`, `onPlayRequired` potentially fired multiple times with different timing.
+**Multi-client verification**: NOT POSSIBLE. The browser tool supports only a single session — I cannot open a second independent tab to simulate a joiner. This is a hard limitation of the testing environment.
 
-**No requestId exists**. No sender validation. No duplicate rejection. `hasSyncedRef` in useRoom partially gates queue hydration but doesn't prevent useSyncV2 from processing both responses.
+**Conclusion**: All multi-client scenarios (A through J) remain CODE-ONLY verified. I cannot claim runtime evidence for any of them.
 
-## 2. Fix Strategy
+## 2. Reclassifications from Phase 6.5
 
-### A) Add `requestId` correlation to sync_request/response
+| Scenario | Phase 6.5 Status | Phase 6.6 Status | Reason |
+|----------|-----------------|-----------------|--------|
+| A: Normal join | PASS | PASS WITH RISK | Code-only, no runtime joiner evidence |
+| B: Multiple non-hosts | PASS | PASS WITH RISK | Code-only |
+| C: Duplicate response | PASS | PASS WITH RISK | Code-only, logic is correct but untested |
+| D: Mismatched requestId | PASS | PASS WITH RISK | Code-only |
+| E: Delayed/stale | PASS | PASS WITH RISK | Code-only |
+| F: Join mid-song | PASS | PASS WITH RISK | Code-only |
+| G: Ready check join | PASS WITH RISK | PASS WITH RISK | Unchanged |
+| H: Queue transition | PASS | PASS WITH RISK | Code-only |
+| I: Host leaves | PASS WITH RISK | PASS WITH RISK | Unchanged |
+| J: Cleanup/listeners | PASS | PASS WITH RISK | Code-only |
 
-- `sync_request` includes `requestId: string` and `requesterId: string`
-- `full_sync_response` includes `requestId: string` and `senderId: string`
-- Proactive push on join uses `requestId: 'proactive-{newUserId}'`
+All scenarios require manual multi-tab QA before shipping.
 
-### B) Joiner tracks pending request lifecycle
+## 3. Hardening Fix #1: Proactive-join gating
 
-In `useRoom.ts`, add refs:
-- `pendingSyncRequestId: string | null` — active request
-- `syncFulfilledRequestId: string | null` — already-applied request
+**Problem**: A `proactive-join` response is accepted even when a `sync_request` is already in flight (`pendingSyncRequestIdRef.current !== null`). The proactive push arrives ~500ms after join, while the explicit sync_request fires ~300ms after join. Both can race and the proactive one might win, then the explicit response also gets accepted because its requestId differs from `'proactive-join'`.
 
-When sync_request is emitted → set `pendingSyncRequestId`, clear `syncFulfilledRequestId`.
+Current acceptance logic (line 287):
+```
+const isAcceptable = (isProactive || matchesPending) && incomingRequestId !== fulfilledId;
+```
 
-### C) Only host responds to sync_request
+**Fix**: If there is an active pending sync request, reject proactive pushes — only the correlated response should be accepted:
+```
+const isProactive = incomingRequestId === 'proactive-join' && !pendingId;
+```
 
-Already the case (line 234: `if (isHostRef.current)`). No change needed.
+This means:
+- If joiner has already sent a `sync_request` (pendingId is set), proactive push is ignored — the correlated response will arrive shortly
+- If joiner has NOT sent a `sync_request` (e.g. reconnect case where `shouldRequestSync` was false), proactive push is accepted as before
+- After fulfillment, `syncFulfilledIdRef` prevents any further application regardless
 
-### D) Joiner validates before applying full_sync_response
+**File**: `src/hooks/useRoom.ts` line 285  
+**Change**: Single expression update  
+**Safety**: Strictly tighter gating. No new code paths.
 
-In `useRoom.ts` handler (line 254-273), before applying:
-1. Check `requestId` matches `pendingSyncRequestId` OR is `'proactive-{userId}'`
-2. Check not already fulfilled (`syncFulfilledRequestId !== requestId`)
-3. If valid → apply, set `syncFulfilledRequestId = requestId`
-4. If invalid → ignore with log
+## 4. Hardening Fix #2: Sync request retry timeout
 
-### E) useSyncV2 defers to useRoom for gating
+**Problem**: If no host responds to `sync_request` (host crashed, network partition, slow), the joiner silently gets stuck with no room state. No retry exists.
 
-The key insight: useSyncV2 should NOT independently decide whether to apply `full_sync_response`. Instead:
-- Add a `onFullSyncPlayback` callback prop to useSyncV2
-- useRoom calls this callback AFTER it validates and applies queue/mode
-- useSyncV2 removes its own `full_sync_response` handler entirely
+**Fix**: Add a single delayed retry 5 seconds after the initial request. If `hasSyncedRef.current` is still false when the timer fires, re-emit `sync_request` with the same `requestId`. No loop, no multi-responder, no infinite retry.
 
-This eliminates the race: useRoom validates first, then passes playback state to useSyncV2 in a controlled sequence.
+**File**: `src/hooks/useRoom.ts` lines ~386-402  
+**Change**: Add a `setTimeout` after the initial request that checks `hasSyncedRef.current` and retries once if still false  
+**Safety**: Same requestId reuse means the existing dedup logic still prevents double-application. Only fires once. Cleaned up on unmount.
 
-### F) Collapse proactive push + sync_request response
+## 5. Files Changed
 
-Currently both paths produce identical `full_sync_response` payloads. After this fix:
-- Proactive push uses `requestId: 'proactive-join'`
-- sync_request response uses the joiner's `requestId`
-- Joiner accepts whichever arrives first and rejects the other
-
-## 3. Files Changed
-
-### `src/hooks/useRoom.ts`
-- Add `pendingSyncRequestIdRef` and `syncFulfilledIdRef` refs
-- Include `requestId` in `sync_request` emission (line 359)
-- Include `requestId` in proactive push (line 144)
-- Include `requestId` in sync_request response (line 237)
-- Gate `full_sync_response` handler on requestId match + not-already-fulfilled
-- After applying queue/mode, call a new callback to pass playback state to useSyncV2
-- Add `onSyncPlaybackState?: (playbackState: PlaybackState) => void` parameter
-
-### `src/hooks/useSyncV2.ts`
-- Remove the `full_sync_response` case from the internal event handler (lines 471-513)
-- Add an `applyFullSyncPlayback(state: PlaybackState)` function that does what the removed handler did
-- Export this function from the hook return
-- This function is called by useRoom after validation
-
-### `src/pages/Room.tsx`
-- Wire `syncV2.applyFullSyncPlayback` into `useRoom`'s `onSyncPlaybackState` parameter
-
-## 4. New Sync Rules (Post-Fix)
-
-| Rule | Detail |
+| File | Change |
 |------|--------|
-| Who can answer `sync_request` | Only the host (unchanged) |
-| requestId generation | `crypto.randomUUID()` on each `sync_request`; `'proactive-join'` for presence-triggered push |
-| When responses are ignored | Mismatched requestId, already-fulfilled requestId, or `hasSyncedRef` already true with non-empty queue |
-| Duplicate prevention | `syncFulfilledIdRef` tracks last applied requestId; second response for same ID is dropped |
-| Fallback | If no response within existing 300ms+500ms window, `requestSync()` can be called manually (already exists). No multi-responder fallback. |
+| `src/hooks/useRoom.ts` line 285 | Tighten proactive-join to reject when pending request exists |
+| `src/hooks/useRoom.ts` lines 386-402 | Add single retry timeout for sync_request |
 
-## 5. Execution Order
+## 6. Remaining Real Risks Before Shipping
 
-1. Add `applyFullSyncPlayback` to `useSyncV2` return, remove `full_sync_response` from its event handler
-2. Add requestId correlation + gating to `useRoom`
-3. Wire callback in `Room.tsx`
-
-## 6. Safety
-
-- Join flow preserved: same data, same timing, just gated
-- Host authority unchanged
-- Queue/mode/playback hydration order now deterministic (useRoom first, then useSyncV2)
-- Mobile/desktop identical (both use same hooks)
-- No unrelated event types touched
+1. **All multi-client scenarios are code-only verified** — manual 2-tab QA is mandatory
+2. **Joiner during `preparing` phase** won't see ready check overlay (pre-existing, not a Phase 6 issue)
+3. **`useRoom.ts` is still ~660 lines** — future decomposition needed but not blocking
 
