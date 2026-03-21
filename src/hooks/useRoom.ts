@@ -152,6 +152,7 @@ export const useRoom = (
         if (isHostRef.current) {
           setTimeout(() => {
             const proactiveRequestId = 'proactive-join';
+            console.log('[RoomSync] full_sync_response SENT (proactive)', { requestId: proactiveRequestId, at: Date.now() });
             channel.send({
               type: 'broadcast',
               event: 'room_event',
@@ -246,6 +247,7 @@ export const useRoom = (
             // If we're host, respond with full state including the joiner's requestId
             if (isHostRef.current) {
               const requestData = data.payload as { requesterId?: string; requestId?: string; latency?: number } | null;
+              console.log('[RoomSync] host responding to sync_request', { requestId: requestData?.requestId, at: Date.now() });
               channel.send({
                 type: 'broadcast',
                 event: 'room_event',
@@ -262,6 +264,8 @@ export const useRoom = (
                   },
                 },
               });
+            } else {
+              console.log('[RoomSync] sync_request received but not host, ignoring');
             }
             break;
           }
@@ -288,7 +292,7 @@ export const useRoom = (
 
             // Also gate on hasSynced (original logic preserved)
             if (isAcceptable && (!hasSyncedRef.current || queueRef.current.length === 0)) {
-              console.log('[Room] Accepted full_sync_response (requestId:', incomingRequestId, ')');
+              console.log('[RoomSync] full_sync_response ACCEPTED', { requestId: incomingRequestId, source: isProactive ? 'proactive' : 'requested', at: Date.now() });
 
               setQueue(syncData.queue);
               setRoomMode(syncData.roomMode);
@@ -301,8 +305,7 @@ export const useRoom = (
                 onSyncPlaybackStateRef.current?.(syncData.playbackState);
               }
             } else {
-              console.log('[Room] Ignored full_sync_response (requestId:', incomingRequestId,
-                ', pending:', pendingId, ', fulfilled:', fulfilledId, ', hasSynced:', hasSyncedRef.current, ')');
+              console.log('[RoomSync] full_sync_response IGNORED', { requestId: incomingRequestId, reason: !isAcceptable ? 'unacceptable' : 'already-synced', pending: pendingId, fulfilled: fulfilledId, hasSynced: hasSyncedRef.current });
             }
             break;
           }
@@ -389,7 +392,7 @@ export const useRoom = (
               (currentPlayback?.isPlaying && !currentPlayback?.startAtRoomTime);
             if (shouldRequestSync) {
               const requestId = crypto.randomUUID();
-              console.log('[Room] Requesting sync (requestId:', requestId, ')');
+              console.log('[RoomSync] sync_request SENT', { requestId, at: Date.now() });
               hasSyncedRef.current = false;
               pendingSyncRequestIdRef.current = requestId;
               syncFulfilledIdRef.current = null;
@@ -402,7 +405,7 @@ export const useRoom = (
               // Single retry after 5s if no response received
               const retryTimer = setTimeout(() => {
                 if (!hasSyncedRef.current && pendingSyncRequestIdRef.current === requestId) {
-                  console.log('[Room] Sync retry (requestId:', requestId, ')');
+                  console.log('[RoomSync] sync_request RETRY', { requestId, at: Date.now(), elapsedMs: 5000 });
                   channel.send({
                     type: 'broadcast',
                     event: 'room_event',
