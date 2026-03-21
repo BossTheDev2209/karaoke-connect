@@ -132,7 +132,7 @@ export const SongQueue: React.FC<SongQueueProps> = ({
                   ? 'bg-neon-purple text-primary-foreground' 
                   : 'bg-muted text-muted-foreground'
               )}>
-                {index + 1}
+                {index === currentIndex ? '▶' : index + 1}
               </span>
               
               <img
