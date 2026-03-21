@@ -315,21 +315,24 @@ export const useRoom = (
             const pendingId = pendingSyncRequestIdRef.current;
             const fulfilledId = syncFulfilledIdRef.current;
 
-            // Gate: accept only if requestId matches our pending request OR is a proactive push,
+            // Gate: accept only if requestId matches our pending request OR is a proactive/migration push,
             // AND we haven't already fulfilled this exact requestId
             const isProactive = incomingRequestId === 'proactive-join' && !pendingId;
+            const isMigration = incomingRequestId === 'host-migration';
             const matchesPending = pendingId && incomingRequestId === pendingId;
-            const isAcceptable = (isProactive || matchesPending) && incomingRequestId !== fulfilledId;
+            const isAcceptable = (isProactive || matchesPending || isMigration) && incomingRequestId !== fulfilledId;
 
-            // Also gate on hasSynced (original logic preserved)
-            if (isAcceptable && (!hasSyncedRef.current || queueRef.current.length === 0)) {
-              console.log('[RoomSync] full_sync_response ACCEPTED', { requestId: incomingRequestId, source: isProactive ? 'proactive' : 'requested', at: Date.now() });
+            // Also gate on hasSynced (original logic preserved) — migration always accepted
+            if (isAcceptable && (isMigration || !hasSyncedRef.current || queueRef.current.length === 0)) {
+              const source = isProactive ? 'proactive' : isMigration ? 'migration' : 'requested';
+              console.log('[RoomSync] full_sync_response ACCEPTED', { requestId: incomingRequestId, source, at: Date.now() });
 
               setQueue(syncData.queue);
               setRoomMode(syncData.roomMode);
               setBattleFormat(syncData.battleFormat);
               hasSyncedRef.current = true;
               syncFulfilledIdRef.current = incomingRequestId;
+              setSyncStatus('synced');
 
               // Clear retry timer on successful sync
               if ((channel as any).__syncRetryTimer) {
