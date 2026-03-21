@@ -576,13 +576,18 @@ export const useRoom = (
   }, [user]);
 
   const requestSync = useCallback(() => {
-    hasSyncedRef.current = false; // Allow re-sync
+    const requestId = crypto.randomUUID();
+    hasSyncedRef.current = false;
+    pendingSyncRequestIdRef.current = requestId;
+    syncFulfilledIdRef.current = null;
+    setSyncStatus('syncing');
     channelRef.current?.send({
       type: 'broadcast',
       event: 'room_event',
       payload: { 
         type: 'sync_request', 
         payload: { 
+          requestId,
           requesterId: user?.id, 
           latency: getAverageRTT() 
         } 
