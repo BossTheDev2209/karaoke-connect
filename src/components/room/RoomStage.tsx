@@ -2,7 +2,8 @@ import React from 'react';
 import { SingReactOverlay } from '@/components/effects/SingReactOverlay';
 import { LyricsDisplay } from '@/components/LyricsDisplay';
 import { Button } from '@/components/ui/button';
-import { Play } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Play, Pause, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LyricLine } from '@/types/karaoke';
 
