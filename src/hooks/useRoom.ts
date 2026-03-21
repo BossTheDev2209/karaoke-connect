@@ -243,16 +243,17 @@ export const useRoom = (
           // are handled by useSyncV2 — no duplicate handling here.
 
           case 'sync_request': {
-            // If we're host, respond with full state
+            // If we're host, respond with full state including the joiner's requestId
             if (isHostRef.current) {
-              const requestData = data.payload as { requesterId?: string; latency?: number } | null;
-              const targetLatency = requestData?.latency || 0;
+              const requestData = data.payload as { requesterId?: string; requestId?: string; latency?: number } | null;
               channel.send({
                 type: 'broadcast',
                 event: 'room_event',
                 payload: {
                   type: 'full_sync_response',
                   payload: {
+                    requestId: requestData?.requestId || 'unknown',
+                    senderId: user?.id,
                     queue: queueRef.current,
                     playbackState: getPlaybackState?.() ?? DEFAULT_PLAYBACK,
                     roomMode: roomModeRef.current,
@@ -265,23 +266,43 @@ export const useRoom = (
             break;
           }
           case 'full_sync_response': {
-            // Only accept sync if we haven't synced yet or have no data
-            if (!hasSyncedRef.current || queueRef.current.length === 0) {
-              const syncData = data.payload as {
-                queue: Song[];
-                playbackState: PlaybackState;
-                roomMode: RoomMode;
-                battleFormat?: BattleFormat;
-                serverTime?: number;
-              };
-              console.log('Received full sync:', syncData);
-              
+            const syncData = data.payload as {
+              requestId?: string;
+              senderId?: string;
+              queue: Song[];
+              playbackState: PlaybackState;
+              roomMode: RoomMode;
+              battleFormat?: BattleFormat;
+              serverTime?: number;
+            };
+
+            const incomingRequestId = syncData.requestId || null;
+            const pendingId = pendingSyncRequestIdRef.current;
+            const fulfilledId = syncFulfilledIdRef.current;
+
+            // Gate: accept only if requestId matches our pending request OR is a proactive push,
+            // AND we haven't already fulfilled this exact requestId
+            const isProactive = incomingRequestId === 'proactive-join';
+            const matchesPending = pendingId && incomingRequestId === pendingId;
+            const isAcceptable = (isProactive || matchesPending) && incomingRequestId !== fulfilledId;
+
+            // Also gate on hasSynced (original logic preserved)
+            if (isAcceptable && (!hasSyncedRef.current || queueRef.current.length === 0)) {
+              console.log('[Room] Accepted full_sync_response (requestId:', incomingRequestId, ')');
+
               setQueue(syncData.queue);
-              // playbackState hydration handled by useSyncV2
-              
               setRoomMode(syncData.roomMode);
               setBattleFormat(syncData.battleFormat);
               hasSyncedRef.current = true;
+              syncFulfilledIdRef.current = incomingRequestId;
+
+              // Delegate playback hydration to useSyncV2 via callback
+              if (syncData.playbackState) {
+                onSyncPlaybackStateRef.current?.(syncData.playbackState);
+              }
+            } else {
+              console.log('[Room] Ignored full_sync_response (requestId:', incomingRequestId,
+                ', pending:', pendingId, ', fulfilled:', fulfilledId, ', hasSynced:', hasSyncedRef.current, ')');
             }
             break;
           }
