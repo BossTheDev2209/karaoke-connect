@@ -300,6 +300,12 @@ export const useRoom = (
               hasSyncedRef.current = true;
               syncFulfilledIdRef.current = incomingRequestId;
 
+              // Clear retry timer on successful sync
+              if ((channel as any).__syncRetryTimer) {
+                clearTimeout((channel as any).__syncRetryTimer);
+                (channel as any).__syncRetryTimer = null;
+              }
+
               // Delegate playback hydration to useSyncV2 via callback
               if (syncData.playbackState) {
                 onSyncPlaybackStateRef.current?.(syncData.playbackState);
