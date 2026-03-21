@@ -590,16 +590,17 @@ export function useSyncV2({
           if (delayMs > 50) {
             console.log(`[SyncV2] Scheduling playback in ${delayMs}ms`);
             setTimeout(() => {
+              if (!playerSafeRef.current) return;
               const targetTime = (Date.now() + serverTimeOffset - startAtRoomTime) / 1000 + (seekOffset || 0);
-              onSeekRequired(Math.max(0, targetTime));
-              onPlayRequired();
+              onSeekRequiredRef.current(Math.max(0, targetTime));
+              onPlayRequiredRef.current();
             }, delayMs);
-          } else {
+          } else if (playerSafeRef.current) {
             const elapsed = (roomTime - startAtRoomTime) / 1000;
             const targetTime = Math.max(0, elapsed + (seekOffset || 0));
             console.log(`[SyncV2] Starting immediately at ${targetTime.toFixed(2)}s`);
-            onSeekRequired(targetTime);
-            onPlayRequired();
+            onSeekRequiredRef.current(targetTime);
+            onPlayRequiredRef.current();
           }
           break;
         }
@@ -618,7 +619,9 @@ export function useSyncV2({
             lastUpdate: Date.now(),
           }));
           
-          onPauseRequired();
+          if (playerSafeRef.current) {
+            onPauseRequiredRef.current();
+          }
           break;
         }
         
@@ -643,15 +646,16 @@ export function useSyncV2({
           if (delayMs > 50) {
             console.log(`[SyncV2] Scheduling resume in ${delayMs}ms`);
             setTimeout(() => {
-              onSeekRequired(seekOffset);
-              onPlayRequired();
+              if (!playerSafeRef.current) return;
+              onSeekRequiredRef.current(seekOffset);
+              onPlayRequiredRef.current();
             }, delayMs);
-          } else {
+          } else if (playerSafeRef.current) {
             const elapsed = (roomTime - startAtRoomTime) / 1000;
             const targetTime = Math.max(0, elapsed + seekOffset);
             console.log(`[SyncV2] Resuming immediately at ${targetTime.toFixed(2)}s`);
-            onSeekRequired(targetTime);
-            onPlayRequired();
+            onSeekRequiredRef.current(targetTime);
+            onPlayRequiredRef.current();
           }
           break;
         }
@@ -668,7 +672,9 @@ export function useSyncV2({
             lastUpdate: Date.now(),
           }));
           
-          onSeekRequired(seekOffset);
+          if (playerSafeRef.current) {
+            onSeekRequiredRef.current(seekOffset);
+          }
           break;
         }
         
@@ -694,7 +700,9 @@ export function useSyncV2({
               lastUpdate: Date.now(),
             }));
           }
-          onSeekRequired(currentTime);
+          if (playerSafeRef.current) {
+            onSeekRequiredRef.current(currentTime);
+          }
           break;
         }
       }
