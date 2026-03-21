@@ -82,6 +82,8 @@ export const RoomStage: React.FC<RoomStageProps> = ({
   playerError,
   onClearErrorAndSkip,
   hasMoreSongs,
+  isPlaying,
+  isPaused,
   showLyrics,
   lyricsDisplayProps,
 }) => {

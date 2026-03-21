@@ -414,9 +414,11 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
               <button
                 key={result.videoId}
                 onClick={() => handleAddSong(result)}
+                disabled={recentlyAdded.has(result.videoId)}
                 className={cn(
                   'w-full flex items-center gap-3 p-2 rounded-lg transition-colors',
-                  'hover:bg-muted/50 text-left group'
+                  'hover:bg-muted/50 text-left group',
+                  recentlyAdded.has(result.videoId) && 'opacity-60'
                 )}
               >
                 <img
@@ -434,7 +436,11 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                   <span className="text-xs text-muted-foreground font-mono">
                     {result.duration}
                   </span>
-                  <Plus className="w-5 h-5 text-neon-green opacity-0 group-hover:opacity-100 transition-opacity" />
+                  {recentlyAdded.has(result.videoId) ? (
+                    <Check className="w-5 h-5 text-neon-green" />
+                  ) : (
+                    <Plus className="w-5 h-5 text-neon-green opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
                 </div>
               </button>
             ))}
