@@ -133,8 +133,34 @@ export const useRoom = (
             (a, b) => (a.joinedAt || 0) - (b.joinedAt || 0)
           );
           const newIsHost = sortedByJoinTime[0]?.id === user.id;
+          const wasHost = isHostRef.current;
           isHostRef.current = newIsHost;
           setIsHost(newIsHost);
+
+          // Host migration: if we just became host, push authoritative state
+          if (newIsHost && !wasHost) {
+            console.log('[RoomSync] Host migration detected — this client is now host');
+            setSyncStatus('host-changed');
+            setTimeout(() => {
+              setSyncStatus('synced');
+              // Push authoritative state to all peers
+              channel.send({
+                type: 'broadcast',
+                event: 'room_event',
+                payload: {
+                  type: 'full_sync_response',
+                  payload: {
+                    requestId: 'host-migration',
+                    senderId: user?.id,
+                    queue: queueRef.current,
+                    playbackState: getPlaybackState?.() ?? DEFAULT_PLAYBACK,
+                    roomMode: roomModeRef.current,
+                    battleFormat: battleFormatRef.current,
+                  },
+                },
+              });
+            }, 1000);
+          }
         } else {
           isHostRef.current = false;
           setIsHost(false);
