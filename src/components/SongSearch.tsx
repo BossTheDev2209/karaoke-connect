@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Plus, X, Loader2, Music, User, ArrowLeft, Sparkles } from 'lucide-react';
+import { Search, Plus, X, Loader2, Music, User, ArrowLeft, Sparkles, Check } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,6 +31,9 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
   const [selectedChannel, setSelectedChannel] = useState<YouTubeChannel | null>(null);
   const [channelVideos, setChannelVideos] = useState<YouTubeSearchResult[]>([]);
   const [artistModalOpen, setArtistModalOpen] = useState(false);
+  
+  // Double-add prevention
+  const [recentlyAdded, setRecentlyAdded] = useState<Set<string>>(new Set());
 
   // Search for songs (main search bar) - uses songQuery
   const handleSongSearch = async () => {
@@ -99,7 +102,9 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
     setChannelVideos([]);
   };
 
-  const handleAddSong = (result: YouTubeSearchResult) => {
+  const handleAddSong = useCallback((result: YouTubeSearchResult) => {
+    if (recentlyAdded.has(result.videoId)) return;
+    
     const song: Song = {
       id: crypto.randomUUID(),
       videoId: result.videoId,
@@ -110,8 +115,17 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
       addedBy: userId,
     };
     onAddSong(song);
-    // Don't close anything - let user continue browsing/adding songs
-  };
+    
+    // Prevent double-add for 2 seconds
+    setRecentlyAdded(prev => new Set(prev).add(result.videoId));
+    setTimeout(() => {
+      setRecentlyAdded(prev => {
+        const next = new Set(prev);
+        next.delete(result.videoId);
+        return next;
+      });
+    }, 2000);
+  }, [recentlyAdded, onAddSong, userId]);
 
   const handleClose = () => {
     setIsOpen(false);
@@ -400,9 +414,11 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
               <button
                 key={result.videoId}
                 onClick={() => handleAddSong(result)}
+                disabled={recentlyAdded.has(result.videoId)}
                 className={cn(
                   'w-full flex items-center gap-3 p-2 rounded-lg transition-colors',
-                  'hover:bg-muted/50 text-left group'
+                  'hover:bg-muted/50 text-left group',
+                  recentlyAdded.has(result.videoId) && 'opacity-60'
                 )}
               >
                 <img
@@ -420,7 +436,11 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                   <span className="text-xs text-muted-foreground font-mono">
                     {result.duration}
                   </span>
-                  <Plus className="w-5 h-5 text-neon-green opacity-0 group-hover:opacity-100 transition-opacity" />
+                  {recentlyAdded.has(result.videoId) ? (
+                    <Check className="w-5 h-5 text-neon-green" />
+                  ) : (
+                    <Plus className="w-5 h-5 text-neon-green opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
                 </div>
               </button>
             ))}

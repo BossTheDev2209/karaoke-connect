@@ -90,7 +90,7 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
   };
 
   return (
-    <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
+    <div className="h-[100dvh] flex flex-col bg-background text-foreground overflow-hidden">
       {/* 1. Mobile Header */}
       <header className="flex items-center justify-between p-3 border-b bg-card/50 backdrop-blur-md">
         <div className="flex items-center gap-2">

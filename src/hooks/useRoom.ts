@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { User, Song, PlaybackState, RealtimePayload, RoomMode, BattleFormat } from '@/types/karaoke';
 import { DEFAULT_PLAYBACK } from '@/lib/playbackDefaults';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { toast } from 'sonner';
 
 interface UseRoomReturn {
   users: User[];
@@ -300,6 +301,12 @@ export const useRoom = (
               hasSyncedRef.current = true;
               syncFulfilledIdRef.current = incomingRequestId;
 
+              // Clear retry timer on successful sync
+              if ((channel as any).__syncRetryTimer) {
+                clearTimeout((channel as any).__syncRetryTimer);
+                (channel as any).__syncRetryTimer = null;
+              }
+
               // Delegate playback hydration to useSyncV2 via callback
               if (syncData.playbackState) {
                 onSyncPlaybackStateRef.current?.(syncData.playbackState);
@@ -406,6 +413,7 @@ export const useRoom = (
               const retryTimer = setTimeout(() => {
                 if (!hasSyncedRef.current && pendingSyncRequestIdRef.current === requestId) {
                   console.log('[RoomSync] sync_request RETRY', { requestId, at: Date.now(), elapsedMs: 5000 });
+                  toast.info('Syncing with room host...', { duration: 3000 });
                   channel.send({
                     type: 'broadcast',
                     event: 'room_event',
