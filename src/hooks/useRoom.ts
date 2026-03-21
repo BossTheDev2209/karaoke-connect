@@ -292,7 +292,7 @@ export const useRoom = (
 
             // Also gate on hasSynced (original logic preserved)
             if (isAcceptable && (!hasSyncedRef.current || queueRef.current.length === 0)) {
-              console.log('[Room] Accepted full_sync_response (requestId:', incomingRequestId, ')');
+              console.log('[RoomSync] full_sync_response ACCEPTED', { requestId: incomingRequestId, source: isProactive ? 'proactive' : 'requested', at: Date.now() });
 
               setQueue(syncData.queue);
               setRoomMode(syncData.roomMode);
