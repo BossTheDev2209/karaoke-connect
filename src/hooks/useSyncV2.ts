@@ -95,12 +95,19 @@ export function useSyncV2({
   const getTargetTimeRef = useRef<() => number>(() => 0);
   const getCurrentVideoTimeRef = useRef(getCurrentVideoTime);
   const onSeekRequiredRef = useRef(onSeekRequired);
+  const onPlayRequiredRef = useRef(onPlayRequired);
+  const onPauseRequiredRef = useRef(onPauseRequired);
+  const playerSafeRef = useRef(isPlayerReady);
+  const unsafeSyncLoggedRef = useRef(false);
   
   // Keep callback refs updated
   useEffect(() => {
     getCurrentVideoTimeRef.current = getCurrentVideoTime;
     onSeekRequiredRef.current = onSeekRequired;
-  }, [getCurrentVideoTime, onSeekRequired]);
+    onPlayRequiredRef.current = onPlayRequired;
+    onPauseRequiredRef.current = onPauseRequired;
+    playerSafeRef.current = isPlayerReady;
+  }, [getCurrentVideoTime, onSeekRequired, onPlayRequired, onPauseRequired, isPlayerReady]);
 
   /**
    * Initialize Web Worker for background-safe timing

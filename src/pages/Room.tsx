@@ -227,12 +227,33 @@ export default function Room() {
   // initialVideoId: used by useYouTubePlayer for first render. SyncV2 handles actual cuing.
   const initialVideoId = queue[0]?.videoId || null;
 
-  const { isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable, error: playerError, clearError, cueVideo, getCurrentTime: getPlayerTime } = useYouTubePlayer('youtube-player', initialVideoId, handleStateChange, handleVideoEnded, privacyMode);
+  const {
+    isReady,
+    isSafe: isPlayerSafe,
+    currentTime,
+    duration,
+    isPlaying,
+    play,
+    pause,
+    seekTo,
+    setVolume: setPlayerVolume,
+    mute,
+    unmute,
+    isMuted,
+    enableCaptions,
+    disableCaptions,
+    areCaptionsEnabled,
+    hasCaptionsAvailable,
+    error: playerError,
+    clearError,
+    cueVideo,
+    getCurrentTime: getPlayerTime,
+  } = useYouTubePlayer('youtube-player', initialVideoId, handleStateChange, handleVideoEnded, privacyMode);
 
   const syncV2 = useSyncV2({
     channel, userId: user?.id || null, isHost, queue,
     onSeekRequired: seekTo, onPlayRequired: play, onPauseRequired: pause,
-    onCueVideo: cueVideo, getCurrentVideoTime: getPlayerTime, isPlayerReady: isReady,
+    onCueVideo: cueVideo, getCurrentVideoTime: getPlayerTime, isPlayerReady: isPlayerSafe,
   });
 
   // Keep syncV2Ref and applyFullSyncPlaybackRef updated
