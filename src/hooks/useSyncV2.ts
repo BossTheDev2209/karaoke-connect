@@ -469,6 +469,19 @@ export function useSyncV2({
   const applyFullSyncPlayback = useCallback((incomingState: PlaybackState) => {
     console.log('[SyncV2] applyFullSyncPlayback', { status: incomingState.status, isPlaying: incomingState.isPlaying, videoId: incomingState.videoId, startAtRoomTime: incomingState.startAtRoomTime, seekOffset: incomingState.seekOffset });
     
+    // Handle preparing/ready phases (ready-check hydration for late joiners)
+    if (incomingState.status === 'preparing' || incomingState.status === 'ready') {
+      const newState: PlaybackState = { ...incomingState };
+      setPlaybackState(newState);
+      playbackRef.current = newState;
+      
+      if (incomingState.videoId) {
+        console.log(`[SyncV2] Hydrating preparing/ready phase, cueing video: ${incomingState.videoId}`);
+        onCueVideo(incomingState.videoId);
+      }
+      return;
+    }
+    
     if (incomingState.status === 'playing' || incomingState.startAtRoomTime) {
       const newState: PlaybackState = {
         ...incomingState,

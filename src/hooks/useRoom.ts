@@ -412,6 +412,7 @@ export const useRoom = (
               const retryTimer = setTimeout(() => {
                 if (!hasSyncedRef.current && pendingSyncRequestIdRef.current === requestId) {
                   console.log('[RoomSync] sync_request RETRY', { requestId, at: Date.now(), elapsedMs: 5000 });
+                  toast.info('Syncing with room host...', { duration: 3000 });
                   channel.send({
                     type: 'broadcast',
                     event: 'room_event',

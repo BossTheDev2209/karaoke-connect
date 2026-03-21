@@ -31,6 +31,9 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
   const [selectedChannel, setSelectedChannel] = useState<YouTubeChannel | null>(null);
   const [channelVideos, setChannelVideos] = useState<YouTubeSearchResult[]>([]);
   const [artistModalOpen, setArtistModalOpen] = useState(false);
+  
+  // Double-add prevention
+  const [recentlyAdded, setRecentlyAdded] = useState<Set<string>>(new Set());
 
   // Search for songs (main search bar) - uses songQuery
   const handleSongSearch = async () => {
