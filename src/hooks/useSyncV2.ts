@@ -486,13 +486,12 @@ export function useSyncV2({
   const applyFullSyncPlayback = useCallback((incomingState: PlaybackState) => {
     console.log('[SyncV2] applyFullSyncPlayback', { status: incomingState.status, isPlaying: incomingState.isPlaying, videoId: incomingState.videoId, startAtRoomTime: incomingState.startAtRoomTime, seekOffset: incomingState.seekOffset });
     
-    // Handle preparing/ready phases (ready-check hydration for late joiners)
     if (incomingState.status === 'preparing' || incomingState.status === 'ready') {
       const newState: PlaybackState = { ...incomingState };
       setPlaybackState(newState);
       playbackRef.current = newState;
       
-      if (incomingState.videoId) {
+      if (incomingState.videoId && playerSafeRef.current) {
         console.log(`[SyncV2] Hydrating preparing/ready phase, cueing video: ${incomingState.videoId}`);
         onCueVideo(incomingState.videoId);
       }
@@ -507,7 +506,7 @@ export function useSyncV2({
       setPlaybackState(newState);
       playbackRef.current = newState;
       
-      if (incomingState.isPlaying && incomingState.startAtRoomTime) {
+      if (incomingState.isPlaying && incomingState.startAtRoomTime && playerSafeRef.current) {
         const roomTime = getRoomTime();
         const elapsed = (roomTime - incomingState.startAtRoomTime) / 1000;
         const targetTime = Math.max(0, elapsed + (incomingState.seekOffset || 0));
@@ -519,6 +518,7 @@ export function useSyncV2({
         }
         
         setTimeout(() => {
+          if (!playerSafeRef.current) return;
           onSeekRequired(targetTime);
           onPlayRequired();
         }, 500);

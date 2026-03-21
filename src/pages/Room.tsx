@@ -561,6 +561,7 @@ export default function Room() {
     isPlaying,
     isPaused: !isPlaying && playbackState.status === 'paused',
     showLyrics,
+    playerHost,
     lyricsDisplayProps: {
       lyrics, currentLineIndex, currentTime, isLoading: lyricsLoading,
       error: lyricsError, offset: lyricsOffset, onOffsetChange: setLyricsOffset,
