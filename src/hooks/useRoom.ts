@@ -151,20 +151,23 @@ export const useRoom = (
         // (Don't gate on queue length; new users still need mode/battleFormat/empty queue.)
         if (isHostRef.current) {
           setTimeout(() => {
+            const proactiveRequestId = 'proactive-join';
             channel.send({
               type: 'broadcast',
               event: 'room_event',
               payload: {
                 type: 'full_sync_response',
                 payload: {
+                  requestId: proactiveRequestId,
+                  senderId: user?.id,
                   queue: queueRef.current,
-                    playbackState: getPlaybackState?.() ?? DEFAULT_PLAYBACK,
+                  playbackState: getPlaybackState?.() ?? DEFAULT_PLAYBACK,
                   roomMode: roomModeRef.current,
                   battleFormat: battleFormatRef.current,
                 },
               },
             });
-          }, 500); // Small delay to ensure new user is ready
+          }, 500);
         }
       })
       .on('presence', { event: 'leave' }, ({ leftPresences }) => {
