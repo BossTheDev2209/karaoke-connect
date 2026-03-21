@@ -682,7 +682,7 @@ export function useSyncV2({
     channel.on('broadcast', { event: 'room_event' }, handleSyncEvent);
     
     return () => {
-      // Cleanup handled by useRoom when channel is destroyed
+      channel.off('broadcast', { event: 'room_event' }, handleSyncEvent);
     };
   }, [channel, onCueVideo, onPauseRequired, onSeekRequired, onPlayRequired, getRoomTime, serverTimeOffset]);
 

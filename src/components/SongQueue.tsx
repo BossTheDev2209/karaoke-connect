@@ -167,17 +167,19 @@ export const SongQueue: React.FC<SongQueueProps> = ({
                 <span className="text-xs text-muted-foreground font-mono">
                   {song.duration}
                 </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemove(song.id);
-                  }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                {onRemove && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove(song.id);
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
             </div>
           );

@@ -734,6 +734,7 @@ export const useRoom = (
     isConnected,
     isHost,
     channel: channelRef.current,
+    syncStatus,
     updateQueue,
     updateSpeaking,
     updateMicStatus,
