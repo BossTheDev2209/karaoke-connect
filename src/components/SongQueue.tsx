@@ -119,12 +119,13 @@ export const SongQueue: React.FC<SongQueueProps> = ({
             <div
               key={song.id}
               className={cn(
-                'flex items-center gap-3 p-2 rounded-lg transition-all cursor-pointer group',
+                'flex items-center gap-3 p-2 rounded-lg transition-all',
+                onSelect ? 'cursor-pointer' : 'cursor-default',
                 index === currentIndex 
                   ? 'bg-primary/20 neon-border' 
-                  : 'hover:bg-muted/50'
+                  : onSelect ? 'hover:bg-muted/50' : ''
               )}
-              onClick={() => onSelect(index)}
+              onClick={() => onSelect?.(index)}
             >
               <span className={cn(
                 'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
