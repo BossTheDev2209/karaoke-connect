@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Song, RoomMode, PlaybackState, BattleFormat } from '@/types/karaoke';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -81,6 +81,36 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState('remote');
   const [showVideo, setShowVideo] = useState(true);
+  const [isLandscape, setIsLandscape] = useState(false);
+
+  // Detect landscape for responsive adjustments
+  useEffect(() => {
+    const checkOrientation = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
+    checkOrientation();
+    window.addEventListener('resize', checkOrientation);
+    return () => window.removeEventListener('resize', checkOrientation);
+  }, []);
+
+  // Trigger layout recalc after orientation change to prevent stale sizing
+  useEffect(() => {
+    const handleResize = () => {
+      requestAnimationFrame(() => {
+        // Force the player container to recalculate by reading layout
+        youtubePlayerRef.current?.getBoundingClientRect();
+      });
+    };
+    window.addEventListener('orientationchange', handleResize);
+    // Also handle resize for browsers that don't fire orientationchange
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('orientationchange', handleResize);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [youtubePlayerRef]);
+
+  const videoVisible = showVideo && activeTab === 'remote';
 
   // Format time helper
   const formatTime = (seconds: number) => {
@@ -90,12 +120,17 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
   };
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-background text-foreground overflow-hidden">
+    <div className="min-h-[100svh] h-[100svh] flex flex-col bg-background text-foreground overflow-hidden">
       {/* 1. Mobile Header */}
-      <header className="flex items-center justify-between p-3 border-b bg-card/50 backdrop-blur-md">
+      <header className={cn(
+        "flex items-center justify-between border-b bg-card/50 backdrop-blur-md shrink-0",
+        isLandscape ? "px-3 py-1" : "p-3"
+      )}>
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-neon-green' : 'bg-red-500'} animate-pulse`} />
-          <h1 className="font-bold text-lg tracking-tight">Karaoke<span className="text-primary">Connect</span></h1>
+          <h1 className={cn("font-bold tracking-tight", isLandscape ? "text-sm" : "text-lg")}>
+            Karaoke<span className="text-primary">Connect</span>
+          </h1>
         </div>
         
         <div className="flex items-center gap-2">
@@ -104,19 +139,20 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
             variant={isMicEnabled ? "default" : "outline"}
             size="icon"
             className={cn(
-              "rounded-full w-9 h-9 transition-all",
+              "rounded-full transition-all",
+              isLandscape ? "w-7 h-7" : "w-9 h-9",
               isMicEnabled && "bg-neon-green text-black hover:bg-neon-green/90 shadow-[0_0_10px_rgba(34,197,94,0.5)]"
             )}
             onClick={onMicToggle}
           >
-            {isMicEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+            {isMicEnabled ? <Mic className={cn(isLandscape ? "w-3 h-3" : "w-4 h-4")} /> : <MicOff className={cn(isLandscape ? "w-3 h-3" : "w-4 h-4")} />}
           </Button>
 
           {/* Menu Sheet */}
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="w-9 h-9">
-                <Menu className="w-5 h-5" />
+              <Button variant="ghost" size="icon" className={cn(isLandscape ? "w-7 h-7" : "w-9 h-9")}>
+                <Menu className={cn(isLandscape ? "w-4 h-4" : "w-5 h-5")} />
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[80vw]">
@@ -162,55 +198,63 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
         </div>
       </header>
 
-      {/* 2. Persistent Video Player Area (Moved out of Tabs for persistence) */}
+      {/* 2. Persistent Video Player — ALWAYS in document flow, collapsed via height when hidden */}
       <div 
         ref={youtubePlayerRef}
         id="youtube-player"
         className={cn(
-          "transition-all duration-300 bg-black overflow-hidden shadow-lg shrink-0",
-          (showVideo && activeTab === 'remote') 
-            ? "w-full h-[35vh] min-h-[180px] max-h-[280px] relative opacity-100" 
-            : "absolute top-0 left-0 w-px h-px opacity-0 pointer-events-none"
+          "transition-all duration-300 bg-black overflow-hidden shrink-0",
+          videoVisible 
+            ? cn(
+                "w-full relative opacity-100",
+                isLandscape 
+                  ? "h-[25vh] min-h-[100px] max-h-[160px]" 
+                  : "h-[35vh] min-h-[180px] max-h-[280px]"
+              )
+            : "w-full h-0 max-h-0 opacity-0 pointer-events-none"
         )}
       />
 
       {/* 3. Main Content Area */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 overflow-hidden relative min-h-0">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
           
           {/* TAB: REMOTE (Main Player) */}
-          <TabsContent value="remote" className="flex-1 flex flex-col m-0 p-4 data-[state=active]:flex overflow-hidden">
+          <TabsContent value="remote" className="flex-1 flex flex-col m-0 p-3 data-[state=active]:flex overflow-hidden">
             
             {/* Current Song Info */}
-            <div className="text-center mb-4 space-y-1 shrink-0">
+            <div className={cn("text-center shrink-0", isLandscape ? "mb-1 space-y-0" : "mb-3 space-y-1")}>
               {currentSong ? (
                 <>
-                  <h2 className="text-xl font-bold truncate px-4 leading-tight">{currentSong.title}</h2>
-                  <p className="text-sm text-primary truncate">{currentSong.artist}</p>
+                  <h2 className={cn("font-bold truncate px-4 leading-tight", isLandscape ? "text-base" : "text-xl")}>{currentSong.title}</h2>
+                  <p className={cn("text-primary truncate", isLandscape ? "text-xs" : "text-sm")}>{currentSong.artist}</p>
                 </>
               ) : (
-                <div className="py-6 text-muted-foreground">
-                  <Music className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                <div className={cn("text-muted-foreground", isLandscape ? "py-2" : "py-6")}>
+                  <Music className={cn("mx-auto opacity-20", isLandscape ? "w-8 h-8 mb-1" : "w-12 h-12 mb-2")} />
                   <p>No song playing</p>
                 </div>
               )}
             </div>
 
             {/* Lyrics Area (Scrollable) */}
-            <div className="flex-1 min-h-0 bg-secondary/10 rounded-2xl p-4 mb-4 relative overflow-hidden backdrop-blur-sm border border-white/5">
+            <div className={cn(
+              "flex-1 min-h-0 bg-secondary/10 rounded-2xl relative overflow-hidden backdrop-blur-sm border border-white/5",
+              isLandscape ? "p-2 mb-2" : "p-4 mb-3"
+            )}>
               <ScrollArea className="h-full">
                 <LyricsDisplay {...lyricsProps} className="text-center" />
               </ScrollArea>
             </div>
 
             {/* Progress Bar */}
-            <div className="mb-4 px-1 shrink-0">
+            <div className={cn("px-1 shrink-0", isLandscape ? "mb-1" : "mb-3")}>
               <Slider
                 value={[currentTime]}
                 max={duration || 100}
                 step={1}
                 onValueChange={(val) => onSeek(val[0])}
-                className="mb-1.5"
+                className="mb-1"
               />
               <div className="flex justify-between text-[10px] text-muted-foreground font-mono px-0.5">
                 <span>{formatTime(currentTime)}</span>
@@ -219,25 +263,28 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
             </div>
 
             {/* Playback Controls */}
-            <div className="flex items-center justify-center gap-6 mb-4 shrink-0">
+            <div className={cn("flex items-center justify-center shrink-0", isLandscape ? "gap-4 mb-1" : "gap-6 mb-3")}>
               <Button variant="ghost" size="icon" onClick={onPrevious} className="text-muted-foreground">
-                <SkipBack className="w-6 h-6" />
+                <SkipBack className={cn(isLandscape ? "w-5 h-5" : "w-6 h-6")} />
               </Button>
               
               <Button 
                 size="icon" 
-                className="w-16 h-16 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-105 transition-transform"
+                className={cn(
+                  "rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-105 transition-transform",
+                  isLandscape ? "w-12 h-12" : "w-16 h-16"
+                )}
                 onClick={onPlayPause}
               >
                 {playbackState.isPlaying ? (
-                  <Pause className="w-8 h-8 fill-current" />
+                  <Pause className={cn("fill-current", isLandscape ? "w-6 h-6" : "w-8 h-8")} />
                 ) : (
-                  <Play className="w-8 h-8 fill-current ml-1" />
+                  <Play className={cn("fill-current ml-0.5", isLandscape ? "w-6 h-6" : "w-8 h-8")} />
                 )}
               </Button>
               
               <Button variant="ghost" size="icon" onClick={onNext} className="text-muted-foreground">
-                <SkipForward className="w-6 h-6" />
+                <SkipForward className={cn(isLandscape ? "w-5 h-5" : "w-6 h-6")} />
               </Button>
             </div>
           </TabsContent>
@@ -245,10 +292,10 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
 
           {/* TAB: QUEUE (Search & List) */}
           <TabsContent value="queue" className="flex-1 flex flex-col m-0 p-0 data-[state=active]:flex overflow-hidden">
-            <div className="p-4 border-b bg-muted/20 shrink-0">
+            <div className="p-3 border-b bg-muted/20 shrink-0">
               <SongSearch onAddSong={onAddSong} userId={user.id} compact />
             </div>
-            <ScrollArea className="flex-1 p-4">
+            <ScrollArea className="flex-1 p-3">
               <SongQueue 
                 queue={queue}
                 currentIndex={playbackState.currentSongIndex}
@@ -261,9 +308,9 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
 
 
           {/* TAB: SOCIAL (Reactions & Users) */}
-          <TabsContent value="social" className="flex-1 flex flex-col m-0 p-4 data-[state=active]:flex overflow-hidden">
+          <TabsContent value="social" className="flex-1 flex flex-col m-0 p-3 data-[state=active]:flex overflow-hidden">
             <ScrollArea className="flex-1 h-full"> 
-             <div className="space-y-6 pb-4">
+             <div className="space-y-4 pb-4">
               {/* Reactions Grid */}
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Reactions</h3>
@@ -271,7 +318,7 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
               </div>
 
               {/* Quick tip - Menu is in header */}
-              <div className="text-center py-3 px-4 rounded-lg bg-muted/20 border border-dashed border-border">
+              <div className="text-center py-2 px-3 rounded-lg bg-muted/20 border border-dashed border-border">
                 <p className="text-xs text-muted-foreground">
                   💡 Settings, voting & more in the <span className="font-semibold text-primary">Menu ☰</span> button above
                 </p>
@@ -300,27 +347,39 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
 
 
           {/* 4. Bottom Navigation Bar */}
-          <TabsList className="grid grid-cols-3 h-16 shrink-0 rounded-none border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <TabsList className={cn(
+            "grid grid-cols-3 shrink-0 rounded-none border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+            isLandscape ? "h-10" : "h-14"
+          )}>
             <TabsTrigger 
               value="remote" 
-              className="flex flex-col gap-1 h-full rounded-none data-[state=active]:bg-transparent data-[state=active]:text-primary border-t-2 border-transparent data-[state=active]:border-primary transition-all"
+              className={cn(
+                "flex flex-col gap-0.5 h-full rounded-none data-[state=active]:bg-transparent data-[state=active]:text-primary border-t-2 border-transparent data-[state=active]:border-primary transition-all",
+                isLandscape && "py-1"
+              )}
             >
-              <Music className="w-5 h-5" />
-              <span className="text-[10px] font-medium">Remote</span>
+              <Music className={cn(isLandscape ? "w-4 h-4" : "w-5 h-5")} />
+              <span className={cn("font-medium", isLandscape ? "text-[8px]" : "text-[10px]")}>Remote</span>
             </TabsTrigger>
             <TabsTrigger 
               value="queue" 
-              className="flex flex-col gap-1 h-full rounded-none data-[state=active]:bg-transparent data-[state=active]:text-primary border-t-2 border-transparent data-[state=active]:border-primary transition-all"
+              className={cn(
+                "flex flex-col gap-0.5 h-full rounded-none data-[state=active]:bg-transparent data-[state=active]:text-primary border-t-2 border-transparent data-[state=active]:border-primary transition-all",
+                isLandscape && "py-1"
+              )}
             >
-              <Search className="w-5 h-5" />
-              <span className="text-[10px] font-medium">Queue</span>
+              <Search className={cn(isLandscape ? "w-4 h-4" : "w-5 h-5")} />
+              <span className={cn("font-medium", isLandscape ? "text-[8px]" : "text-[10px]")}>Queue</span>
             </TabsTrigger>
             <TabsTrigger 
               value="social" 
-              className="flex flex-col gap-1 h-full rounded-none data-[state=active]:bg-transparent data-[state=active]:text-primary border-t-2 border-transparent data-[state=active]:border-primary transition-all"
+              className={cn(
+                "flex flex-col gap-0.5 h-full rounded-none data-[state=active]:bg-transparent data-[state=active]:text-primary border-t-2 border-transparent data-[state=active]:border-primary transition-all",
+                isLandscape && "py-1"
+              )}
             >
-              <Users className="w-5 h-5" />
-              <span className="text-[10px] font-medium">Social</span>
+              <Users className={cn(isLandscape ? "w-4 h-4" : "w-5 h-5")} />
+              <span className={cn("font-medium", isLandscape ? "text-[8px]" : "text-[10px]")}>Social</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>

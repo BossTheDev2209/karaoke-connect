@@ -409,7 +409,7 @@ export default function Room() {
     };
   }, [handleLeave, isMicEnabled, toggleMic, eqSettings]);
 
-  const isMobile = useMediaQuery('(max-width: 768px)');
+  const isMobile = useMediaQuery('(max-width: 1024px) and (pointer: coarse)');
   const youtubePlayerRef = useRef<HTMLDivElement>(null);
 
   if (!user || !code) return null;
