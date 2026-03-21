@@ -55,6 +55,11 @@ export const useRoom = (
   const isHostRef = useRef(false);
   const hasSyncedRef = useRef(false);
 
+  // Phase 6: requestId correlation for full_sync protocol
+  const pendingSyncRequestIdRef = useRef<string | null>(null);
+  const syncFulfilledIdRef = useRef<string | null>(null);
+  const onSyncPlaybackStateRef = useRef(onSyncPlaybackState);
+
   // RTT measurement state (for latency display only)
   const rttSamplesRef = useRef<number[]>([]);
   const pendingPingsRef = useRef<Map<string, number>>(new Map());
