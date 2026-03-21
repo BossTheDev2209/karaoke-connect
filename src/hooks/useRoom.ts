@@ -425,7 +425,6 @@ export const useRoom = (
           setIsConnected(true);
           
           // Request sync after joining with a small delay
-          // Also request if we were previously synced but need to catch up (e.g., after reconnect)
           setTimeout(() => {
             const currentPlayback = getPlaybackState?.();
             const shouldRequestSync = !hasSyncedRef.current || 
@@ -436,6 +435,7 @@ export const useRoom = (
               hasSyncedRef.current = false;
               pendingSyncRequestIdRef.current = requestId;
               syncFulfilledIdRef.current = null;
+              setSyncStatus('syncing');
               channel.send({
                 type: 'broadcast',
                 event: 'room_event',
@@ -447,6 +447,7 @@ export const useRoom = (
                 if (!hasSyncedRef.current && pendingSyncRequestIdRef.current === requestId) {
                   console.log('[RoomSync] sync_request RETRY', { requestId, at: Date.now(), elapsedMs: 5000 });
                   toast.info('Syncing with room host...', { duration: 3000 });
+                  setSyncStatus('reconnecting');
                   channel.send({
                     type: 'broadcast',
                     event: 'room_event',
@@ -457,6 +458,8 @@ export const useRoom = (
 
               // Store for cleanup
               (channel as any).__syncRetryTimer = retryTimer;
+            } else {
+              setSyncStatus('synced');
             }
           }, 300);
         }
