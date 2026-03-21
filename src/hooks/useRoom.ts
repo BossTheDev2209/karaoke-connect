@@ -5,6 +5,8 @@ import { DEFAULT_PLAYBACK } from '@/lib/playbackDefaults';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 
+export type SyncStatus = 'synced' | 'syncing' | 'reconnecting' | 'host-changed' | 'idle';
+
 interface UseRoomReturn {
   users: User[];
   queue: Song[];
@@ -12,6 +14,7 @@ interface UseRoomReturn {
   isConnected: boolean;
   isHost: boolean;
   channel: RealtimeChannel | null;
+  syncStatus: SyncStatus;
   updateQueue: (queue: Song[]) => void;
   updateSpeaking: (isSpeaking: boolean, audioLevel?: number, score?: number) => void;
   updateMicStatus: (isMicEnabled: boolean) => void;
