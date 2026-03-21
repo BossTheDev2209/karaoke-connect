@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Plus, X, Loader2, Music, User, ArrowLeft, Sparkles } from 'lucide-react';
+import { Search, Plus, X, Loader2, Music, User, ArrowLeft, Sparkles, Check } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
