@@ -305,8 +305,7 @@ export const useRoom = (
                 onSyncPlaybackStateRef.current?.(syncData.playbackState);
               }
             } else {
-              console.log('[Room] Ignored full_sync_response (requestId:', incomingRequestId,
-                ', pending:', pendingId, ', fulfilled:', fulfilledId, ', hasSynced:', hasSyncedRef.current, ')');
+              console.log('[RoomSync] full_sync_response IGNORED', { requestId: incomingRequestId, reason: !isAcceptable ? 'unacceptable' : 'already-synced', pending: pendingId, fulfilled: fulfilledId, hasSynced: hasSyncedRef.current });
             }
             break;
           }
