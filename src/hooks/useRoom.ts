@@ -39,7 +39,8 @@ export const useRoom = (
   user: User | null,
   onUserJoin?: (user: User) => void,
   onHostAction?: (action: 'mute' | 'kick' | 'control_access', payload?: any) => void,
-  getPlaybackState?: () => PlaybackState
+  getPlaybackState?: () => PlaybackState,
+  onSyncPlaybackState?: (playbackState: PlaybackState) => void,
 ): UseRoomReturn => {
   const [users, setUsers] = useState<User[]>([]);
   const [queue, setQueue] = useState<Song[]>([]);
