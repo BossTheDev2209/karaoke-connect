@@ -247,6 +247,7 @@ export const useRoom = (
             // If we're host, respond with full state including the joiner's requestId
             if (isHostRef.current) {
               const requestData = data.payload as { requesterId?: string; requestId?: string; latency?: number } | null;
+              console.log('[RoomSync] host responding to sync_request', { requestId: requestData?.requestId, at: Date.now() });
               channel.send({
                 type: 'broadcast',
                 event: 'room_event',
@@ -263,6 +264,8 @@ export const useRoom = (
                   },
                 },
               });
+            } else {
+              console.log('[RoomSync] sync_request received but not host, ignoring');
             }
             break;
           }
