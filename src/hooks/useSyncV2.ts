@@ -123,11 +123,21 @@ export function useSyncV2({
       const { type } = event.data;
       
       if (type === 'tick') {
-        // Worker tick - perform drift correction
-        // Use refs to avoid stale closure issues
         const state = playbackRef.current;
         if (state.status !== 'playing') return;
-        
+        if (!playerSafeRef.current) {
+          if (!unsafeSyncLoggedRef.current && import.meta.env.DEV) {
+            console.log('[SyncV2] Drift correction paused: player unsafe');
+            unsafeSyncLoggedRef.current = true;
+          }
+          return;
+        }
+
+        if (unsafeSyncLoggedRef.current && import.meta.env.DEV) {
+          console.log('[SyncV2] Drift correction resumed: player safe');
+          unsafeSyncLoggedRef.current = false;
+        }
+
         const targetTime = getTargetTimeRef.current();
         const currentTime = getCurrentVideoTimeRef.current();
         const drift = Math.abs(targetTime - currentTime);
