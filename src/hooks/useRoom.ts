@@ -39,7 +39,8 @@ export const useRoom = (
   user: User | null,
   onUserJoin?: (user: User) => void,
   onHostAction?: (action: 'mute' | 'kick' | 'control_access', payload?: any) => void,
-  getPlaybackState?: () => PlaybackState
+  getPlaybackState?: () => PlaybackState,
+  onSyncPlaybackState?: (playbackState: PlaybackState) => void,
 ): UseRoomReturn => {
   const [users, setUsers] = useState<User[]>([]);
   const [queue, setQueue] = useState<Song[]>([]);
@@ -53,6 +54,11 @@ export const useRoom = (
   const channelRef = useRef<RealtimeChannel | null>(null);
   const isHostRef = useRef(false);
   const hasSyncedRef = useRef(false);
+
+  // Phase 6: requestId correlation for full_sync protocol
+  const pendingSyncRequestIdRef = useRef<string | null>(null);
+  const syncFulfilledIdRef = useRef<string | null>(null);
+  const onSyncPlaybackStateRef = useRef(onSyncPlaybackState);
 
   // RTT measurement state (for latency display only)
   const rttSamplesRef = useRef<number[]>([]);
@@ -86,6 +92,10 @@ export const useRoom = (
   useEffect(() => {
     queueRef.current = queue;
   }, [queue]);
+
+  useEffect(() => {
+    onSyncPlaybackStateRef.current = onSyncPlaybackState;
+  }, [onSyncPlaybackState]);
 
 
   useEffect(() => {
@@ -141,20 +151,23 @@ export const useRoom = (
         // (Don't gate on queue length; new users still need mode/battleFormat/empty queue.)
         if (isHostRef.current) {
           setTimeout(() => {
+            const proactiveRequestId = 'proactive-join';
             channel.send({
               type: 'broadcast',
               event: 'room_event',
               payload: {
                 type: 'full_sync_response',
                 payload: {
+                  requestId: proactiveRequestId,
+                  senderId: user?.id,
                   queue: queueRef.current,
-                    playbackState: getPlaybackState?.() ?? DEFAULT_PLAYBACK,
+                  playbackState: getPlaybackState?.() ?? DEFAULT_PLAYBACK,
                   roomMode: roomModeRef.current,
                   battleFormat: battleFormatRef.current,
                 },
               },
             });
-          }, 500); // Small delay to ensure new user is ready
+          }, 500);
         }
       })
       .on('presence', { event: 'leave' }, ({ leftPresences }) => {
@@ -230,16 +243,17 @@ export const useRoom = (
           // are handled by useSyncV2 — no duplicate handling here.
 
           case 'sync_request': {
-            // If we're host, respond with full state
+            // If we're host, respond with full state including the joiner's requestId
             if (isHostRef.current) {
-              const requestData = data.payload as { requesterId?: string; latency?: number } | null;
-              const targetLatency = requestData?.latency || 0;
+              const requestData = data.payload as { requesterId?: string; requestId?: string; latency?: number } | null;
               channel.send({
                 type: 'broadcast',
                 event: 'room_event',
                 payload: {
                   type: 'full_sync_response',
                   payload: {
+                    requestId: requestData?.requestId || 'unknown',
+                    senderId: user?.id,
                     queue: queueRef.current,
                     playbackState: getPlaybackState?.() ?? DEFAULT_PLAYBACK,
                     roomMode: roomModeRef.current,
@@ -252,23 +266,43 @@ export const useRoom = (
             break;
           }
           case 'full_sync_response': {
-            // Only accept sync if we haven't synced yet or have no data
-            if (!hasSyncedRef.current || queueRef.current.length === 0) {
-              const syncData = data.payload as {
-                queue: Song[];
-                playbackState: PlaybackState;
-                roomMode: RoomMode;
-                battleFormat?: BattleFormat;
-                serverTime?: number;
-              };
-              console.log('Received full sync:', syncData);
-              
+            const syncData = data.payload as {
+              requestId?: string;
+              senderId?: string;
+              queue: Song[];
+              playbackState: PlaybackState;
+              roomMode: RoomMode;
+              battleFormat?: BattleFormat;
+              serverTime?: number;
+            };
+
+            const incomingRequestId = syncData.requestId || null;
+            const pendingId = pendingSyncRequestIdRef.current;
+            const fulfilledId = syncFulfilledIdRef.current;
+
+            // Gate: accept only if requestId matches our pending request OR is a proactive push,
+            // AND we haven't already fulfilled this exact requestId
+            const isProactive = incomingRequestId === 'proactive-join';
+            const matchesPending = pendingId && incomingRequestId === pendingId;
+            const isAcceptable = (isProactive || matchesPending) && incomingRequestId !== fulfilledId;
+
+            // Also gate on hasSynced (original logic preserved)
+            if (isAcceptable && (!hasSyncedRef.current || queueRef.current.length === 0)) {
+              console.log('[Room] Accepted full_sync_response (requestId:', incomingRequestId, ')');
+
               setQueue(syncData.queue);
-              // playbackState hydration handled by useSyncV2
-              
               setRoomMode(syncData.roomMode);
               setBattleFormat(syncData.battleFormat);
               hasSyncedRef.current = true;
+              syncFulfilledIdRef.current = incomingRequestId;
+
+              // Delegate playback hydration to useSyncV2 via callback
+              if (syncData.playbackState) {
+                onSyncPlaybackStateRef.current?.(syncData.playbackState);
+              }
+            } else {
+              console.log('[Room] Ignored full_sync_response (requestId:', incomingRequestId,
+                ', pending:', pendingId, ', fulfilled:', fulfilledId, ', hasSynced:', hasSyncedRef.current, ')');
             }
             break;
           }
@@ -354,12 +388,15 @@ export const useRoom = (
             const shouldRequestSync = !hasSyncedRef.current || 
               (currentPlayback?.isPlaying && !currentPlayback?.startAtRoomTime);
             if (shouldRequestSync) {
-              console.log('[Room] Requesting sync (first join or reconnect)');
-              hasSyncedRef.current = false; // Reset to accept new sync
+              const requestId = crypto.randomUUID();
+              console.log('[Room] Requesting sync (requestId:', requestId, ')');
+              hasSyncedRef.current = false;
+              pendingSyncRequestIdRef.current = requestId;
+              syncFulfilledIdRef.current = null;
               channel.send({
                 type: 'broadcast',
                 event: 'room_event',
-                payload: { type: 'sync_request', payload: null },
+                payload: { type: 'sync_request', payload: { requestId, requesterId: user?.id } },
               });
             }
           }, 300);

@@ -58,6 +58,8 @@ interface UseSyncV2Return {
   serverTimeOffset: number;
   /** Whether server time is calibrated */
   isTimeCalibrated: boolean;
+  /** Apply full sync playback state from useRoom (called after validation) */
+  applyFullSyncPlayback: (incomingState: PlaybackState) => void;
 }
 
 export function useSyncV2({
@@ -459,7 +461,42 @@ export function useSyncV2({
     });
   }, [channel, userId, getRoomTime]);
 
-  // Handle incoming sync events
+  /**
+   * Apply full sync playback state from useRoom after validation.
+   * This is the ONLY path for full_sync_response playback hydration.
+   * useRoom validates requestId/dedup before calling this.
+   */
+  const applyFullSyncPlayback = useCallback((incomingState: PlaybackState) => {
+    console.log('[SyncV2] applyFullSyncPlayback called:', incomingState);
+    
+    if (incomingState.status === 'playing' || incomingState.startAtRoomTime) {
+      const newState: PlaybackState = {
+        ...incomingState,
+        status: incomingState.isPlaying ? 'playing' : (incomingState.status || 'idle'),
+      };
+      setPlaybackState(newState);
+      playbackRef.current = newState;
+      
+      if (incomingState.isPlaying && incomingState.startAtRoomTime) {
+        const roomTime = getRoomTime();
+        const elapsed = (roomTime - incomingState.startAtRoomTime) / 1000;
+        const targetTime = Math.max(0, elapsed + (incomingState.seekOffset || 0));
+        
+        console.log(`[SyncV2] New joiner syncing to ${targetTime.toFixed(2)}s (elapsed=${elapsed.toFixed(2)}s)`);
+        
+        if (incomingState.videoId) {
+          onCueVideo(incomingState.videoId);
+        }
+        
+        setTimeout(() => {
+          onSeekRequired(targetTime);
+          onPlayRequired();
+        }, 500);
+      }
+    }
+  }, [getRoomTime, onCueVideo, onSeekRequired, onPlayRequired]);
+
+  // Handle incoming sync events (all EXCEPT full_sync_response, which goes through applyFullSyncPlayback)
   useEffect(() => {
     if (!channel) return;
     
@@ -467,51 +504,8 @@ export function useSyncV2({
       const data = payload;
       
       switch (data.type) {
-        // Handle full_sync_response for new joiners - this is the KEY fix!
-        case 'full_sync_response': {
-          const syncData = data.payload as {
-            queue: any[];
-            playbackState: PlaybackState;
-            roomMode: string;
-            battleFormat?: any;
-            serverTime?: number;
-          };
-          
-          console.log('[SyncV2] Received full_sync_response:', syncData.playbackState);
-          
-          // Only handle if playback is active (status playing or has startAtRoomTime)
-          const incomingState = syncData.playbackState;
-          if (incomingState.status === 'playing' || incomingState.startAtRoomTime) {
-            // Hydrate SyncV2 state
-            const newState: PlaybackState = {
-              ...incomingState,
-              status: incomingState.isPlaying ? 'playing' : (incomingState.status || 'idle'),
-            };
-            setPlaybackState(newState);
-            playbackRef.current = newState;
-            
-            // If playing, start playback at correct position
-            if (incomingState.isPlaying && incomingState.startAtRoomTime) {
-              const roomTime = getRoomTime();
-              const elapsed = (roomTime - incomingState.startAtRoomTime) / 1000;
-              const targetTime = Math.max(0, elapsed + (incomingState.seekOffset || 0));
-              
-              console.log(`[SyncV2] New joiner syncing to ${targetTime.toFixed(2)}s (elapsed=${elapsed.toFixed(2)}s)`);
-              
-              // Cue video first if we have a videoId
-              if (incomingState.videoId) {
-                onCueVideo(incomingState.videoId);
-              }
-              
-              // Small delay to allow video to cue, then seek and play
-              setTimeout(() => {
-                onSeekRequired(targetTime);
-                onPlayRequired();
-              }, 500);
-            }
-          }
-          break;
-        }
+        // full_sync_response is NOT handled here — it goes through useRoom validation
+        // then useRoom calls applyFullSyncPlayback after gating.
         
         case 'prepare_song': {
           const { videoId, songIndex } = data.payload;
@@ -524,7 +518,6 @@ export function useSyncV2({
             currentSongIndex: songIndex,
           }));
           
-          // Cue the video
           onCueVideo(videoId);
           break;
         }
@@ -557,7 +550,6 @@ export function useSyncV2({
           setPlaybackState(newState);
           playbackRef.current = newState;
           
-          // Schedule or immediately start playback
           const roomTime = getRoomTime();
           const delayMs = startAtRoomTime - roomTime;
           
@@ -569,7 +561,6 @@ export function useSyncV2({
               onPlayRequired();
             }, delayMs);
           } else {
-            // Already past start time - calculate correct position
             const elapsed = (roomTime - startAtRoomTime) / 1000;
             const targetTime = Math.max(0, elapsed + (seekOffset || 0));
             console.log(`[SyncV2] Starting immediately at ${targetTime.toFixed(2)}s`);
@@ -612,7 +603,6 @@ export function useSyncV2({
           setPlaybackState(newState);
           playbackRef.current = newState;
           
-          // Schedule or immediately resume
           const roomTime = getRoomTime();
           const delayMs = startAtRoomTime - roomTime;
           
@@ -623,7 +613,6 @@ export function useSyncV2({
               onPlayRequired();
             }, delayMs);
           } else {
-            // Already past start - calculate current position
             const elapsed = (roomTime - startAtRoomTime) / 1000;
             const targetTime = Math.max(0, elapsed + seekOffset);
             console.log(`[SyncV2] Resuming immediately at ${targetTime.toFixed(2)}s`);
@@ -658,12 +647,10 @@ export function useSyncV2({
           break;
         }
         
-        // Handle force_sync from host control panel
         case 'force_sync': {
           const { currentTime, timestamp, roomTime } = data.payload;
           console.log('[SyncV2] Force sync received:', { currentTime, roomTime });
           
-          // Re-sync using the room time reference
           if (roomTime && playbackRef.current.status === 'playing') {
             setPlaybackState(prev => ({
               ...prev,
@@ -679,12 +666,8 @@ export function useSyncV2({
       }
     };
     
-    // Listen for room events
-    // Note: Channel cleanup is handled by useRoom, so we just add the listener
-    const subscription = channel.on('broadcast', { event: 'room_event' }, handleSyncEvent);
+    channel.on('broadcast', { event: 'room_event' }, handleSyncEvent);
     
-    // Return cleanup - we need to unsubscribe by creating a new channel state
-    // Since Supabase doesn't have .off(), we rely on useRoom's cleanup
     return () => {
       // Cleanup handled by useRoom when channel is destroyed
     };
@@ -733,5 +716,6 @@ export function useSyncV2({
     reportBuffering,
     serverTimeOffset,
     isTimeCalibrated: isCalibrated,
+    applyFullSyncPlayback,
   };
 }

@@ -125,6 +125,12 @@ export default function Room() {
     }
   }, [autoSyncOnJoin]);
 
+  // Ref for syncV2's applyFullSyncPlayback — wired after syncV2 is created
+  const applyFullSyncPlaybackRef = useRef<((state: PlaybackState) => void) | null>(null);
+  const handleSyncPlaybackState = useCallback((playbackState: PlaybackState) => {
+    applyFullSyncPlaybackRef.current?.(playbackState);
+  }, []);
+
   const { 
     users, queue, roomMode, battleFormat,
     isConnected, isHost, channel, 
@@ -133,7 +139,7 @@ export default function Room() {
     broadcastMatchStart, broadcastMatchEnd,
     requestSync, networkLatency,
     kickUser, forceMuteUser, toggleControlAccess,
-  } = useRoom(code || '', user, handleUserJoin, handleHostAction, getPlaybackState);
+  } = useRoom(code || '', user, handleUserJoin, handleHostAction, getPlaybackState, handleSyncPlaybackState);
 
   // Keep refs in sync
   useEffect(() => { isHostRef.current = isHost; }, [isHost]);
@@ -221,8 +227,11 @@ export default function Room() {
     onCueVideo: cueVideo, getCurrentVideoTime: getPlayerTime, isPlayerReady: isReady,
   });
 
-  // Keep syncV2Ref updated (used by pre-syncV2 callbacks)
-  useEffect(() => { syncV2Ref.current = syncV2; }, [syncV2]);
+  // Keep syncV2Ref and applyFullSyncPlaybackRef updated
+  useEffect(() => {
+    syncV2Ref.current = syncV2;
+    applyFullSyncPlaybackRef.current = syncV2.applyFullSyncPlayback;
+  }, [syncV2]);
 
   // === SyncV2 is now the single source of truth for playback state ===
   const playbackState = syncV2.playbackState;
