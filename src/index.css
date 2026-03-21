@@ -392,6 +392,26 @@
     display: none;
   }
 
+  /* Themed scrollbar for native overflow areas */
+  .scrollbar-themed {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary) / 0.3) transparent;
+  }
+  .scrollbar-themed::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-themed::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-themed::-webkit-scrollbar-thumb {
+    background: hsl(var(--primary) / 0.3);
+    border-radius: 9999px;
+  }
+  .scrollbar-themed::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.5);
+  }
+
   /* Light stick wave animation */
   @keyframes lightstick-wave {
     0%,

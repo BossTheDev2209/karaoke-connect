@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -16,18 +16,30 @@ interface ReactionBarProps {
   onReact: (emoji: string) => void;
   isWaving: boolean;
   onWaveToggle: () => void;
+  layout?: 'inline' | 'grid';
 }
 
-export const ReactionBar: React.FC<ReactionBarProps> = ({ onReact, isWaving, onWaveToggle }) => {
+export const ReactionBar: React.FC<ReactionBarProps> = ({ onReact, isWaving, onWaveToggle, layout = 'inline' }) => {
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex gap-1 p-2 rounded-full glass border border-border/50">
+    <div className={cn(
+      layout === 'grid' ? 'flex flex-col gap-3' : 'flex items-center gap-2'
+    )}>
+      <div className={cn(
+        "glass border border-border/50 rounded-2xl",
+        layout === 'grid' 
+          ? 'grid grid-cols-4 gap-1 p-2' 
+          : 'flex gap-1 p-2 rounded-full'
+      )}>
         {REACTION_EMOJIS.map((emoji) => (
           <Button
             key={emoji}
             variant="ghost"
             size="sm"
-            className="w-8 h-8 p-0 text-lg hover:scale-125 transition-transform"
+            className={cn(
+              "text-lg hover:scale-125 active:scale-95 transition-transform rounded-xl",
+              // Larger touch targets on mobile
+              layout === 'grid' ? "w-full h-12 p-0" : "w-9 h-9 p-0"
+            )}
             onClick={() => onReact(emoji)}
           >
             {emoji}
@@ -35,13 +47,13 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({ onReact, isWaving, onW
         ))}
       </div>
       
-      {/* Wave button */}
       <Button
         variant={isWaving ? 'default' : 'outline'}
         size="sm"
         onClick={onWaveToggle}
         className={cn(
-          'gap-1.5 transition-all',
+          'gap-1.5 transition-all rounded-xl',
+          layout === 'grid' ? 'w-full h-11' : '',
           isWaving && 'bg-primary shadow-lg shadow-primary/50'
         )}
       >
@@ -71,132 +83,5 @@ export const FloatingReactions: React.FC<{ reactions: FloatingReaction[] }> = ({
   );
 };
 
-// Hook to manage reactions with Supabase realtime
-export const useReactions = (
-  channel: any | null,
-  userId: string
-) => {
-  // Floating reactions (visual particles)
-  const [reactions, setReactions] = useState<FloatingReaction[]>([]);
-  // Persistent Zoom-style reactions (badge on avatar)
-  const [activeReactions, setActiveReactions] = useState<Map<string, string>>(new Map());
-
-  const sendReaction = useCallback((emoji: string) => {
-    if (!channel) return;
-
-    // 1. Broadcast to others
-    channel.send({
-      type: 'broadcast',
-      event: 'reaction',
-      payload: {
-        id: `${Date.now()}-${Math.random()}`,
-        emoji,
-        userId,
-      },
-    });
-
-    // 2. Show locally (Instant feedback)
-    handleNewReaction(userId, emoji);
-
-  }, [channel, userId]);
-
-  // Common handler for both local and remote reactions
-  const handleNewReaction = (reactorId: string, emoji: string) => {
-    // A. Add to floating particles (transient)
-    const newParticle: FloatingReaction = {
-      id: `${Date.now()}-${Math.random()}`,
-      emoji,
-      x: 30 + Math.random() * 40, // Random X for global float (legacy support)
-      userId: reactorId,
-    };
-
-    setReactions((prev) => [...prev, newParticle]);
-    setTimeout(() => {
-      setReactions((prev) => prev.filter((r) => r.id !== newParticle.id));
-    }, 3000);
-
-    // B. Set active persistent reaction (Zoom style)
-    setActiveReactions((prev) => {
-      const next = new Map(prev);
-      next.set(reactorId, emoji);
-      return next;
-    });
-
-    // Clear active reaction after 5 seconds (Zoom behavior)
-    setTimeout(() => {
-      setActiveReactions((prev) => {
-        const next = new Map(prev);
-        // Only remove if it's still the same emoji (hasn't been overwritten)
-        if (next.get(reactorId) === emoji) {
-          next.delete(reactorId);
-        }
-        return next;
-      });
-    }, 5000);
-  };
-
-  useEffect(() => {
-    if (!channel) return;
-
-    const handleReaction = (payload: { payload: { id: string; emoji: string; userId: string } }) => {
-      const { userId: reactorId, emoji } = payload.payload;
-      if (reactorId === userId) return; // Skip own reactions (already handled)
-      handleNewReaction(reactorId, emoji);
-    };
-
-    channel.on('broadcast', { event: 'reaction' }, handleReaction);
-  }, [channel, userId]);
-
-  return { reactions, activeReactions, sendReaction };
-};
-
-// Hook to manage light stick waving
-export const useWaving = (
-  channel: any | null,
-  userId: string
-) => {
-  const [isWaving, setIsWaving] = useState(false);
-  const [wavingUsers, setWavingUsers] = useState<Set<string>>(new Set());
-
-  const toggleWaving = useCallback(() => {
-    const newWaving = !isWaving;
-    setIsWaving(newWaving);
-
-    if (channel) {
-      channel.send({
-        type: 'broadcast',
-        event: 'lightstick_wave',
-        payload: { userId, isWaving: newWaving },
-      });
-    }
-  }, [channel, userId, isWaving]);
-
-  useEffect(() => {
-    if (!channel) return;
-
-    const handleWave = (payload: { payload: { userId: string; isWaving: boolean } }) => {
-      const { userId: oderId, isWaving: oderWaving } = payload.payload;
-      if (oderId === userId) return;
-
-      setWavingUsers(prev => {
-        const next = new Set(prev);
-        if (oderWaving) {
-          next.add(oderId);
-        } else {
-          next.delete(oderId);
-        }
-        return next;
-      });
-    };
-
-    channel.on('broadcast', { event: 'lightstick_wave' }, handleWave);
-  }, [channel, userId]);
-
-  // Include current user in waving set if they're waving
-  const allWavingUsers = new Set(wavingUsers);
-  if (isWaving) {
-    allWavingUsers.add(userId);
-  }
-
-  return { isWaving, toggleWaving, wavingUsers: allWavingUsers };
-};
+// Hook exports
+export { useReactions, useWaving } from '@/hooks/useReactionsHook';
