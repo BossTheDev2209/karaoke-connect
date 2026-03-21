@@ -102,76 +102,103 @@ export const SongQueue: React.FC<SongQueueProps> = ({
   if (queue.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-8">
-        <Music className="w-12 h-12 mb-4 opacity-50" />
-        <p className="text-sm">Queue is empty</p>
-        <p className="text-xs mt-1">Search and add songs to get started!</p>
+        <div className="p-4 rounded-full bg-muted/30 mb-4">
+          <Music className="w-10 h-10 opacity-40" />
+        </div>
+        <p className="text-sm font-medium">Queue is empty</p>
+        <p className="text-xs mt-1 text-muted-foreground/70">Search and add songs to get started!</p>
       </div>
     );
   }
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {queue.map((song, index) => {
           const lyricStatus = getLyricStatus?.(song.id) || 'pending';
+          const isCurrent = index === currentIndex;
+          const isNext = index === currentIndex + 1;
+          const isInteractive = !!onSelect;
           
           return (
             <div
               key={song.id}
               className={cn(
-                'flex items-center gap-3 p-2 rounded-lg transition-all',
-                onSelect ? 'cursor-pointer' : 'cursor-default',
-                index === currentIndex 
-                  ? 'bg-primary/20 neon-border' 
-                  : onSelect ? 'hover:bg-muted/50' : ''
+                'group flex items-center gap-3 rounded-xl transition-all',
+                // Larger touch targets on mobile
+                isCompact ? 'p-2.5 min-h-[56px]' : 'p-3 min-h-[60px]',
+                // Current song highlight
+                isCurrent
+                  ? 'bg-primary/15 border border-primary/40 shadow-[0_0_12px_hsl(var(--primary)/0.15)]' 
+                  : isNext
+                    ? 'bg-muted/20 border border-border/50'
+                    : 'border border-transparent',
+                // Interactive states
+                isInteractive 
+                  ? 'cursor-pointer hover:bg-muted/40 hover:border-border/70 active:scale-[0.99] active:bg-muted/50' 
+                  : 'cursor-default',
               )}
               onClick={() => onSelect?.(index)}
             >
+              {/* Index / Now Playing indicator */}
               <span className={cn(
-                'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
-                index === currentIndex 
-                  ? 'bg-neon-purple text-primary-foreground' 
-                  : 'bg-muted text-muted-foreground'
+                'w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 transition-colors',
+                isCurrent 
+                  ? 'bg-primary text-primary-foreground shadow-sm' 
+                  : 'bg-muted/50 text-muted-foreground'
               )}>
-                {index === currentIndex ? '▶' : index + 1}
+                {isCurrent ? '▶' : index + 1}
               </span>
               
+              {/* Thumbnail */}
               <img
                 src={song.thumbnail}
                 alt={song.title}
-                className="w-12 h-9 object-cover rounded shrink-0"
+                className={cn(
+                  "object-cover rounded-lg shrink-0",
+                  isCompact ? "w-14 h-10" : "w-16 h-12"
+                )}
               />
               
+              {/* Song info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <p className={cn(
-                    'text-sm font-medium truncate',
-                    index === currentIndex && 'text-neon-pink'
+                    'font-medium truncate',
+                    isCompact ? 'text-sm' : 'text-sm',
+                    isCurrent && 'text-primary'
                   )}>
                     {song.title}
                   </p>
-                  {index === currentIndex && (
-                    <span className="text-[9px] uppercase tracking-wider text-neon-pink font-bold shrink-0">Now</span>
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="text-xs text-muted-foreground truncate">
+                    {song.artist}
+                  </p>
+                  {isCurrent && (
+                    <span className="text-[9px] uppercase tracking-widest text-primary font-bold shrink-0 bg-primary/10 px-1.5 py-0.5 rounded">Now</span>
                   )}
-                  {index === currentIndex + 1 && (
+                  {isNext && (
                     <span className="text-[9px] uppercase tracking-wider text-muted-foreground shrink-0">Next</span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground truncate">
-                  {song.artist}
-                </p>
               </div>
               
-              <div className="flex items-center gap-2 shrink-0">
+              {/* Actions */}
+              <div className="flex items-center gap-1.5 shrink-0">
                 <LyricStatusIcon status={lyricStatus} />
-                <span className="text-xs text-muted-foreground font-mono">
+                <span className="text-[11px] text-muted-foreground font-mono hidden sm:block">
                   {song.duration}
                 </span>
                 {onRemove && (
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                    className={cn(
+                      "h-8 w-8 rounded-lg transition-all text-muted-foreground hover:text-destructive hover:bg-destructive/10",
+                      // Always visible on mobile (touch), hover-reveal on desktop
+                      "sm:opacity-0 sm:group-hover:opacity-100"
+                    )}
                     onClick={(e) => {
                       e.stopPropagation();
                       onRemove(song.id);

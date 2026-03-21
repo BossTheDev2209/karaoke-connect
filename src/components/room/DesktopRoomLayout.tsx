@@ -90,7 +90,7 @@ export const DesktopRoomLayout: React.FC<DesktopRoomLayoutProps> = ({
           <div className={cn("mb-3", !queuePanelProps.isHost && "opacity-70")}>
             <SongSearch onAddSong={queuePanelProps.onAddSong} userId={queuePanelProps.userId} />
           </div>
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto scrollbar-themed">
             <SongQueue 
               queue={queuePanelProps.queue} 
               currentIndex={queuePanelProps.currentSongIndex} 
