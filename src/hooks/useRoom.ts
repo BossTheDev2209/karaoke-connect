@@ -282,7 +282,7 @@ export const useRoom = (
 
             // Gate: accept only if requestId matches our pending request OR is a proactive push,
             // AND we haven't already fulfilled this exact requestId
-            const isProactive = incomingRequestId === 'proactive-join';
+            const isProactive = incomingRequestId === 'proactive-join' && !pendingId;
             const matchesPending = pendingId && incomingRequestId === pendingId;
             const isAcceptable = (isProactive || matchesPending) && incomingRequestId !== fulfilledId;
 
