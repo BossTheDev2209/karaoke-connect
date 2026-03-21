@@ -490,7 +490,7 @@ export default function Room() {
 
   const headerProps = {
     code, isHost, isConnected, userCount: users.length, networkLatency,
-    isMicEnabled, webrtcStats, roomMode,
+    isMicEnabled, webrtcStats, roomMode, syncStatus,
     onShowHostControlPanel: () => setShowHostControlPanel(true),
     onLeave: handleLeave,
     roomMenuProps: {

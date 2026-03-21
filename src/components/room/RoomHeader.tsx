@@ -2,9 +2,11 @@ import React from 'react';
 import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
 import { RoomMenu } from '@/components/RoomMenu';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { LogOut, Swords, Mic2, Settings2 } from 'lucide-react';
+import { LogOut, Swords, Mic2, Settings2, Loader2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { RoomMode } from '@/types/karaoke';
+import { SyncStatus } from '@/hooks/useRoom';
 
 export interface RoomHeaderProps {
   code: string;
@@ -15,10 +17,54 @@ export interface RoomHeaderProps {
   isMicEnabled: boolean;
   webrtcStats: { connectedPeers: number; connectionQuality: string; avgLatency: number };
   roomMode: RoomMode;
+  syncStatus: SyncStatus;
   onShowHostControlPanel: () => void;
   onLeave: () => void;
   roomMenuProps: React.ComponentProps<typeof RoomMenu>;
 }
+
+const SyncStatusChip: React.FC<{ status: SyncStatus; isConnected: boolean }> = ({ status, isConnected }) => {
+  if (!isConnected) {
+    return (
+      <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-destructive/20 text-destructive border-destructive/30 animate-pulse gap-1">
+        <AlertCircle className="w-3 h-3" />
+        Disconnected
+      </Badge>
+    );
+  }
+  switch (status) {
+    case 'syncing':
+      return (
+        <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-primary/20 text-primary border-primary/30 animate-pulse gap-1">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          Syncing…
+        </Badge>
+      );
+    case 'reconnecting':
+      return (
+        <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-orange-500/20 text-orange-400 border-orange-500/30 animate-pulse gap-1">
+          <RefreshCw className="w-3 h-3 animate-spin" />
+          Reconnecting…
+        </Badge>
+      );
+    case 'host-changed':
+      return (
+        <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-amber-500/20 text-amber-400 border-amber-500/30 gap-1">
+          <RefreshCw className="w-3 h-3" />
+          Host Changed
+        </Badge>
+      );
+    case 'synced':
+      return (
+        <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-neon-green/10 text-neon-green border-neon-green/30 gap-1">
+          <CheckCircle2 className="w-3 h-3" />
+          Synced
+        </Badge>
+      );
+    default:
+      return null;
+  }
+};
 
 export const RoomHeader: React.FC<RoomHeaderProps> = ({
   code,
@@ -29,6 +75,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   isMicEnabled,
   webrtcStats,
   roomMode,
+  syncStatus,
   onShowHostControlPanel,
   onLeave,
   roomMenuProps,
@@ -40,7 +87,10 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
         ? "bg-gradient-to-r from-amber-950/40 via-background to-background border border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.1)]" 
         : "bg-gradient-to-r from-primary/10 via-background to-background border border-border/50 shadow-sm"
     )}>
-      <RoomCodeDisplay code={code} />
+      <div className="flex items-center gap-2">
+        <RoomCodeDisplay code={code} />
+        <SyncStatusChip status={syncStatus} isConnected={isConnected} />
+      </div>
       <div className="flex items-center gap-2">
         {/* Connection indicator */}
         <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-neon-green' : 'bg-destructive'}`} />
