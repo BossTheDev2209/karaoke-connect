@@ -372,86 +372,93 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
         document.body
       )}
 
-      {/* Song Results Dropdown */}
-      {isOpen && results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-2 z-40 glass rounded-xl max-h-[70vh] sm:max-h-96 overflow-hidden flex flex-col">
-          <div className="p-2.5 flex justify-between items-center border-b border-border shrink-0">
-            <span className="text-sm text-muted-foreground font-medium">
-              {results.length} songs found
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleClose}
-              className="h-7 w-7 rounded-lg hover:bg-destructive/10 hover:text-destructive"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-
-          <ScrollArea className="flex-1">
-            <div className="p-1.5 space-y-0.5">
-              {results.map((result) => {
-                const wasAdded = recentlyAdded.has(result.videoId);
-                return (
-                  <div
-                    key={result.videoId}
-                    className={cn(
-                      'flex items-center gap-3 rounded-xl transition-all',
-                      // Large touch targets for mobile
-                      'p-2.5 min-h-[60px]',
-                      wasAdded
-                        ? 'bg-neon-green/10 border border-neon-green/20'
-                        : 'hover:bg-muted/40 border border-transparent active:bg-muted/60'
-                    )}
-                  >
-                    {/* Thumbnail */}
-                    <img
-                      src={result.thumbnail}
-                      alt={result.title}
-                      className="w-16 h-12 object-cover rounded-lg shrink-0"
-                    />
-                    
-                    {/* Song info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{result.title}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-xs text-primary truncate font-medium">
-                          {result.channelTitle}
-                        </p>
-                        <span className="text-[11px] text-muted-foreground font-mono shrink-0">
-                          {result.duration}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {/* Add button — always visible, large touch target */}
+      {/* Song Results — portaled to escape overflow clipping */}
+      {createPortal(
+        <AnimatePresence>
+          {isOpen && results.length > 0 && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={handleClose}
+                className="fixed inset-0 z-[90] bg-background/60 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="fixed inset-x-0 bottom-0 top-16 z-[91] flex flex-col sm:inset-auto sm:top-auto sm:left-1/2 sm:-translate-x-1/2 sm:bottom-4 sm:w-full sm:max-w-2xl sm:max-h-[80vh] sm:rounded-2xl"
+              >
+                <div className="flex flex-col h-full bg-card/95 backdrop-blur-xl border-t sm:border border-border sm:rounded-2xl shadow-2xl overflow-hidden">
+                  <div className="p-3 flex justify-between items-center border-b border-border shrink-0">
+                    <span className="text-sm text-muted-foreground font-medium">
+                      {results.length} songs found
+                    </span>
                     <Button
-                      variant={wasAdded ? "ghost" : "default"}
+                      variant="ghost"
                       size="icon"
-                      disabled={wasAdded}
-                      onClick={() => handleAddSong(result)}
-                      className={cn(
-                        "shrink-0 rounded-xl transition-all",
-                        // Large 44x44 touch target
-                        "h-11 w-11",
-                        wasAdded
-                          ? "text-neon-green"
-                          : "bg-neon-green/90 hover:bg-neon-green text-black shadow-sm shadow-neon-green/20"
-                      )}
+                      onClick={handleClose}
+                      className="h-8 w-8 rounded-lg hover:bg-destructive/10 hover:text-destructive"
                     >
-                      {wasAdded ? (
-                        <Check className="w-5 h-5" />
-                      ) : (
-                        <Plus className="w-5 h-5" />
-                      )}
+                      <X className="w-4 h-4" />
                     </Button>
                   </div>
-                );
-              })}
-            </div>
-          </ScrollArea>
-        </div>
+
+                  <ScrollArea className="flex-1">
+                    <div className="p-1.5 space-y-0.5">
+                      {results.map((result) => {
+                        const wasAdded = recentlyAdded.has(result.videoId);
+                        return (
+                          <button
+                            key={result.videoId}
+                            type="button"
+                            disabled={wasAdded}
+                            onClick={() => handleAddSong(result)}
+                            className={cn(
+                              'flex items-center gap-3 rounded-xl transition-all w-full text-left',
+                              'p-2.5 min-h-[60px]',
+                              wasAdded
+                                ? 'bg-neon-green/10 border border-neon-green/20'
+                                : 'hover:bg-muted/40 border border-transparent active:bg-muted/60'
+                            )}
+                          >
+                            <img
+                              src={result.thumbnail}
+                              alt={result.title}
+                              className="w-16 h-12 object-cover rounded-lg shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{result.title}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <p className="text-xs text-primary truncate font-medium">
+                                  {result.channelTitle}
+                                </p>
+                                <span className="text-[11px] text-muted-foreground font-mono shrink-0">
+                                  {result.duration}
+                                </span>
+                              </div>
+                            </div>
+                            <div className={cn(
+                              "shrink-0 rounded-xl flex items-center justify-center h-11 w-11 transition-all",
+                              wasAdded
+                                ? "text-neon-green"
+                                : "bg-neon-green/90 text-black shadow-sm shadow-neon-green/20"
+                            )}>
+                              {wasAdded ? <Check className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
       )}
     </div>
   );
