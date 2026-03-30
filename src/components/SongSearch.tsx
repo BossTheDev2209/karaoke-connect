@@ -266,7 +266,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                   )}
 
                   {/* Content */}
-                  <ScrollArea className="flex-1">
+                  <ScrollArea className="flex-1 min-h-0">
                     <div className="p-4">
                       {isArtistLoading ? (
                         <div className="flex items-center justify-center py-12">
