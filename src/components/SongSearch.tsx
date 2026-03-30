@@ -389,9 +389,9 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="fixed inset-x-0 bottom-0 top-16 z-[91] flex flex-col sm:inset-x-0 sm:top-auto sm:bottom-4 sm:mx-auto sm:w-full sm:max-w-2xl sm:max-h-[80vh] sm:rounded-2xl"
+                className="fixed inset-x-0 bottom-0 top-16 z-[91] flex flex-col sm:inset-0 sm:items-center sm:justify-center sm:p-4"
               >
-                <div className="flex flex-col h-full bg-card/95 backdrop-blur-xl border-t sm:border border-border sm:rounded-2xl shadow-2xl overflow-hidden">
+                <div className="flex h-full flex-col overflow-hidden bg-card/95 backdrop-blur-xl border-t border-border shadow-2xl sm:h-auto sm:w-full sm:max-w-2xl sm:max-h-[80vh] sm:rounded-2xl sm:border">
                   <div className="p-3 flex justify-between items-center border-b border-border shrink-0">
                     <span className="text-sm text-muted-foreground font-medium">
                       {results.length} songs found
@@ -407,7 +407,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                   </div>
 
                   <ScrollArea className="flex-1">
-                    <div className="p-2 sm:p-1.5 space-y-0.5">
+                    <div className="space-y-1 p-2 pr-4 sm:p-2 sm:pr-5">
                       {results.map((result) => {
                         const wasAdded = recentlyAdded.has(result.videoId);
                         return (
@@ -417,8 +417,8 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                             disabled={wasAdded}
                             onClick={() => handleAddSong(result)}
                             className={cn(
-                              'flex items-center gap-3 rounded-xl transition-all w-full text-left',
-                              'p-2.5 min-h-[60px]',
+                              'flex w-full items-center gap-3 rounded-xl text-left transition-all',
+                              'min-h-[60px] p-3 pr-4',
                               wasAdded
                                 ? 'bg-neon-green/10 border border-neon-green/20'
                                 : 'hover:bg-muted/40 border border-transparent active:bg-muted/60'
@@ -429,7 +429,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                               alt={result.title}
                               className="w-16 h-12 object-cover rounded-lg shrink-0"
                             />
-                            <div className="flex-1 min-w-0">
+                            <div className="flex-1 min-w-0 pr-1">
                               <p className="text-sm font-medium truncate">{result.title}</p>
                               <div className="flex items-center gap-2 mt-0.5">
                                 <p className="text-xs text-primary truncate font-medium">
@@ -441,10 +441,10 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                               </div>
                             </div>
                             <div className={cn(
-                              "shrink-0 rounded-xl flex items-center justify-center h-11 w-11 transition-all",
+                              'h-11 w-11 shrink-0 flex-none rounded-xl flex items-center justify-center transition-all',
                               wasAdded
-                                ? "text-neon-green"
-                                : "bg-neon-green/90 text-black shadow-sm shadow-neon-green/20"
+                                ? 'text-neon-green'
+                                : 'bg-neon-green/90 text-black shadow-sm shadow-neon-green/20'
                             )}>
                               {wasAdded ? <Check className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
                             </div>
