@@ -389,7 +389,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="fixed inset-x-0 bottom-0 top-16 z-[91] flex flex-col sm:inset-auto sm:top-auto sm:left-1/2 sm:-translate-x-1/2 sm:bottom-4 sm:w-full sm:max-w-2xl sm:max-h-[80vh] sm:rounded-2xl"
+                className="fixed inset-x-0 bottom-0 top-16 z-[91] flex flex-col sm:inset-x-0 sm:top-auto sm:bottom-4 sm:mx-auto sm:w-full sm:max-w-2xl sm:max-h-[80vh] sm:rounded-2xl"
               >
                 <div className="flex flex-col h-full bg-card/95 backdrop-blur-xl border-t sm:border border-border sm:rounded-2xl shadow-2xl overflow-hidden">
                   <div className="p-3 flex justify-between items-center border-b border-border shrink-0">
@@ -407,7 +407,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                   </div>
 
                   <ScrollArea className="flex-1">
-                    <div className="p-1.5 space-y-0.5">
+                    <div className="p-2 sm:p-1.5 space-y-0.5">
                       {results.map((result) => {
                         const wasAdded = recentlyAdded.has(result.videoId);
                         return (
