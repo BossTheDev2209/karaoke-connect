@@ -406,8 +406,8 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                     </Button>
                   </div>
 
-                  <ScrollArea className="flex-1">
-                    <div className="space-y-1 p-2 pr-4 sm:p-2 sm:pr-5">
+                  <ScrollArea className="flex-1 overflow-x-hidden">
+                    <div className="space-y-1 overflow-hidden p-2 pr-3 sm:p-2 sm:pr-4">
                       {results.map((result) => {
                         const wasAdded = recentlyAdded.has(result.videoId);
                         return (
@@ -417,8 +417,8 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                             disabled={wasAdded}
                             onClick={() => handleAddSong(result)}
                             className={cn(
-                              'flex w-full items-center gap-3 rounded-xl text-left transition-all',
-                              'min-h-[60px] p-3 pr-4',
+                              'grid w-full max-w-full grid-cols-[64px,minmax(0,1fr),44px] items-center gap-3 overflow-hidden rounded-xl text-left transition-all',
+                              'min-h-[60px] p-3',
                               wasAdded
                                 ? 'bg-neon-green/10 border border-neon-green/20'
                                 : 'hover:bg-muted/40 border border-transparent active:bg-muted/60'
@@ -429,7 +429,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                               alt={result.title}
                               className="w-16 h-12 object-cover rounded-lg shrink-0"
                             />
-                            <div className="flex-1 min-w-0 pr-1">
+                            <div className="min-w-0 overflow-hidden pr-1">
                               <p className="text-sm font-medium truncate">{result.title}</p>
                               <div className="flex items-center gap-2 mt-0.5">
                                 <p className="text-xs text-primary truncate font-medium">
@@ -441,7 +441,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                               </div>
                             </div>
                             <div className={cn(
-                              'h-11 w-11 shrink-0 flex-none rounded-xl flex items-center justify-center transition-all',
+                              'h-11 w-11 justify-self-end rounded-xl flex items-center justify-center transition-all',
                               wasAdded
                                 ? 'text-neon-green'
                                 : 'bg-neon-green/90 text-black shadow-sm shadow-neon-green/20'
