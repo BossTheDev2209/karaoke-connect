@@ -314,12 +314,17 @@ export default function Room() {
   const { getStatusForSong, getLyricsForSong } = useLyricsPreload(queue, currentSongIndex);
   const preloadedLyrics = currentSong ? getLyricsForSong(currentSong.id) : undefined;
 
+  // Unified time source: sync-authoritative when playing, raw player time otherwise
   const syncedCurrentTime = useMemo(() => {
     if (syncV2?.isTimeCalibrated && playbackState.status === 'playing') {
       return syncV2.getTargetTime();
     }
+    // For paused/idle, use seekOffset (authoritative pause position) or raw player time
+    if (playbackState.status === 'paused' && playbackState.seekOffset != null) {
+      return playbackState.seekOffset;
+    }
     return currentTime;
-  }, [syncV2, playbackState.status, currentTime]);
+  }, [syncV2, playbackState.status, playbackState.seekOffset, currentTime]);
 
   const { 
     lyrics, currentLineIndex, isLoading: lyricsLoading, error: lyricsError, 
@@ -468,7 +473,7 @@ export default function Room() {
           eqSettings={eqSettings}
           onEqChange={handleEqChange}
           playerHost={playerHost}
-          currentTime={currentTime}
+          currentTime={syncedCurrentTime}
           duration={duration}
           
           lyricsProps={{
@@ -540,7 +545,8 @@ export default function Room() {
     id: u.id, nickname: u.nickname, isReady: !!syncV2.playerReadyStates[u.id],
   }));
   const showNoSong = !currentSong;
-  const showRecommendations = !isPlaying && !playerError && queue.length <= 1 && recommendations.length > 0;
+    // Only show recommendations when truly idle at end of queue (not during pauses or transitions)
+    const showRecommendations = playbackState.status === 'idle' && !playerError && queue.length <= 1 && recommendations.length > 0;
   const showPlayerError = !!playerError && !!currentSong;
   const showLyrics = !(hideLyricsWhenNotFound && (lyricsError || lyrics.length === 0));
 
@@ -574,7 +580,7 @@ export default function Room() {
 
   const controlsProps = {
     remoteControlProps: {
-      isPlaying: playbackState.status === 'playing', isMuted: controlMuted, volume, currentTime, duration, isMicEnabled,
+      isPlaying: playbackState.status === 'playing', isMuted: controlMuted, volume, currentTime: syncedCurrentTime, duration, isMicEnabled,
       canGoPrevious: currentSongIndex > 0,
       canGoNext: currentSongIndex < queue.length - 1,
       onPlayPause: handlePlayPause, onNext: handleNext, onPrevious: handlePrevious,

@@ -27,7 +27,8 @@ export function useRecommendations({
     // Reset recommendations when song changes
     setRecommendations([]);
 
-    // Fetch if there's a current song and queue is ending (last song or empty)
+    // Only fetch if there's a current song and it's the last song in queue
+    // Don't fetch during active playback - wait until queue is truly ending
     if (!currentSong || queue.length > 1) {
       return;
     }

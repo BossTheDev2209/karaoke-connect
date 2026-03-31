@@ -7,6 +7,7 @@ interface UsePlaybackControlsProps {
     resume: () => void;
     seek: (time: number) => void;
     prepareSong: (index: number) => void;
+    playbackState?: { status: string };
   };
   play: () => void;
   pause: () => void;
@@ -38,7 +39,9 @@ export function usePlaybackControls({
 
   const handlePlayPause = useCallback(() => {
     if (canControl) {
-      if (isPlaying) {
+      // Use sync-authoritative state for play/pause decisions
+      const syncPlaying = syncV2.playbackState?.status === 'playing';
+      if (syncPlaying) {
         syncV2.pause();
       } else {
         syncV2.resume();
