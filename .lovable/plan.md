@@ -1,77 +1,96 @@
 
+Goal: fix the room so the DJ panel becomes authoritative again, lyrics stay aligned, queue advancement works, and no recommendations leak through the player end-state — without changing the karaoke-room concept or layout architecture.
 
-# Fix: DJ Control State + Ready Check + YouTube Controls
+What I confirmed from the code + logs
 
-## Root Causes
+1. Real bug: duplicated SyncV2 broadcast handlers
+- File: `src/hooks/useSyncV2.ts`
+- Cause: the `room_event` listener is added inside an effect, but cleanup only flips `__syncV2Registered = false`; it does not actually remove the old handler.
+- Result: every re-run stacks another listener, which matches the console evidence showing many repeated `prepare_song` and `start_song` events for one action.
 
-### 1. DJ Control panel state not updating
-The DJ Control (RemoteControl) shows `isPlaying` from the YouTube player hook, which only updates via `onStateChange` events from the YouTube iframe. When the player isn't safe/attached, or during the scheduled delay in SyncV2's `resume()` (1s delay), the UI appears frozen.
+2. Real bug: host controls depend too much on self-broadcast
+- File: `src/hooks/useSyncV2.ts`
+- Cause: `prepareSong()` updates state and broadcasts, but does not locally `onCueVideo()` for the host; `pause()` broadcasts but does not locally `onPauseRequired()`.
+- Result: host/DJ actions can look “dead” or lag badly if the self-broadcast path is delayed or duplicated. This directly explains “can’t stop video”, “can’t skip”, and inconsistent timeline behavior.
 
-**Additionally**: The RemoteControl's progress slider is disabled for non-host (`disabled={!isHost}`), but the `isHost` prop is actually `canControl` (Room.tsx line 583). For the host, seeking goes through `onHostSeek` which maps to `handleSeek` → `syncV2.seek()`. This should work. The issue is more likely that the slider's `onValueCommit` is used instead of `onValueChange` — meaning seeks only fire on pointer-up, but the visual feedback during drag uses local `seekValue` state that resets.
+3. Real bug: UI time sources are split
+- Files: `src/pages/Room.tsx`, `src/components/RemoteControl.tsx`, `src/components/MobileRoomLayout.tsx`
+- Cause: the room uses sync-authoritative playback state for some UI, but still passes raw player `currentTime` into controls/layout. Lyrics highlight uses sync time, while parts of the panel and stage still depend on player time.
+- Result: the slider, visible playback state, and lyrics can drift apart when sync state and actual player state temporarily diverge.
 
-**Volume not working**: `handleVolumeChange` calls `setPlayerVolume` which calls `withSafePlayer(player.setVolume)`. If player isn't safe at that moment, it silently fails. No visual feedback of failure.
+4. Real bug: recommendations are shown too eagerly
+- Files: `src/pages/Room.tsx`, `src/hooks/useRecommendations.ts`, `src/components/room/RoomStage.tsx`
+- Cause: the overlay condition is basically “not playing + last song + recommendations exist”, which can trigger after pauses/end transitions. Recommendation fetching is also not tightly tied to a true “queue exhausted and settled” state.
+- Result: recommendation UI can appear at the wrong time and compete with the karaoke stage.
 
-**Fix**: 
-- Add `isMuted` toggle to `usePlaybackControls` so volume/mute state is managed alongside volume value
-- Ensure the play/pause button shows the SyncV2 playback status (not just YouTube player state) for immediate visual feedback
-- Pass `playbackState.status` to RemoteControl so it can show the sync-authoritative playing state
+5. Real bug: YouTube end-screen is still reachable
+- Files: `src/hooks/useYouTubePlayer.ts`, `src/pages/Room.tsx`
+- Cause: hiding controls and blocking pointer events does not suppress YouTube’s visual end-screen. If the video reaches true `ENDED` without immediately transitioning to the next controlled state, the iframe can still render native recommendations.
+- Result: users still see recommendations after the song ends.
 
-### 2. "Waiting for players" showing with 1 user
-`showReadyCheck` (Room.tsx line 538) shows whenever `playbackState.status === 'preparing' || 'ready'`. With only 1 user (the host), the ready check is unnecessary — the host should auto-start.
+What is likely not the main issue
+- The persistent single player host pattern is present; this does not look like a “multiple players” regression.
+- Lyrics fetching itself is not broken; network logs show `fetch-lyrics` succeeds.
+- Server-time calibration is working; the main problem is event/control state integrity, not missing clock sync.
 
-**Fix**: Change `showReadyCheck` to require `users.length > 1`. When only 1 user, auto-force-start after a brief delay (or skip ready check entirely in `prepareSong`).
+Minimal implementation plan
 
-### 3. YouTube buttons visible
-The player already has `controls: 0` in playerVars (line 284), which hides the standard control bar. But YouTube still shows:
-- The title/info overlay at top
-- The "Watch on YouTube" link at bottom  
-- The play button overlay in center
+1. Fix SyncV2 listener lifecycle first
+- In `src/hooks/useSyncV2.ts`, replace the current registration guard approach with a stable subscription pattern that does not stack handlers across re-renders.
+- Ensure cleanup removes the exact listener behavior instead of only resetting a flag.
+- Keep this localized to SyncV2 event wiring.
 
-**Fix**: Add CSS to hide all YouTube iframe overlays. Use `pointer-events: none` on the iframe with a transparent overlay div to intercept clicks, plus CSS to hide YouTube's branding elements via the `.ytp-` class selectors (limited by cross-origin, so we use the overlay approach).
+2. Make host playback actions local-first, then broadcast
+- In `src/hooks/useSyncV2.ts`:
+  - `prepareSong()` should immediately cue the selected video locally for the host before/alongside broadcast.
+  - `pause()` should immediately pause locally before/alongside broadcast.
+  - keep `seek()` local-immediate as it already is.
+  - verify `resume()` and `startSongInternal()` stay schedule-based, but only once.
+- This should make DJ control panel actions visibly work even before remote echo arrives.
 
-## Files to Change
+3. Unify the room UI around sync-authoritative playback state
+- In `src/pages/Room.tsx`, derive a single display time for controls/lyrics from SyncV2 when status is `playing`, with safe fallback to raw player time when idle/paused.
+- Pass that unified time into:
+  - `RemoteControl`
+  - `MobileRoomLayout`
+  - `LyricsDisplay`
+- Keep the player hook for actual media operations, but stop mixing different time sources in the visible control UI.
 
-| File | Change |
-|------|--------|
-| `src/pages/Room.tsx` | Pass sync-authoritative `isPlaying` to RemoteControl; skip ready check for solo user |
-| `src/components/room/RoomStage.tsx` | Skip ready check overlay for single user; add YouTube overlay blocker |
-| `src/components/RemoteControl.tsx` | Use sync-authoritative playing state for play/pause button visual |
-| `src/components/MobileRoomLayout.tsx` | Add YouTube overlay blocker CSS; use actual `isPlaying` for button state |
-| `src/hooks/usePlaybackControls.ts` | Add mute state management |
-| `src/index.css` | Add global CSS to hide YouTube iframe overlays |
+4. Tighten next-song and end-of-song behavior
+- In `src/pages/Room.tsx` and `src/hooks/useSyncV2.ts`:
+  - harden `handleVideoEnded()` so host transitions exactly once.
+  - ensure next-song actions (`Next`, auto-advance, queue selection) always call the same prepare/start path.
+  - when queue is exhausted, move the player out of the true YouTube `ENDED` presentation state quickly so native end recommendations do not remain visible.
+- This is the lowest-risk place to suppress the end-screen without redesigning the player.
 
-## Detailed Changes
+5. Restrict recommendation UI to true idle/queue-end states
+- In `src/hooks/useRecommendations.ts` and `src/pages/Room.tsx`:
+  - only fetch/show recommendations when the room is actually settled at the end of the queue, not merely “not playing”.
+  - prevent recommendations from appearing during pauses, ready-check, or transient state changes.
+- Keep the feature, but stop it from hijacking the main karaoke stage.
 
-### 1. Skip ready check for solo user
-In `Room.tsx`, change:
-```ts
-const showReadyCheck = playbackState.status === 'preparing' || playbackState.status === 'ready';
-```
-to:
-```ts
-const showReadyCheck = (playbackState.status === 'preparing' || playbackState.status === 'ready') && users.length > 1;
-```
+6. Small control-panel polish tied to correctness
+- In `src/hooks/usePlaybackControls.ts`, keep local volume/mute state, but align the visible play/pause/seek response with sync-authoritative state.
+- In `src/components/RemoteControl.tsx` and `src/components/MobileRoomLayout.tsx`, make the slider/playback visuals follow the unified time/status source so the panel feels responsive and trustworthy.
 
-### 2. Auto-start for solo host in SyncV2
-In `useSyncV2.ts`, in `prepareSong`, if only 1 user detected, skip ready check and call `forceStart()` immediately.
+Files I would change
+- `src/hooks/useSyncV2.ts`
+- `src/pages/Room.tsx`
+- `src/hooks/usePlaybackControls.ts`
+- `src/hooks/useRecommendations.ts`
+- `src/hooks/useYouTubePlayer.ts`
+- `src/components/RemoteControl.tsx`
+- `src/components/MobileRoomLayout.tsx`
+- `src/components/room/RoomStage.tsx` (only if the recommendation/end-state overlay condition needs a small presentation tweak)
 
-### 3. YouTube overlay blocker
-In `index.css`, add CSS to suppress YouTube overlays:
-```css
-#youtube-player iframe {
-  pointer-events: none;
-}
-```
-Then wrap `playerHost` in both RoomStage and MobileRoomLayout with a transparent overlay div that captures clicks but prevents interaction with YouTube's built-in UI.
+Expected outcome
+- Play/pause works from DJ controls
+- Volume/timeline controls visually track the real room state again
+- Next song and queue selection reliably prepare/play the new track
+- Lyrics stay aligned with the same playback timeline the room uses
+- Duplicate SyncV2 reactions stop
+- Recommendation overlays no longer appear at the wrong time
+- Native YouTube end recommendations no longer leak through normal room playback flow
 
-### 4. Fix play/pause visual feedback
-The RemoteControl already receives `isPlaying` from the YouTube hook. The issue is the 1-second delay in SyncV2's `resume()`. Add optimistic UI: when user clicks play/pause, immediately toggle the visual state.
-
-### 5. Volume feedback
-Add a local `isMuted` state to `usePlaybackControls` and ensure mute/unmute calls go through the hook for consistent state.
-
-## Risk Assessment
-- **Low risk**: CSS overlay, solo-user ready check skip, visual state fixes
-- **Medium risk**: Modifying SyncV2 auto-start for solo users (but it's a simple conditional)
-- No sync protocol changes, no architectural changes
-
+Remaining risk after this pass
+- If YouTube embed behavior still shows a brief end-state flash on some videos/devices, a Phase 2 follow-up may be needed to further neutralize end-screen presentation. But the highest-value, code-confirmed regressions are the duplicated SyncV2 handlers and self-broadcast-dependent host controls.
