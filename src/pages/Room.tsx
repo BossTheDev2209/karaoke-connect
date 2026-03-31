@@ -314,12 +314,17 @@ export default function Room() {
   const { getStatusForSong, getLyricsForSong } = useLyricsPreload(queue, currentSongIndex);
   const preloadedLyrics = currentSong ? getLyricsForSong(currentSong.id) : undefined;
 
+  // Unified time source: sync-authoritative when playing, raw player time otherwise
   const syncedCurrentTime = useMemo(() => {
     if (syncV2?.isTimeCalibrated && playbackState.status === 'playing') {
       return syncV2.getTargetTime();
     }
+    // For paused/idle, use seekOffset (authoritative pause position) or raw player time
+    if (playbackState.status === 'paused' && playbackState.seekOffset != null) {
+      return playbackState.seekOffset;
+    }
     return currentTime;
-  }, [syncV2, playbackState.status, currentTime]);
+  }, [syncV2, playbackState.status, playbackState.seekOffset, currentTime]);
 
   const { 
     lyrics, currentLineIndex, isLoading: lyricsLoading, error: lyricsError, 
