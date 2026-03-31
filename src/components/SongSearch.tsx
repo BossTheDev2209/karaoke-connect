@@ -406,7 +406,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                     </Button>
                   </div>
 
-                  <ScrollArea className="flex-1 overflow-x-hidden">
+                  <ScrollArea className="flex-1 min-h-0 overflow-x-hidden">
                     <div className="space-y-1 overflow-hidden p-2 pr-3 sm:p-2 sm:pr-4">
                       {results.map((result) => {
                         const wasAdded = recentlyAdded.has(result.videoId);
