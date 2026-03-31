@@ -521,6 +521,19 @@
     animation: screen-shake 0.3s linear;
   }
 
+  /* YouTube iframe overlay blocker - prevent all native YouTube UI interactions */
+  #youtube-player iframe {
+    pointer-events: none !important;
+  }
+
+  .youtube-overlay-blocker {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: auto;
+    cursor: default;
+  }
+
   /* Main singer scale effect */
   .main-singer-spotlight {
     animation: main-singer-glow 1.5s ease-in-out infinite alternate;

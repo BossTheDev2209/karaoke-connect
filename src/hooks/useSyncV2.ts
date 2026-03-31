@@ -251,6 +251,16 @@ export function useSyncV2({
       console.log('[SyncV2] Ready check timeout - force starting');
       forceStart();
     }, READY_CHECK_TIMEOUT_MS);
+
+    // Solo user: skip ready check entirely
+    // We check after a brief delay to allow channel presence to settle
+    setTimeout(() => {
+      // If still in preparing state and only host present, auto-start
+      if (playbackRef.current.status === 'preparing') {
+        console.log('[SyncV2] Solo user detected, auto-starting');
+        forceStart();
+      }
+    }, 500);
   }, [channel, userId, queue]);
 
   /**

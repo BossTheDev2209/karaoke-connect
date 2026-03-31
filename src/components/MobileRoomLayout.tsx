@@ -255,7 +255,7 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
                 )}
                 onClick={onPlayPause}
               >
-                {playbackState.isPlaying ? (
+              {playbackState.status === 'playing' ? (
                   <Pause className={cn('fill-current', isLandscape ? 'w-6 h-6' : 'w-8 h-8')} />
                 ) : (
                   <Play className={cn('fill-current ml-0.5', isLandscape ? 'w-6 h-6' : 'w-8 h-8')} />
