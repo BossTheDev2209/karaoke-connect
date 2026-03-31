@@ -278,8 +278,8 @@ export default function Room() {
 
   // --- Playback Controls hook ---
   const {
-    volume, handlePlayPause, handleSeek, handleForceSync,
-    handleNext, handlePrevious, handleVolumeChange,
+    volume, isMuted: controlMuted, handlePlayPause, handleSeek, handleForceSync,
+    handleNext, handlePrevious, handleVolumeChange, handleMuteToggle,
   } = usePlaybackControls({
     canControl, syncV2, play, pause, seekTo, getPlayerTime,
     setPlayerVolume, isHost, isPlaying,
