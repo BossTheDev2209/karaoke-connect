@@ -7,6 +7,7 @@ interface UsePlaybackControlsProps {
     resume: () => void;
     seek: (time: number) => void;
     prepareSong: (index: number) => void;
+    playbackState?: { status: string };
   };
   play: () => void;
   pause: () => void;
