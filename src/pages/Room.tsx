@@ -535,7 +535,7 @@ export default function Room() {
     },
   };
 
-  const showReadyCheck = playbackState.status === 'preparing' || playbackState.status === 'ready';
+  const showReadyCheck = (playbackState.status === 'preparing' || playbackState.status === 'ready') && users.length > 1;
   const readyCheckUsers = users.map(u => ({
     id: u.id, nickname: u.nickname, isReady: !!syncV2.playerReadyStates[u.id],
   }));
