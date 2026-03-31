@@ -33,6 +33,8 @@ export function usePlaybackControls({
   queueLength,
 }: UsePlaybackControlsProps) {
   const [volume, setVolume] = useState(80);
+  const [isMuted, setIsMuted] = useState(false);
+  const prevVolumeRef = useRef(80);
 
   const handlePlayPause = useCallback(() => {
     if (canControl) {
