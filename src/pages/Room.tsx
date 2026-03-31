@@ -545,7 +545,8 @@ export default function Room() {
     id: u.id, nickname: u.nickname, isReady: !!syncV2.playerReadyStates[u.id],
   }));
   const showNoSong = !currentSong;
-  const showRecommendations = !isPlaying && !playerError && queue.length <= 1 && recommendations.length > 0;
+    // Only show recommendations when truly idle at end of queue (not during pauses or transitions)
+    const showRecommendations = playbackState.status === 'idle' && !playerError && queue.length <= 1 && recommendations.length > 0;
   const showPlayerError = !!playerError && !!currentSong;
   const showLyrics = !(hideLyricsWhenNotFound && (lyricsError || lyrics.length === 0));
 
