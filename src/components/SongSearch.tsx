@@ -391,7 +391,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                 className="fixed inset-x-0 bottom-0 top-16 z-[91] flex flex-col sm:inset-0 sm:items-center sm:justify-center sm:p-4"
               >
-                <div className="flex h-full flex-col overflow-hidden bg-card/95 backdrop-blur-xl border-t border-border shadow-2xl sm:h-auto sm:w-full sm:max-w-2xl sm:max-h-[80vh] sm:rounded-2xl sm:border">
+                <div className="flex h-full max-h-[100dvh] flex-col overflow-hidden bg-card/95 backdrop-blur-xl border-t border-border shadow-2xl sm:h-auto sm:w-full sm:max-w-2xl sm:max-h-[80vh] sm:rounded-2xl sm:border">
                   <div className="p-3 flex justify-between items-center border-b border-border shrink-0">
                     <span className="text-sm text-muted-foreground font-medium">
                       {results.length} songs found
