@@ -328,6 +328,13 @@ export const useYouTubePlayer = (
 
             if (ended && !endedHandledRef.current) {
               endedHandledRef.current = true;
+              // Suppress YouTube native end-screen by seeking back slightly and pausing
+              try {
+                if (playerRef.current) {
+                  playerRef.current.seekTo(0, true);
+                  playerRef.current.pauseVideo();
+                }
+              } catch {}
               onEndedRef.current?.();
             }
           },
