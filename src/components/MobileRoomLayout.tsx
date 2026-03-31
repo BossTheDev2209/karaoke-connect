@@ -199,6 +199,7 @@ export const MobileRoomLayout: React.FC<MobileRoomLayoutProps> = ({
         )}
       >
         {playerHost}
+        <div className="youtube-overlay-blocker" />
       </div>
 
       <div className="flex-1 overflow-hidden relative min-h-0">
