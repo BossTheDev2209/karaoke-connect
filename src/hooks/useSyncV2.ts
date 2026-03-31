@@ -13,6 +13,7 @@ import { useServerTime } from './useServerTime';
  * 3. startAtRoomTime: Stores WHEN song started, not current position
  * 4. Web Worker for background-safe drift correction (not throttled in background tabs)
  * 5. Single source of truth - no legacy sync conflicts
+ * 6. Host actions are LOCAL-FIRST then broadcast (no self-echo dependency)
  */
 
 // How long to wait for all players to be ready before force-starting
@@ -97,8 +98,14 @@ export function useSyncV2({
   const onSeekRequiredRef = useRef(onSeekRequired);
   const onPlayRequiredRef = useRef(onPlayRequired);
   const onPauseRequiredRef = useRef(onPauseRequired);
+  const onCueVideoRef = useRef(onCueVideo);
+  const getRoomTimeRef = useRef(getRoomTime);
+  const serverTimeOffsetRef = useRef(serverTimeOffset);
   const playerSafeRef = useRef(isPlayerReady);
   const unsafeSyncLoggedRef = useRef(false);
+  
+  // Track which channel instance we've registered on to prevent duplicate handlers
+  const registeredChannelRef = useRef<RealtimeChannel | null>(null);
   
   // Keep callback refs updated
   useEffect(() => {
@@ -106,8 +113,11 @@ export function useSyncV2({
     onSeekRequiredRef.current = onSeekRequired;
     onPlayRequiredRef.current = onPlayRequired;
     onPauseRequiredRef.current = onPauseRequired;
+    onCueVideoRef.current = onCueVideo;
+    getRoomTimeRef.current = getRoomTime;
+    serverTimeOffsetRef.current = serverTimeOffset;
     playerSafeRef.current = isPlayerReady;
-  }, [getCurrentVideoTime, onSeekRequired, onPlayRequired, onPauseRequired, isPlayerReady]);
+  }, [getCurrentVideoTime, onSeekRequired, onPlayRequired, onPauseRequired, onCueVideo, getRoomTime, serverTimeOffset, isPlayerReady]);
 
   /**
    * Initialize Web Worker for background-safe timing
@@ -180,7 +190,6 @@ export function useSyncV2({
 
   /**
    * Calculate the target video time based on room clock.
-   * Internal version that doesn't depend on getRoomTime callback
    */
   const getTargetTimeInternal = useCallback(() => {
     const state = playbackRef.current;
@@ -206,7 +215,7 @@ export function useSyncV2({
 
   /**
    * Host: Prepare a song for synchronized playback.
-   * This triggers the ready check flow.
+   * LOCAL-FIRST: Cues the video locally, then broadcasts to peers.
    */
   const prepareSong = useCallback((songIndex: number) => {
     if (!channel || !isHostRef.current) return;
@@ -229,7 +238,10 @@ export function useSyncV2({
     // Clear ready states
     setPlayerReadyStates({});
     
-    // Broadcast prepare command
+    // LOCAL-FIRST: Cue video locally for the host immediately
+    onCueVideoRef.current(song.videoId);
+    
+    // Broadcast prepare command to peers
     channel.send({
       type: 'broadcast',
       event: 'room_event',
@@ -253,9 +265,7 @@ export function useSyncV2({
     }, READY_CHECK_TIMEOUT_MS);
 
     // Solo user: skip ready check entirely
-    // We check after a brief delay to allow channel presence to settle
     setTimeout(() => {
-      // If still in preparing state and only host present, auto-start
       if (playbackRef.current.status === 'preparing') {
         console.log('[SyncV2] Solo user detected, auto-starting');
         forceStart();
@@ -279,8 +289,8 @@ export function useSyncV2({
       readyCheckTimeoutRef.current = null;
     }
     
-    const roomTime = getRoomTime();
-    const startAtRoomTime = roomTime + delayMs; // Start in delayMs milliseconds
+    const roomTime = getRoomTimeRef.current();
+    const startAtRoomTime = roomTime + delayMs;
     
     console.log(`[SyncV2] Starting song in ${delayMs}ms (roomTime=${roomTime}, startAt=${startAtRoomTime})`);
     
@@ -289,7 +299,7 @@ export function useSyncV2({
       status: 'playing',
       startAtRoomTime,
       seekOffset: 0,
-      isPlaying: true, // Legacy compat
+      isPlaying: true,
       currentTime: 0,
       lastUpdate: Date.now(),
     };
@@ -311,12 +321,12 @@ export function useSyncV2({
       },
     });
     
-    // Host also schedules own playback
+    // Host schedules own playback locally
     setTimeout(() => {
-      onSeekRequired(0);
-      onPlayRequired();
+      onSeekRequiredRef.current(0);
+      onPlayRequiredRef.current();
     }, delayMs);
-  }, [channel, getRoomTime, onSeekRequired, onPlayRequired]);
+  }, [channel]);
 
   /**
    * Force start (skip ready check).
@@ -327,11 +337,12 @@ export function useSyncV2({
 
   /**
    * Pause playback.
+   * LOCAL-FIRST: Pauses locally then broadcasts.
    */
   const pause = useCallback(() => {
     if (!channel) return;
     
-    const currentTime = getCurrentVideoTime();
+    const currentTime = getCurrentVideoTimeRef.current();
     console.log(`[SyncV2] Pausing at ${currentTime}s`);
     
     const newState: PlaybackState = {
@@ -347,6 +358,10 @@ export function useSyncV2({
     setPlaybackState(newState);
     playbackRef.current = newState;
     
+    // LOCAL-FIRST: Pause the player immediately
+    onPauseRequiredRef.current();
+    
+    // Then broadcast to peers
     channel.send({
       type: 'broadcast',
       event: 'room_event',
@@ -357,17 +372,18 @@ export function useSyncV2({
         },
       },
     });
-  }, [channel, getCurrentVideoTime]);
+  }, [channel]);
 
   /**
    * Resume playback from paused state.
+   * LOCAL-FIRST: Schedules local playback then broadcasts.
    */
   const resume = useCallback(() => {
     if (!channel) return;
     
     const state = playbackRef.current;
-    const roomTime = getRoomTime();
-    const delayMs = 1000; // 1 second to sync
+    const roomTime = getRoomTimeRef.current();
+    const delayMs = 1000;
     const startAtRoomTime = roomTime + delayMs;
     
     console.log(`[SyncV2] Resuming from ${state.seekOffset}s in ${delayMs}ms`);
@@ -383,6 +399,7 @@ export function useSyncV2({
     setPlaybackState(newState);
     playbackRef.current = newState;
     
+    // Broadcast to peers
     channel.send({
       type: 'broadcast',
       event: 'room_event',
@@ -395,25 +412,25 @@ export function useSyncV2({
       },
     });
     
-    // Host also schedules own playback
+    // Host schedules own playback locally
     setTimeout(() => {
-      onSeekRequired(state.seekOffset);
-      onPlayRequired();
+      onSeekRequiredRef.current(state.seekOffset);
+      onPlayRequiredRef.current();
     }, delayMs);
-  }, [channel, getRoomTime, onSeekRequired, onPlayRequired]);
+  }, [channel]);
 
   /**
    * Seek to specific time.
+   * LOCAL-FIRST: Seeks locally then broadcasts.
    */
   const seek = useCallback((time: number) => {
     if (!channel) return;
     
     const state = playbackRef.current;
-    const roomTime = getRoomTime();
+    const roomTime = getRoomTimeRef.current();
     
     console.log(`[SyncV2] Seeking to ${time}s`);
     
-    // Calculate new startAtRoomTime so that getTargetTime() returns `time`
     const newState: PlaybackState = {
       ...state,
       seekOffset: time,
@@ -425,6 +442,10 @@ export function useSyncV2({
     setPlaybackState(newState);
     playbackRef.current = newState;
     
+    // LOCAL-FIRST: Seek immediately
+    onSeekRequiredRef.current(time);
+    
+    // Broadcast to peers
     channel.send({
       type: 'broadcast',
       event: 'room_event',
@@ -437,10 +458,7 @@ export function useSyncV2({
         },
       },
     });
-    
-    // Apply locally immediately
-    onSeekRequired(time);
-  }, [channel, getRoomTime, onSeekRequired]);
+  }, [channel]);
 
   /**
    * End current song.
@@ -457,6 +475,9 @@ export function useSyncV2({
     
     setPlaybackState(newState);
     playbackRef.current = newState;
+    
+    // LOCAL-FIRST: Stop playback
+    onPauseRequiredRef.current();
     
     channel.send({
       type: 'broadcast',
@@ -482,16 +503,14 @@ export function useSyncV2({
         payload: {
           userId,
           isBuffering,
-          timestamp: getRoomTime(),
+          timestamp: getRoomTimeRef.current(),
         },
       },
     });
-  }, [channel, userId, getRoomTime]);
+  }, [channel, userId]);
 
   /**
    * Apply full sync playback state from useRoom after validation.
-   * This is the ONLY path for full_sync_response playback hydration.
-   * useRoom validates requestId/dedup before calling this.
    */
   const applyFullSyncPlayback = useCallback((incomingState: PlaybackState) => {
     console.log('[SyncV2] applyFullSyncPlayback', { status: incomingState.status, isPlaying: incomingState.isPlaying, videoId: incomingState.videoId, startAtRoomTime: incomingState.startAtRoomTime, seekOffset: incomingState.seekOffset });
@@ -503,7 +522,7 @@ export function useSyncV2({
       
       if (incomingState.videoId && playerSafeRef.current) {
         console.log(`[SyncV2] Hydrating preparing/ready phase, cueing video: ${incomingState.videoId}`);
-        onCueVideo(incomingState.videoId);
+        onCueVideoRef.current(incomingState.videoId);
       }
       return;
     }
@@ -517,41 +536,45 @@ export function useSyncV2({
       playbackRef.current = newState;
       
       if (incomingState.isPlaying && incomingState.startAtRoomTime && playerSafeRef.current) {
-        const roomTime = getRoomTime();
+        const roomTime = getRoomTimeRef.current();
         const elapsed = (roomTime - incomingState.startAtRoomTime) / 1000;
         const targetTime = Math.max(0, elapsed + (incomingState.seekOffset || 0));
         
         console.log(`[SyncV2] New joiner syncing to ${targetTime.toFixed(2)}s (elapsed=${elapsed.toFixed(2)}s)`);
         
         if (incomingState.videoId) {
-          onCueVideo(incomingState.videoId);
+          onCueVideoRef.current(incomingState.videoId);
         }
         
         setTimeout(() => {
           if (!playerSafeRef.current) return;
-          onSeekRequired(targetTime);
-          onPlayRequired();
+          onSeekRequiredRef.current(targetTime);
+          onPlayRequiredRef.current();
         }, 500);
       }
     }
-  }, [getRoomTime, onCueVideo, onSeekRequired, onPlayRequired]);
+  }, []);
 
-  // Handle incoming sync events (all EXCEPT full_sync_response, which goes through applyFullSyncPlayback)
+  /**
+   * Handle incoming sync events from peers.
+   * CRITICAL: Only register ONCE per channel instance to prevent duplicate handlers.
+   * All callback access is via refs to avoid stale closures.
+   */
   useEffect(() => {
     if (!channel) return;
     
-    // Guard against duplicate handler registrations
-    if ((channel as any).__syncV2Registered) return;
-    (channel as any).__syncV2Registered = true;
+    // Prevent duplicate registration on the same channel instance
+    if (registeredChannelRef.current === channel) return;
+    registeredChannelRef.current = channel;
     
     const handleSyncEvent = ({ payload }: { payload: any }) => {
       const data = payload;
       
       switch (data.type) {
-        // full_sync_response is NOT handled here — it goes through useRoom validation
-        // then useRoom calls applyFullSyncPlayback after gating.
-        
         case 'prepare_song': {
+          // Host already handled this locally in prepareSong()
+          if (isHostRef.current) break;
+          
           const { videoId, songIndex } = data.payload;
           console.log('[SyncV2] Received prepare_song:', videoId);
           
@@ -562,7 +585,7 @@ export function useSyncV2({
             currentSongIndex: songIndex,
           }));
           
-          onCueVideo(videoId);
+          onCueVideoRef.current(videoId);
           break;
         }
         
@@ -578,6 +601,9 @@ export function useSyncV2({
         }
         
         case 'start_song': {
+          // Host already scheduled local playback in startSongInternal()
+          if (isHostRef.current) break;
+          
           const { videoId, startAtRoomTime, seekOffset } = data.payload;
           console.log('[SyncV2] Received start_song:', { videoId, startAtRoomTime, seekOffset });
           
@@ -594,14 +620,14 @@ export function useSyncV2({
           setPlaybackState(newState);
           playbackRef.current = newState;
           
-          const roomTime = getRoomTime();
+          const roomTime = getRoomTimeRef.current();
           const delayMs = startAtRoomTime - roomTime;
           
           if (delayMs > 50) {
             console.log(`[SyncV2] Scheduling playback in ${delayMs}ms`);
             setTimeout(() => {
               if (!playerSafeRef.current) return;
-              const targetTime = (Date.now() + serverTimeOffset - startAtRoomTime) / 1000 + (seekOffset || 0);
+              const targetTime = (Date.now() + serverTimeOffsetRef.current - startAtRoomTime) / 1000 + (seekOffset || 0);
               onSeekRequiredRef.current(Math.max(0, targetTime));
               onPlayRequiredRef.current();
             }, delayMs);
@@ -616,6 +642,9 @@ export function useSyncV2({
         }
         
         case 'pause_song': {
+          // Host already paused locally in pause()
+          if (isHostRef.current) break;
+          
           const { seekOffset } = data.payload;
           console.log('[SyncV2] Received pause_song at:', seekOffset);
           
@@ -636,6 +665,9 @@ export function useSyncV2({
         }
         
         case 'resume_song': {
+          // Host already scheduled local playback in resume()
+          if (isHostRef.current) break;
+          
           const { startAtRoomTime, seekOffset } = data.payload;
           console.log('[SyncV2] Received resume_song:', { startAtRoomTime, seekOffset });
           
@@ -650,7 +682,7 @@ export function useSyncV2({
           setPlaybackState(newState);
           playbackRef.current = newState;
           
-          const roomTime = getRoomTime();
+          const roomTime = getRoomTimeRef.current();
           const delayMs = startAtRoomTime - roomTime;
           
           if (delayMs > 50) {
@@ -671,6 +703,9 @@ export function useSyncV2({
         }
         
         case 'seek_song': {
+          // Host already seeked locally in seek()
+          if (isHostRef.current) break;
+          
           const { seekOffset, startAtRoomTime } = data.payload;
           console.log('[SyncV2] Received seek_song:', seekOffset);
           
@@ -689,6 +724,9 @@ export function useSyncV2({
         }
         
         case 'end_song': {
+          // Host already handled locally in endSong()
+          if (isHostRef.current) break;
+          
           console.log('[SyncV2] Received end_song');
           setPlaybackState(prev => ({
             ...DEFAULT_PLAYBACK,
@@ -720,10 +758,14 @@ export function useSyncV2({
     
     channel.on('broadcast', { event: 'room_event' }, handleSyncEvent);
     
+    // No cleanup that would allow re-registration — we track by channel identity
     return () => {
-      (channel as any).__syncV2Registered = false;
+      // Only clear the ref if the channel is being replaced
+      if (registeredChannelRef.current === channel) {
+        registeredChannelRef.current = null;
+      }
     };
-  }, [channel, onCueVideo, onPauseRequired, onSeekRequired, onPlayRequired, getRoomTime, serverTimeOffset]);
+  }, [channel]); // ONLY depend on channel — everything else is via refs
 
   // When player becomes ready, broadcast it
   useEffect(() => {
@@ -751,9 +793,6 @@ export function useSyncV2({
       status: 'ready',
     }));
   }, [channel, userId, isPlayerReady]);
-
-  // NOTE: Playback scheduling is now handled directly in event handlers (start_song, resume_song)
-  // This ensures playback starts immediately when events are received, without relying on state changes
 
   return {
     playbackState,

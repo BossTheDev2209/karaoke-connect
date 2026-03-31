@@ -473,7 +473,7 @@ export default function Room() {
           eqSettings={eqSettings}
           onEqChange={handleEqChange}
           playerHost={playerHost}
-          currentTime={currentTime}
+          currentTime={syncedCurrentTime}
           duration={duration}
           
           lyricsProps={{
