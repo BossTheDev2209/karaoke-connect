@@ -580,7 +580,7 @@ export default function Room() {
 
   const controlsProps = {
     remoteControlProps: {
-      isPlaying: playbackState.status === 'playing', isMuted: controlMuted, volume, currentTime, duration, isMicEnabled,
+      isPlaying: playbackState.status === 'playing', isMuted: controlMuted, volume, currentTime: syncedCurrentTime, duration, isMicEnabled,
       canGoPrevious: currentSongIndex > 0,
       canGoNext: currentSongIndex < queue.length - 1,
       onPlayPause: handlePlayPause, onNext: handleNext, onPrevious: handlePrevious,
