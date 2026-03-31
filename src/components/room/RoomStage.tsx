@@ -96,6 +96,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
     <div className="lg:col-span-6 flex flex-col gap-3 min-h-0 order-1 lg:order-2">
       <div className="card-karaoke relative flex-1 min-h-0 overflow-hidden rounded-lg">
         {playerHost}
+        <div className="youtube-overlay-blocker" />
 
         {phaseBadge && (
           <div className="absolute top-2 left-2 z-10">

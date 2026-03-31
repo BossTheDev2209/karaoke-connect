@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 interface UsePlaybackControlsProps {
   canControl: boolean;
@@ -33,6 +33,8 @@ export function usePlaybackControls({
   queueLength,
 }: UsePlaybackControlsProps) {
   const [volume, setVolume] = useState(80);
+  const [isMuted, setIsMuted] = useState(false);
+  const prevVolumeRef = useRef(80);
 
   const handlePlayPause = useCallback(() => {
     if (canControl) {
@@ -86,17 +88,36 @@ export function usePlaybackControls({
     (v: number) => {
       setVolume(v);
       setPlayerVolume(v);
+      if (v > 0) {
+        setIsMuted(false);
+        prevVolumeRef.current = v;
+      }
     },
     [setPlayerVolume]
   );
 
+  const handleMuteToggle = useCallback(() => {
+    if (isMuted) {
+      const restoreVol = prevVolumeRef.current || 80;
+      setVolume(restoreVol);
+      setPlayerVolume(restoreVol);
+      setIsMuted(false);
+    } else {
+      prevVolumeRef.current = volume;
+      setPlayerVolume(0);
+      setIsMuted(true);
+    }
+  }, [isMuted, volume, setPlayerVolume]);
+
   return {
     volume,
+    isMuted,
     handlePlayPause,
     handleSeek,
     handleForceSync,
     handleNext,
     handlePrevious,
     handleVolumeChange,
+    handleMuteToggle,
   };
 }

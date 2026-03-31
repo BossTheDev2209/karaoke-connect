@@ -278,8 +278,8 @@ export default function Room() {
 
   // --- Playback Controls hook ---
   const {
-    volume, handlePlayPause, handleSeek, handleForceSync,
-    handleNext, handlePrevious, handleVolumeChange,
+    volume, isMuted: controlMuted, handlePlayPause, handleSeek, handleForceSync,
+    handleNext, handlePrevious, handleVolumeChange, handleMuteToggle,
   } = usePlaybackControls({
     canControl, syncV2, play, pause, seekTo, getPlayerTime,
     setPlayerVolume, isHost, isPlaying,
@@ -535,7 +535,7 @@ export default function Room() {
     },
   };
 
-  const showReadyCheck = playbackState.status === 'preparing' || playbackState.status === 'ready';
+  const showReadyCheck = (playbackState.status === 'preparing' || playbackState.status === 'ready') && users.length > 1;
   const readyCheckUsers = users.map(u => ({
     id: u.id, nickname: u.nickname, isReady: !!syncV2.playerReadyStates[u.id],
   }));
@@ -574,12 +574,12 @@ export default function Room() {
 
   const controlsProps = {
     remoteControlProps: {
-      isPlaying, isMuted, volume, currentTime, duration, isMicEnabled,
+      isPlaying: playbackState.status === 'playing', isMuted: controlMuted, volume, currentTime, duration, isMicEnabled,
       canGoPrevious: currentSongIndex > 0,
       canGoNext: currentSongIndex < queue.length - 1,
       onPlayPause: handlePlayPause, onNext: handleNext, onPrevious: handlePrevious,
       onSeek: handleSeek, onVolumeChange: handleVolumeChange,
-      onMuteToggle: isMuted ? unmute : mute, onMicToggle: handleMicToggle,
+      onMuteToggle: handleMuteToggle, onMicToggle: handleMicToggle,
       onSync: requestSync, isHost: canControl, users, queue,
       currentSongIndex, roomMode, battleFormat,
       onForceSync: handleForceSync, onSmartPlay: handlePlayPause,
