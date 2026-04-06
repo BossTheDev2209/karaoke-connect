@@ -20,16 +20,10 @@ interface LyricsDisplayProps {
   error: string | null;
   offset?: number;
   onOffsetChange?: (offset: number) => void;
-  onSeek?: (time: number) => void;
   areCaptionsEnabled?: boolean;
   hasCaptionsAvailable?: boolean;
   onEnableCaptions?: () => void;
   onDisableCaptions?: () => void;
-  // Source and multiple matches support
-  source?: string | null;
-  hasMultipleMatches?: boolean;
-  matchCount?: number;
-  onChangeLyrics?: () => void;
 }
 
 // Simulate loading progress
@@ -100,18 +94,13 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   error,
   offset = 0,
   onOffsetChange,
-  onSeek,
   areCaptionsEnabled = false,
   hasCaptionsAvailable = false,
   onEnableCaptions,
   onDisableCaptions,
-  source,
-  hasMultipleMatches = false,
-  matchCount = 0,
-  onChangeLyrics,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const activeLineRef = useRef<HTMLButtonElement>(null);
+  const activeLineRef = useRef<HTMLDivElement>(null);
   const loadingProgress = useLoadingProgress(isLoading);
   const hasPlainLyrics = isPlainLyrics(lyrics);
   const [showRomanization, setShowRomanization] = useState(true);
@@ -225,30 +214,6 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
     <div className="h-full flex flex-col relative overflow-hidden">
       {/* Controls bar */}
       <div className="absolute top-1 right-1 z-10 flex items-center gap-2">
-        {/* Source badge */}
-        {source && (
-          <span 
-            className="h-6 px-2 text-[10px] font-medium rounded-full bg-background/80 backdrop-blur text-muted-foreground border border-white/10 flex items-center"
-            title={`Lyrics from ${source}`}
-          >
-            via {source}
-          </span>
-        )}
-
-        {/* Change lyrics button - show when matches available */}
-        {onChangeLyrics && matchCount > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onChangeLyrics}
-            className="h-6 px-2 text-xs bg-gradient-to-r from-neon-purple/20 to-neon-pink/20 hover:from-neon-purple/30 hover:to-neon-pink/30 border border-neon-purple/30 rounded-lg"
-            title={matchCount > 1 ? `${matchCount} lyrics options available` : "Choose different lyrics"}
-          >
-            <List className="w-3 h-3 mr-1" />
-            {matchCount > 1 ? `${matchCount} Options` : 'Change'}
-          </Button>
-        )}
-
         {/* Romanization toggle for CJK lyrics */}
         {hasCJK && (
           <Button
@@ -367,26 +332,16 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
             const romanization = showRomanization ? getRomanizedText(line.text) : null;
             const isActive = !hasPlainLyrics && index === currentLineIndex;
             const isPast = !hasPlainLyrics && index < currentLineIndex;
-            const isClickable = !hasPlainLyrics && onSeek && line.time !== undefined;
             
             return (
-              <button
+              <div
                 key={index}
-                type="button"
                 ref={index === currentLineIndex ? activeLineRef : null}
                 className={cn(
-                  'lyric-line transition-all duration-300 w-full text-center',
+                  'lyric-line transition-all duration-300',
                   isActive && 'active',
-                  isPast && 'past',
-                  isClickable && 'cursor-pointer hover:bg-primary/10 hover:scale-[1.02] rounded-lg px-2 py-0.5 -mx-2'
+                  isPast && 'past'
                 )}
-                onClick={() => {
-                  if (isClickable) {
-                    onSeek(line.time);
-                  }
-                }}
-                disabled={!isClickable}
-                title={isClickable ? `Jump to ${Math.floor(line.time / 60)}:${String(Math.floor(line.time % 60)).padStart(2, '0')}` : undefined}
               >
                 <div>{line.text}</div>
                 {romanization && (
@@ -397,7 +352,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
                     {romanization}
                   </div>
                 )}
-              </button>
+              </div>
             );
           })}
         </div>

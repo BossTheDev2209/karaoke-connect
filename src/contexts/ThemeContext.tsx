@@ -3,7 +3,6 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 // Theme presets
 export type ThemePreset = 'auto' | 'neon' | 'ocean' | 'sunset' | 'forest' | 'galaxy' | 'retro' | 'midnight' | 'candy' | 'ember';
 export type BackgroundEffect = 'none' | 'beat-sync' | 'particles' | 'neon-grid' | 'wave-form';
-export type AutoSyncMode = 'off' | 'immediate' | 'after-song';
 
 interface ThemeColors {
   primary: string;   // HSL format: "280 100% 65%"
@@ -18,16 +17,6 @@ interface ThemeContextValue {
   setBackgroundEffect: (effect: BackgroundEffect) => void;
   karaokeFilterEnabled: boolean;
   setKaraokeFilterEnabled: (enabled: boolean) => void;
-  privacyMode: boolean;
-  setPrivacyMode: (enabled: boolean) => void;
-  autoSyncOnJoin: AutoSyncMode;
-  setAutoSyncOnJoin: (mode: AutoSyncMode) => void;
-  hideLyricsWhenNotFound: boolean;
-  setHideLyricsWhenNotFound: (hide: boolean) => void;
-  partyMode: boolean;
-  setPartyMode: (enabled: boolean) => void;
-  autoPlayNext: boolean; // Auto start next song in queue
-  setAutoPlayNext: (enabled: boolean) => void;
   setVideoId: (videoId: string | null) => void;
   colors: ThemeColors;
 }
@@ -193,11 +182,6 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [preset, setPresetState] = useState<ThemePreset>('neon');
   const [backgroundEffect, setBackgroundEffectState] = useState<BackgroundEffect>('beat-sync');
   const [karaokeFilterEnabled, setKaraokeFilterEnabledState] = useState<boolean>(true);
-  const [privacyMode, setPrivacyModeState] = useState<boolean>(true); // Default ON for privacy
-  const [autoSyncOnJoin, setAutoSyncOnJoinState] = useState<AutoSyncMode>('off');
-  const [hideLyricsWhenNotFound, setHideLyricsWhenNotFoundState] = useState<boolean>(false);
-  const [partyMode, setPartyModeState] = useState<boolean>(true); // Default ON for fun party experience
-  const [autoPlayNext, setAutoPlayNextState] = useState<boolean>(true); // Default ON
   const [videoId, setVideoId] = useState<string | null>(null);
   const [autoColors, setAutoColors] = useState<ThemeColors | null>(null);
   const extractionRef = useRef<string | null>(null);
@@ -229,41 +213,6 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     } catch {}
   }, []);
 
-  const setPrivacyMode = useCallback((enabled: boolean) => {
-    setPrivacyModeState(enabled);
-    try {
-      localStorage.setItem('karaoke_privacy_mode', enabled ? 'true' : 'false');
-    } catch {}
-  }, []);
-
-  const setAutoSyncOnJoin = useCallback((mode: AutoSyncMode) => {
-    setAutoSyncOnJoinState(mode);
-    try {
-      localStorage.setItem('karaoke_auto_sync_on_join', mode);
-    } catch {}
-  }, []);
-
-  const setHideLyricsWhenNotFound = useCallback((hide: boolean) => {
-    setHideLyricsWhenNotFoundState(hide);
-    try {
-      localStorage.setItem('karaoke_hide_lyrics_missing', hide ? 'true' : 'false');
-    } catch {}
-  }, []);
-
-  const setPartyMode = useCallback((enabled: boolean) => {
-    setPartyModeState(enabled);
-    try {
-      localStorage.setItem('karaoke_party_mode', enabled ? 'true' : 'false');
-    } catch {}
-  }, []);
-
-  const setAutoPlayNext = useCallback((enabled: boolean) => {
-    setAutoPlayNextState(enabled);
-    try {
-      localStorage.setItem('karaoke_auto_play_next', enabled ? 'true' : 'false');
-    } catch {}
-  }, []);
-
   // Load saved preset on mount
   useEffect(() => {
     try {
@@ -280,31 +229,6 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       const savedFilter = localStorage.getItem('karaoke_search_filter');
       if (savedFilter !== null) {
         setKaraokeFilterEnabledState(savedFilter === 'true');
-      }
-
-      const savedPrivacy = localStorage.getItem('karaoke_privacy_mode');
-      if (savedPrivacy !== null) {
-        setPrivacyModeState(savedPrivacy === 'true');
-      }
-
-      const savedAutoSync = localStorage.getItem('karaoke_auto_sync_on_join') as AutoSyncMode | null;
-      if (savedAutoSync && ['off', 'immediate', 'after-song'].includes(savedAutoSync)) {
-        setAutoSyncOnJoinState(savedAutoSync);
-      }
-
-      const savedHideLyrics = localStorage.getItem('karaoke_hide_lyrics_missing');
-      if (savedHideLyrics !== null) {
-        setHideLyricsWhenNotFoundState(savedHideLyrics === 'true');
-      }
-
-      const savedPartyMode = localStorage.getItem('karaoke_party_mode');
-      if (savedPartyMode !== null) {
-        setPartyModeState(savedPartyMode === 'true');
-      }
-
-      const savedAutoPlayNext = localStorage.getItem('karaoke_auto_play_next');
-      if (savedAutoPlayNext !== null) {
-        setAutoPlayNextState(savedAutoPlayNext === 'true');
       }
     } catch {}
   }, []);
@@ -341,16 +265,6 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       setBackgroundEffect, 
       karaokeFilterEnabled,
       setKaraokeFilterEnabled,
-      privacyMode,
-      setPrivacyMode,
-      autoSyncOnJoin,
-      setAutoSyncOnJoin,
-      hideLyricsWhenNotFound,
-      setHideLyricsWhenNotFound,
-      partyMode,
-      setPartyMode,
-      autoPlayNext,
-      setAutoPlayNext,
       setVideoId, 
       colors 
     }}>

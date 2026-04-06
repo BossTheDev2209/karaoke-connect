@@ -16,30 +16,18 @@ interface ReactionBarProps {
   onReact: (emoji: string) => void;
   isWaving: boolean;
   onWaveToggle: () => void;
-  layout?: 'inline' | 'grid';
 }
 
-export const ReactionBar: React.FC<ReactionBarProps> = ({ onReact, isWaving, onWaveToggle, layout = 'inline' }) => {
+export const ReactionBar: React.FC<ReactionBarProps> = ({ onReact, isWaving, onWaveToggle }) => {
   return (
-    <div className={cn(
-      layout === 'grid' ? 'flex flex-col gap-3' : 'flex items-center gap-2'
-    )}>
-      <div className={cn(
-        "glass border border-border/50 rounded-2xl",
-        layout === 'grid' 
-          ? 'grid grid-cols-4 gap-1 p-2' 
-          : 'flex gap-1 p-2 rounded-full'
-      )}>
+    <div className="flex items-center gap-2">
+      <div className="flex gap-1 p-2 rounded-full glass border border-border/50">
         {REACTION_EMOJIS.map((emoji) => (
           <Button
             key={emoji}
             variant="ghost"
             size="sm"
-            className={cn(
-              "text-lg hover:scale-125 active:scale-95 transition-transform rounded-xl",
-              // Larger touch targets on mobile
-              layout === 'grid' ? "w-full h-12 p-0" : "w-9 h-9 p-0"
-            )}
+            className="w-8 h-8 p-0 text-lg hover:scale-125 transition-transform"
             onClick={() => onReact(emoji)}
           >
             {emoji}
@@ -47,13 +35,13 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({ onReact, isWaving, onW
         ))}
       </div>
       
+      {/* Wave button */}
       <Button
         variant={isWaving ? 'default' : 'outline'}
         size="sm"
         onClick={onWaveToggle}
         className={cn(
-          'gap-1.5 transition-all rounded-xl',
-          layout === 'grid' ? 'w-full h-11' : '',
+          'gap-1.5 transition-all',
           isWaving && 'bg-primary shadow-lg shadow-primary/50'
         )}
       >
@@ -89,54 +77,53 @@ export const useReactions = (
   userId: string
 ) => {
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
-  const [activeReactions, setActiveReactions] = useState<Map<string, string>>(new Map());
 
   const sendReaction = useCallback((emoji: string) => {
     if (!channel) return;
-    channel.send({
-      type: 'broadcast',
-      event: 'reaction',
-      payload: { id: `${Date.now()}-${Math.random()}`, emoji, userId },
-    });
-    handleNewReaction(userId, emoji);
-  }, [channel, userId]);
 
-  const handleNewReaction = (reactorId: string, emoji: string) => {
-    const newParticle: FloatingReaction = {
+    const reaction: FloatingReaction = {
       id: `${Date.now()}-${Math.random()}`,
       emoji,
       x: 30 + Math.random() * 40,
-      userId: reactorId,
+      userId,
     };
-    setReactions((prev) => [...prev, newParticle]);
-    setTimeout(() => {
-      setReactions((prev) => prev.filter((r) => r.id !== newParticle.id));
-    }, 3000);
-    setActiveReactions((prev) => {
-      const next = new Map(prev);
-      next.set(reactorId, emoji);
-      return next;
+
+    // Broadcast to others
+    channel.send({
+      type: 'broadcast',
+      event: 'reaction',
+      payload: reaction,
     });
+
+    // Show locally
+    setReactions((prev) => [...prev, reaction]);
+
+    // Remove after animation
     setTimeout(() => {
-      setActiveReactions((prev) => {
-        const next = new Map(prev);
-        if (next.get(reactorId) === emoji) next.delete(reactorId);
-        return next;
-      });
-    }, 5000);
-  };
+      setReactions((prev) => prev.filter((r) => r.id !== reaction.id));
+    }, 3000);
+  }, [channel, userId]);
 
   useEffect(() => {
     if (!channel) return;
-    const handleReaction = (payload: { payload: { id: string; emoji: string; userId: string } }) => {
-      const { userId: reactorId, emoji } = payload.payload;
-      if (reactorId === userId) return;
-      handleNewReaction(reactorId, emoji);
+
+    const handleReaction = (payload: { payload: FloatingReaction }) => {
+      const reaction = payload.payload;
+      if (reaction.userId === userId) return; // Skip own reactions
+
+      setReactions((prev) => [...prev, reaction]);
+
+      setTimeout(() => {
+        setReactions((prev) => prev.filter((r) => r.id !== reaction.id));
+      }, 3000);
     };
+
     channel.on('broadcast', { event: 'reaction' }, handleReaction);
+
+    // No cleanup needed - channel cleanup is handled by useRoom
   }, [channel, userId]);
 
-  return { reactions, activeReactions, sendReaction };
+  return { reactions, sendReaction };
 };
 
 // Hook to manage light stick waving
@@ -150,6 +137,7 @@ export const useWaving = (
   const toggleWaving = useCallback(() => {
     const newWaving = !isWaving;
     setIsWaving(newWaving);
+
     if (channel) {
       channel.send({
         type: 'broadcast',
@@ -161,21 +149,30 @@ export const useWaving = (
 
   useEffect(() => {
     if (!channel) return;
+
     const handleWave = (payload: { payload: { userId: string; isWaving: boolean } }) => {
       const { userId: oderId, isWaving: oderWaving } = payload.payload;
       if (oderId === userId) return;
+
       setWavingUsers(prev => {
         const next = new Set(prev);
-        if (oderWaving) next.add(oderId);
-        else next.delete(oderId);
+        if (oderWaving) {
+          next.add(oderId);
+        } else {
+          next.delete(oderId);
+        }
         return next;
       });
     };
+
     channel.on('broadcast', { event: 'lightstick_wave' }, handleWave);
   }, [channel, userId]);
 
+  // Include current user in waving set if they're waving
   const allWavingUsers = new Set(wavingUsers);
-  if (isWaving) allWavingUsers.add(userId);
+  if (isWaving) {
+    allWavingUsers.add(userId);
+  }
 
   return { isWaving, toggleWaving, wavingUsers: allWavingUsers };
 };

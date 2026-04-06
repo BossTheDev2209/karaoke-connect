@@ -20,7 +20,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_server_time: { Args: never; Returns: string }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never

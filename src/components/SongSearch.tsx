@@ -1,79 +1,69 @@
-import React, { useState, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { Search, Plus, X, Loader2, Music, User, ArrowLeft, Sparkles, Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, Plus, X, Loader2, Music, User, ArrowLeft } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { YouTubeSearchResult, YouTubeChannel, Song } from '@/types/karaoke';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface SongSearchProps {
   onAddSong: (song: Song) => void;
   userId: string;
-  compact?: boolean;
 }
 
-export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compact = false }) => {
+type SearchTab = 'songs' | 'artists';
+
+export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => {
   const { karaokeFilterEnabled } = useTheme();
-  
-  const [songQuery, setSongQuery] = useState('');
+  const [query, setQuery] = useState('');
   const [results, setResults] = useState<YouTubeSearchResult[]>([]);
-  const [isSongLoading, setIsSongLoading] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
-  
-  const [artistQuery, setArtistQuery] = useState('');
   const [channels, setChannels] = useState<YouTubeChannel[]>([]);
-  const [isArtistLoading, setIsArtistLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<SearchTab>('songs');
   const [selectedChannel, setSelectedChannel] = useState<YouTubeChannel | null>(null);
   const [channelVideos, setChannelVideos] = useState<YouTubeSearchResult[]>([]);
-  const [artistModalOpen, setArtistModalOpen] = useState(false);
-  
-  const [recentlyAdded, setRecentlyAdded] = useState<Set<string>>(new Set());
 
-  const handleSongSearch = async () => {
-    if (!songQuery.trim()) return;
-    setIsSongLoading(true);
+  const handleSearch = async () => {
+    if (!query.trim()) return;
+
+    setIsLoading(true);
+    setSelectedChannel(null);
+    setChannelVideos([]);
+    
     try {
-      const searchQuery = karaokeFilterEnabled 
-        ? `${songQuery} karaoke instrumental` 
-        : songQuery;
-      const { data, error } = await supabase.functions.invoke('youtube-search', {
-        body: { query: searchQuery, type: 'video' },
-      });
-      if (error) throw error;
-      setResults(data.results || []);
+      const searchQuery = activeTab === 'songs' && karaokeFilterEnabled 
+        ? `${query} karaoke instrumental` 
+        : query;
+
+      if (activeTab === 'songs') {
+        const { data, error } = await supabase.functions.invoke('youtube-search', {
+          body: { query: searchQuery, type: 'video' },
+        });
+        if (error) throw error;
+        setResults(data.results || []);
+        setChannels([]);
+      } else {
+        const { data, error } = await supabase.functions.invoke('youtube-search', {
+          body: { query, type: 'channel' },
+        });
+        if (error) throw error;
+        setChannels(data.channels || []);
+        setResults([]);
+      }
       setIsOpen(true);
     } catch (err) {
       console.error('Search error:', err);
     } finally {
-      setIsSongLoading(false);
-    }
-  };
-
-  const handleArtistSearch = async () => {
-    if (!artistQuery.trim()) return;
-    setIsArtistLoading(true);
-    setSelectedChannel(null);
-    setChannelVideos([]);
-    try {
-      const { data, error } = await supabase.functions.invoke('youtube-search', {
-        body: { query: artistQuery, type: 'channel' },
-      });
-      if (error) throw error;
-      setChannels(data.channels || []);
-    } catch (err) {
-      console.error('Search error:', err);
-    } finally {
-      setIsArtistLoading(false);
+      setIsLoading(false);
     }
   };
 
   const handleSelectChannel = async (channel: YouTubeChannel) => {
-    setIsArtistLoading(true);
+    setIsLoading(true);
     setSelectedChannel(channel);
+    
     try {
       const { data, error } = await supabase.functions.invoke('youtube-search', {
         body: { channelId: channel.channelId },
@@ -83,7 +73,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
     } catch (err) {
       console.error('Error fetching channel videos:', err);
     } finally {
-      setIsArtistLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -92,8 +82,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
     setChannelVideos([]);
   };
 
-  const handleAddSong = useCallback((result: YouTubeSearchResult) => {
-    if (recentlyAdded.has(result.videoId)) return;
+  const handleAddSong = (result: YouTubeSearchResult) => {
     const song: Song = {
       id: crypto.randomUUID(),
       videoId: result.videoId,
@@ -104,29 +93,30 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
       addedBy: userId,
     };
     onAddSong(song);
-    setRecentlyAdded(prev => new Set(prev).add(result.videoId));
-    setTimeout(() => {
-      setRecentlyAdded(prev => {
-        const next = new Set(prev);
-        next.delete(result.videoId);
-        return next;
-      });
-    }, 2000);
-  }, [recentlyAdded, onAddSong, userId]);
+    // Don't close anything - let user continue browsing/adding songs
+  };
 
   const handleClose = () => {
     setIsOpen(false);
-    setSongQuery('');
-    setResults([]);
-  };
-
-  const handleCloseArtistModal = () => {
-    setArtistModalOpen(false);
     setSelectedChannel(null);
     setChannelVideos([]);
+    setQuery('');
+    setResults([]);
     setChannels([]);
-    setArtistQuery('');
   };
+
+  const handleTabChange = (tab: SearchTab) => {
+    setActiveTab(tab);
+    setResults([]);
+    setChannels([]);
+    setSelectedChannel(null);
+    setChannelVideos([]);
+  };
+
+  const videosToShow = selectedChannel ? channelVideos : results;
+  const hasResults = activeTab === 'songs' 
+    ? videosToShow.length > 0 
+    : (selectedChannel ? channelVideos.length > 0 : channels.length > 0);
 
   return (
     <div className="relative">
@@ -134,331 +124,164 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, compa
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            value={songQuery}
-            onChange={(e) => setSongQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSongSearch()}
-            placeholder="Search for songs..."
-            className="pl-10 bg-input border-border focus-visible:ring-primary/50"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            placeholder={activeTab === 'songs' ? "Search for songs..." : "Search for artists..."}
+            className="pl-10 bg-input border-border"
           />
         </div>
         <Button 
-          onClick={handleSongSearch} 
-          disabled={isSongLoading}
+          onClick={handleSearch} 
+          disabled={isLoading}
           className="btn-neon"
         >
-          {isSongLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+          {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
         </Button>
       </div>
 
-      {/* Artist Button */}
-      <div className="mt-2">
+      {/* Tabs */}
+      <div className="flex gap-1 mt-2">
         <button
-          onClick={() => setArtistModalOpen(true)}
+          onClick={() => handleTabChange('songs')}
           className={cn(
-            'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all',
-            'bg-gradient-to-r from-neon-purple/20 to-neon-pink/20 border border-neon-purple/30',
-            'hover:from-neon-purple/30 hover:to-neon-pink/30 hover:border-neon-purple/50',
-            'active:scale-[0.98] text-foreground'
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+            activeTab === 'songs' 
+              ? 'bg-primary text-primary-foreground' 
+              : 'bg-muted/50 text-muted-foreground hover:bg-muted'
           )}
         >
-          <User className="w-4 h-4 text-neon-purple" />
-          <span>Browse Artists</span>
-          <Sparkles className="w-3.5 h-3.5 text-neon-pink" />
+          <Music className="w-3.5 h-3.5" />
+          Songs
+        </button>
+        <button
+          onClick={() => handleTabChange('artists')}
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+            activeTab === 'artists' 
+              ? 'bg-primary text-primary-foreground' 
+              : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+          )}
+        >
+          <User className="w-3.5 h-3.5" />
+          Artists
         </button>
       </div>
 
-      {/* Artist Modal */}
-      {createPortal(
-        <AnimatePresence>
-          {artistModalOpen && (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={handleCloseArtistModal}
-                className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-md"
-              />
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="fixed inset-0 z-[101] flex items-center justify-center p-4"
+      {isOpen && hasResults && (
+        <div className="absolute top-full left-0 right-0 mt-2 z-50 glass rounded-xl max-h-96 overflow-y-auto">
+          <div className="p-2 flex justify-between items-center border-b border-border">
+            {selectedChannel ? (
+              <button 
+                onClick={handleBackToChannels}
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
               >
-                <div className="w-full max-w-3xl max-h-[80vh] flex flex-col bg-card/95 backdrop-blur-xl rounded-2xl border border-border shadow-2xl overflow-hidden">
-                  {/* Header */}
-                  <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-neon-purple/10 to-neon-pink/10 shrink-0">
-                    <div className="flex items-center gap-3">
-                      {selectedChannel ? (
-                        <button
-                          onClick={handleBackToChannels}
-                          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          <ArrowLeft className="w-4 h-4" />
-                          Back
-                        </button>
-                      ) : (
-                        <>
-                          <div className="p-2 rounded-xl bg-gradient-to-br from-neon-purple to-neon-pink">
-                            <User className="w-5 h-5 text-white" />
-                          </div>
-                          <div>
-                            <h2 className="text-lg font-bold">Browse Artists</h2>
-                            <p className="text-xs text-muted-foreground">Find your favorite karaoke channels</p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleCloseArtistModal}
-                      className="rounded-xl hover:bg-destructive/20 h-9 w-9"
-                    >
-                      <X className="w-5 h-5" />
-                    </Button>
-                  </div>
+                <ArrowLeft className="w-4 h-4" />
+                Back to artists
+              </button>
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                {activeTab === 'songs' 
+                  ? `${results.length} songs` 
+                  : `${channels.length} artists`}
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleClose}
+              className="h-6 w-6"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
 
-                  {/* Search */}
-                  {!selectedChannel && (
-                    <div className="p-4 border-b border-border shrink-0">
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input
-                            value={artistQuery}
-                            onChange={(e) => setArtistQuery(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleArtistSearch()}
-                            placeholder="Search for artists or channels..."
-                            className="pl-10 bg-muted/50 border-border rounded-xl"
-                            autoFocus
-                          />
-                        </div>
-                        <Button
-                          onClick={handleArtistSearch}
-                          disabled={isArtistLoading}
-                          className="rounded-xl bg-gradient-to-r from-neon-purple to-neon-pink hover:opacity-90"
-                        >
-                          {isArtistLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+          {/* Channel Profile Header */}
+          {selectedChannel && (
+            <div className="p-3 border-b border-border flex items-center gap-3 bg-muted/30">
+              <img
+                src={selectedChannel.thumbnail}
+                alt={selectedChannel.title}
+                className="w-12 h-12 rounded-full object-cover"
+              />
+              <div>
+                <p className="font-semibold">{selectedChannel.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  {selectedChannel.subscriberCount} subscribers • {selectedChannel.videoCount} videos
+                </p>
+              </div>
+            </div>
+          )}
 
-                  {/* Channel Header */}
-                  {selectedChannel && (
-                    <div className="p-4 border-b border-border bg-gradient-to-r from-muted/50 to-transparent shrink-0">
-                      <div className="flex items-center gap-4">
-                        <img
-                          src={selectedChannel.thumbnail}
-                          alt={selectedChannel.title}
-                          className="w-16 h-16 rounded-full object-cover ring-2 ring-neon-purple/50"
-                        />
-                        <div className="flex-1">
-                          <h3 className="font-bold text-lg">{selectedChannel.title}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {selectedChannel.subscriberCount} subscribers • {selectedChannel.videoCount} videos
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Content */}
-                  <ScrollArea className="flex-1 min-h-0">
-                    <div className="p-4">
-                      {isArtistLoading ? (
-                        <div className="flex items-center justify-center py-12">
-                          <div className="flex flex-col items-center gap-3">
-                            <Loader2 className="w-8 h-8 animate-spin text-neon-purple" />
-                            <p className="text-sm text-muted-foreground">
-                              {selectedChannel ? 'Loading videos...' : 'Searching artists...'}
-                            </p>
-                          </div>
-                        </div>
-                      ) : !selectedChannel && channels.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                          <div className="p-4 rounded-full bg-muted/50 mb-4">
-                            <User className="w-8 h-8 text-muted-foreground" />
-                          </div>
-                          <p className="text-muted-foreground">Search for artists to get started</p>
-                          <p className="text-xs text-muted-foreground mt-1">Try "karaoke channel" or your favorite artist</p>
-                        </div>
-                      ) : (
-                        <>
-                          {!selectedChannel && channels.length > 0 && (
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                              {channels.map((channel) => (
-                                <motion.button
-                                  key={channel.channelId}
-                                  whileHover={{ scale: 1.02 }}
-                                  whileTap={{ scale: 0.98 }}
-                                  onClick={() => handleSelectChannel(channel)}
-                                  className="flex flex-col items-center gap-3 p-4 rounded-xl bg-muted/30 hover:bg-muted/50 border border-transparent hover:border-neon-purple/30 transition-all group"
-                                >
-                                  <div className="relative">
-                                    <img
-                                      src={channel.thumbnail}
-                                      alt={channel.title}
-                                      className="w-20 h-20 rounded-full object-cover ring-2 ring-border group-hover:ring-neon-purple/50 transition-all"
-                                    />
-                                    <div className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-gradient-to-br from-neon-purple to-neon-pink opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <Music className="w-3 h-3 text-white" />
-                                    </div>
-                                  </div>
-                                  <div className="text-center">
-                                    <p className="font-medium text-sm truncate max-w-[120px]">{channel.title}</p>
-                                    <p className="text-xs text-muted-foreground">{channel.subscriberCount}</p>
-                                  </div>
-                                </motion.button>
-                              ))}
-                            </div>
-                          )}
-
-                          {selectedChannel && channelVideos.length > 0 && (
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                              {channelVideos.map((video) => (
-                                <motion.button
-                                  key={video.videoId}
-                                  whileHover={{ scale: 1.02 }}
-                                  whileTap={{ scale: 0.98 }}
-                                  onClick={() => handleAddSong(video)}
-                                  className="flex flex-col rounded-xl bg-muted/30 hover:bg-muted/50 border border-border hover:border-neon-green/30 transition-all group overflow-hidden text-left"
-                                >
-                                  <div className="relative aspect-video">
-                                    <img
-                                      src={video.thumbnail}
-                                      alt={video.title}
-                                      className="w-full h-full object-cover"
-                                    />
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                                      <div className="p-2 rounded-full bg-neon-green/90 opacity-0 group-hover:opacity-100 transition-opacity scale-75 group-hover:scale-100">
-                                        <Plus className="w-5 h-5 text-black" />
-                                      </div>
-                                    </div>
-                                    <span className="absolute bottom-1 right-1 text-[10px] bg-black/70 px-1.5 py-0.5 rounded font-mono">
-                                      {video.duration}
-                                    </span>
-                                  </div>
-                                  <div className="p-2">
-                                    <p className="font-medium text-xs line-clamp-2">{video.title}</p>
-                                  </div>
-                                </motion.button>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </ScrollArea>
-
-                  {/* Footer */}
-                  {(channels.length > 0 || channelVideos.length > 0) && (
-                    <div className="p-3 border-t border-border bg-muted/30 text-center shrink-0">
-                      <p className="text-xs text-muted-foreground">
-                        {selectedChannel 
-                          ? `${channelVideos.length} videos from ${selectedChannel.title}`
-                          : `${channels.length} artists found`
-                        }
-                      </p>
-                    </div>
+          <div className="p-2 space-y-1">
+            {/* Show channels list */}
+            {activeTab === 'artists' && !selectedChannel && channels.map((channel) => (
+              <button
+                key={channel.channelId}
+                onClick={() => handleSelectChannel(channel)}
+                className={cn(
+                  'w-full flex items-center gap-3 p-2 rounded-lg transition-colors',
+                  'hover:bg-muted/50 text-left group'
+                )}
+              >
+                <img
+                  src={channel.thumbnail}
+                  alt={channel.title}
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{channel.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {channel.subscriberCount} subscribers
+                  </p>
+                  {channel.description && (
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                      {channel.description}
+                    </p>
                   )}
                 </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
+                <Music className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+            ))}
 
-      {/* Song Results — portaled to escape overflow clipping */}
-      {createPortal(
-        <AnimatePresence>
-          {isOpen && results.length > 0 && (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={handleClose}
-                className="fixed inset-0 z-[90] bg-background/60 backdrop-blur-sm"
-              />
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="fixed inset-x-0 bottom-0 top-16 z-[91] flex flex-col sm:inset-0 sm:items-center sm:justify-center sm:p-4"
+            {/* Show videos (either search results or channel videos) */}
+            {(activeTab === 'songs' || selectedChannel) && videosToShow.map((result) => (
+              <button
+                key={result.videoId}
+                onClick={() => handleAddSong(result)}
+                className={cn(
+                  'w-full flex items-center gap-3 p-2 rounded-lg transition-colors',
+                  'hover:bg-muted/50 text-left group'
+                )}
               >
-                <div className="flex h-full max-h-[100dvh] flex-col overflow-hidden bg-card/95 backdrop-blur-xl border-t border-border shadow-2xl sm:h-auto sm:w-full sm:max-w-2xl sm:max-h-[80vh] sm:rounded-2xl sm:border">
-                  <div className="p-3 flex justify-between items-center border-b border-border shrink-0">
-                    <span className="text-sm text-muted-foreground font-medium">
-                      {results.length} songs found
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleClose}
-                      className="h-8 w-8 rounded-lg hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-
-                  <ScrollArea className="flex-1 min-h-0 overflow-x-hidden">
-                    <div className="space-y-1 overflow-hidden p-2 pr-3 sm:p-2 sm:pr-4">
-                      {results.map((result) => {
-                        const wasAdded = recentlyAdded.has(result.videoId);
-                        return (
-                          <button
-                            key={result.videoId}
-                            type="button"
-                            disabled={wasAdded}
-                            onClick={() => handleAddSong(result)}
-                            className={cn(
-                              'grid w-full max-w-full grid-cols-[64px,minmax(0,1fr),44px] items-center gap-3 overflow-hidden rounded-xl text-left transition-all',
-                              'min-h-[60px] p-3',
-                              wasAdded
-                                ? 'bg-neon-green/10 border border-neon-green/20'
-                                : 'hover:bg-muted/40 border border-transparent active:bg-muted/60'
-                            )}
-                          >
-                            <img
-                              src={result.thumbnail}
-                              alt={result.title}
-                              className="w-16 h-12 object-cover rounded-lg shrink-0"
-                            />
-                            <div className="min-w-0 overflow-hidden pr-1">
-                              <p className="text-sm font-medium truncate">{result.title}</p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <p className="text-xs text-primary truncate font-medium">
-                                  {result.channelTitle}
-                                </p>
-                                <span className="text-[11px] text-muted-foreground font-mono shrink-0">
-                                  {result.duration}
-                                </span>
-                              </div>
-                            </div>
-                            <div className={cn(
-                              'h-11 w-11 justify-self-end rounded-xl flex items-center justify-center transition-all',
-                              wasAdded
-                                ? 'text-neon-green'
-                                : 'bg-neon-green/90 text-black shadow-sm shadow-neon-green/20'
-                            )}>
-                              {wasAdded ? <Check className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </ScrollArea>
+                <img
+                  src={result.thumbnail}
+                  alt={result.title}
+                  className="w-16 h-12 object-cover rounded"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{result.title}</p>
+                  <p className="text-xs text-primary font-medium truncate">
+                    {result.channelTitle}
+                  </p>
                 </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>,
-        document.body
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {result.duration}
+                  </span>
+                  <Plus className="w-5 h-5 text-neon-green opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </button>
+            ))}
+
+            {/* Loading state for channel videos */}
+            {isLoading && selectedChannel && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

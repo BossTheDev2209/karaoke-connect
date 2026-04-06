@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Song, LyricLine } from '@/types/karaoke';
 import { supabase } from '@/integrations/supabase/client';
-import { LyricsMatch } from './useLyrics';
 
 export type LyricStatus = 'pending' | 'loading' | 'loaded' | 'error' | 'not_found';
 
@@ -10,9 +9,6 @@ export interface PreloadedLyrics {
   status: LyricStatus;
   lyrics: LyricLine[];
   isSynced: boolean;
-  // NEW: Support for multiple matches
-  allMatches?: LyricsMatch[];
-  source?: string;
 }
 
 interface UseLyricsPreloadReturn {
@@ -115,9 +111,6 @@ export const useLyricsPreload = (
           status,
           lyrics,
           isSynced,
-          // NEW: Store all matches and source
-          allMatches: data.allMatches || [],
-          source: data.source || undefined,
         });
         return next;
       });

@@ -7,7 +7,6 @@ const corsHeaders = {
 
 const LRCLIB_API = 'https://lrclib.net/api';
 const GENIUS_API = 'https://api.genius.com';
-const LYRICS_OVH_API = 'https://api.lyrics.ovh/v1'; // Free, no API key needed
 
 // Thai character range detection
 function containsThai(text: string): boolean {
@@ -264,384 +263,17 @@ const THAI_ARTIST_MAPPINGS: Record<string, string[]> = {
   'เคลียร์': ['Klear'],
 };
 
-// ============ JAPANESE LANGUAGE SUPPORT ============
-
-// Japanese character detection (Hiragana, Katakana, Kanji)
-function containsJapanese(text: string): boolean {
-  // Hiragana: \u3040-\u309F, Katakana: \u30A0-\u30FF, Kanji: \u4E00-\u9FAF
-  return /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text);
-}
-
-// Extract Japanese text (Hiragana, Katakana, Kanji)
-function extractJapanese(text: string): string {
-  const matches = text.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]+/g);
-  return matches ? matches.join(' ') : '';
-}
-
-// ============ KOREAN LANGUAGE SUPPORT ============
-
-// Korean character detection (Hangul)
-function containsKorean(text: string): boolean {
-  // Hangul Syllables: \uAC00-\uD7AF, Hangul Jamo: \u1100-\u11FF
-  return /[\uAC00-\uD7AF\u1100-\u11FF]/.test(text);
-}
-
-// Extract Korean text (Hangul)
-function extractKorean(text: string): string {
-  const matches = text.match(/[\uAC00-\uD7AF\u1100-\u11FF]+/g);
-  return matches ? matches.join(' ') : '';
-}
-
-// ============ CHINESE LANGUAGE SUPPORT ============
-
-// Chinese character detection (CJK Unified Ideographs - overlaps with Japanese Kanji)
-function containsChinese(text: string): boolean {
-  // CJK: \u4E00-\u9FFF, check for Chinese-specific patterns
-  // If it has Japanese Hiragana/Katakana, it's likely Japanese, not Chinese
-  const hasCJK = /[\u4E00-\u9FFF]/.test(text);
-  const hasJapaneseKana = /[\u3040-\u309F\u30A0-\u30FF]/.test(text);
-  return hasCJK && !hasJapaneseKana;
-}
-
-// Extract Chinese text (CJK characters)
-function extractChinese(text: string): string {
-  const matches = text.match(/[\u4E00-\u9FFF]+/g);
-  return matches ? matches.join(' ') : '';
-}
-
-// ============ EXTRACT ROMANIZED TEXT (for any Asian language) ============
-
-function extractRomanized(text: string): string {
-  return text
-    // Remove Thai
-    .replace(/[\u0E00-\u0E7F]+/g, ' ')
-    // Remove Japanese (Hiragana, Katakana, Kanji)
-    .replace(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]+/g, ' ')
-    // Remove Korean (Hangul)
-    .replace(/[\uAC00-\uD7AF\u1100-\u11FF]+/g, ' ')
-    // Remove Chinese (CJK)
-    .replace(/[\u4E00-\u9FFF]+/g, ' ')
-    // Clean up
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-// ============ JAPANESE ARTIST MAPPINGS ============
-
-const JAPANESE_ARTIST_MAPPINGS: Record<string, string[]> = {
-  // Major J-pop Artists
-  '米津玄師': ['Kenshi Yonezu', 'Yonezu Kenshi'],
-  'Kenshi Yonezu': ['Kenshi Yonezu', 'Yonezu Kenshi', '米津玄師'],
-  'YOASOBI': ['YOASOBI', 'Yoasobi'],
-  '優里': ['Yuuri', 'Yuri'],
-  'Yuuri': ['Yuuri', 'Yuri', '優里'],
-  'Ado': ['Ado', 'アド'],
-  'アド': ['Ado'],
-  'あいみょん': ['Aimyon', 'Aimyon'],
-  'Aimyon': ['Aimyon', 'あいみょん'],
-  '藤井風': ['Fujii Kaze', 'Kaze Fujii'],
-  'Fujii Kaze': ['Fujii Kaze', '藤井風'],
-  'Official髭男dism': ['Official HIGE DANdism', 'Higedan', 'Official Hige Dandism'],
-  'King Gnu': ['King Gnu', 'キングヌー'],
-  'キングヌー': ['King Gnu'],
-  'LiSA': ['LiSA', 'Lisa'],
-  '宇多田ヒカル': ['Utada Hikaru', 'Hikaru Utada'],
-  'Utada Hikaru': ['Utada Hikaru', '宇多田ヒカル'],
-  '椎名林檎': ['Sheena Ringo', 'Ringo Sheena'],
-  'Sheena Ringo': ['Sheena Ringo', '椎名林檎'],
-  'RADWIMPS': ['RADWIMPS', 'Radwimps'],
-  'Aimer': ['Aimer', 'エメ'],
-  'エメ': ['Aimer'],
-  '嵐': ['Arashi'],
-  'Arashi': ['Arashi', '嵐'],
-  'ONE OK ROCK': ['ONE OK ROCK', 'One Ok Rock', 'OOR'],
-  'back number': ['back number', 'Back Number'],
-  'Mrs. GREEN APPLE': ['Mrs. GREEN APPLE', 'Mrs Green Apple'],
-  'BUMP OF CHICKEN': ['BUMP OF CHICKEN', 'Bump of Chicken'],
-  'サザンオールスターズ': ['Southern All Stars', 'SAS'],
-  'Southern All Stars': ['Southern All Stars', 'サザンオールスターズ'],
-  'スピッツ': ['Spitz'],
-  'Spitz': ['Spitz', 'スピッツ'],
-  'Mr.Children': ['Mr.Children', 'Mister Children', 'ミスターチルドレン'],
-  'ミスターチルドレン': ['Mr.Children'],
-  '浜崎あゆみ': ['Ayumi Hamasaki', 'Hamasaki Ayumi'],
-  'Ayumi Hamasaki': ['Ayumi Hamasaki', '浜崎あゆみ'],
-  '安室奈美恵': ['Namie Amuro', 'Amuro Namie'],
-  'Namie Amuro': ['Namie Amuro', '安室奈美恵'],
-  'Perfume': ['Perfume', 'パフューム'],
-  'パフューム': ['Perfume'],
-  'きゃりーぱみゅぱみゅ': ['Kyary Pamyu Pamyu', 'KPP'],
-  'Kyary Pamyu Pamyu': ['Kyary Pamyu Pamyu', 'きゃりーぱみゅぱみゅ'],
-  '中島みゆき': ['Miyuki Nakajima', 'Nakajima Miyuki'],
-  'Miyuki Nakajima': ['Miyuki Nakajima', '中島みゆき'],
-  '星野源': ['Gen Hoshino', 'Hoshino Gen'],
-  'Gen Hoshino': ['Gen Hoshino', '星野源'],
-  'Creepy Nuts': ['Creepy Nuts'],
-  'SEKAI NO OWARI': ['SEKAI NO OWARI', 'End of the World'],
-  'Vaundy': ['Vaundy'],
-  'imase': ['imase', 'Imase'],
-  'TWICE': ['TWICE', 'Twice'],
-  'NiziU': ['NiziU', 'Niziu'],
-  'BE:FIRST': ['BE:FIRST', 'Be First'],
-  'JO1': ['JO1'],
-  'Snow Man': ['Snow Man', 'Snowman'],
-  'SixTONES': ['SixTONES', 'Sixtones'],
-  '乃木坂46': ['Nogizaka46', 'Nogizaka 46'],
-  'Nogizaka46': ['Nogizaka46', '乃木坂46'],
-  '日向坂46': ['Hinatazaka46', 'Hinatazaka 46'],
-  'Hinatazaka46': ['Hinatazaka46', '日向坂46'],
-  '櫻坂46': ['Sakurazaka46', 'Sakurazaka 46'],
-  'YUKI': ['YUKI', 'Yuki'],
-  'Superfly': ['Superfly'],
-  'miwa': ['miwa', 'Miwa'],
-  '絢香': ['Ayaka'],
-  'Ayaka': ['Ayaka', '絢香'],
-  'クリープハイプ': ['CreepHyp', 'Creep Hyp'],
-  'ASIAN KUNG-FU GENERATION': ['ASIAN KUNG-FU GENERATION', 'AKFG', 'Ajikan'],
-  'Linked Horizon': ['Linked Horizon'],
-  'Eve': ['Eve', 'イヴ'],
-  'ZUTOMAYO': ['ZUTOMAYO', 'Zutomayo', 'ずっと真夜中でいいのに。'],
-  'ずっと真夜中でいいのに。': ['ZUTOMAYO', 'Zutomayo'],
-  'Yorushika': ['Yorushika', 'ヨルシカ'],
-  'ヨルシカ': ['Yorushika'],
-  'Reol': ['Reol', 'れをる'],
-  'れをる': ['Reol'],
-};
-
-// ============ KOREAN ARTIST MAPPINGS ============
-
-const KOREAN_ARTIST_MAPPINGS: Record<string, string[]> = {
-  // K-pop Groups
-  'BTS': ['BTS', '방탄소년단', 'Bangtan Sonyeondan'],
-  '방탄소년단': ['BTS', 'Bangtan Sonyeondan'],
-  'BLACKPINK': ['BLACKPINK', 'Black Pink', '블랙핑크'],
-  '블랙핑크': ['BLACKPINK', 'Black Pink'],
-  'TWICE': ['TWICE', '트와이스'],
-  '트와이스': ['TWICE'],
-  'EXO': ['EXO', '엑소'],
-  '엑소': ['EXO'],
-  'NCT': ['NCT', '엔시티'],
-  'NCT 127': ['NCT 127', 'NCT127'],
-  'NCT Dream': ['NCT Dream', 'NCT DREAM'],
-  'Stray Kids': ['Stray Kids', 'SKZ', '스트레이 키즈'],
-  '스트레이 키즈': ['Stray Kids', 'SKZ'],
-  'SEVENTEEN': ['SEVENTEEN', '세븐틴', 'SVT'],
-  '세븐틴': ['SEVENTEEN', 'SVT'],
-  'ENHYPEN': ['ENHYPEN', '엔하이픈'],
-  '엔하이픈': ['ENHYPEN'],
-  'TXT': ['TXT', 'Tomorrow X Together', '투모로우바이투게더'],
-  '투모로우바이투게더': ['TXT', 'Tomorrow X Together'],
-  'LE SSERAFIM': ['LE SSERAFIM', 'Le Sserafim', '르세라핌'],
-  '르세라핌': ['LE SSERAFIM'],
-  'NewJeans': ['NewJeans', 'New Jeans', '뉴진스'],
-  '뉴진스': ['NewJeans'],
-  'IVE': ['IVE', '아이브'],
-  '아이브': ['IVE'],
-  'aespa': ['aespa', 'Aespa', '에스파'],
-  '에스파': ['aespa'],
-  'ITZY': ['ITZY', '있지'],
-  '있지': ['ITZY'],
-  'Red Velvet': ['Red Velvet', '레드벨벳'],
-  '레드벨벳': ['Red Velvet'],
-  'MAMAMOO': ['MAMAMOO', 'Mamamoo', '마마무'],
-  '마마무': ['MAMAMOO'],
-  'GOT7': ['GOT7', '갓세븐'],
-  '갓세븐': ['GOT7'],
-  'ATEEZ': ['ATEEZ', '에이티즈'],
-  '에이티즈': ['ATEEZ'],
-  'THE BOYZ': ['THE BOYZ', '더보이즈'],
-  '더보이즈': ['THE BOYZ'],
-  'TREASURE': ['TREASURE', '트레저'],
-  '트레저': ['TREASURE'],
-  '(G)I-DLE': ['(G)I-DLE', 'G-IDLE', 'GIDLE', '여자아이들'],
-  '여자아이들': ['(G)I-DLE', 'GIDLE'],
-  'NMIXX': ['NMIXX', '엔믹스'],
-  '엔믹스': ['NMIXX'],
-  'Kep1er': ['Kep1er', 'Kepler', '케플러'],
-  '케플러': ['Kep1er'],
-  
-  // Solo Artists
-  'IU': ['IU', '아이유', 'Lee Jieun'],
-  '아이유': ['IU', 'Lee Jieun'],
-  'G-Dragon': ['G-Dragon', 'GD', '지드래곤'],
-  '지드래곤': ['G-Dragon', 'GD'],
-  'JENNIE': ['JENNIE', 'Jennie', '제니'],
-  '제니': ['JENNIE'],
-  'ROSÉ': ['ROSÉ', 'Rose', 'Rosé', '로제'],
-  '로제': ['ROSÉ', 'Rose'],
-  'LISA': ['LISA', 'Lisa', '리사'],
-  '리사': ['LISA'],
-  'Jisoo': ['Jisoo', '지수'],
-  '지수': ['Jisoo'],
-  'V': ['V', 'Taehyung', '뷔', '태형'],
-  '뷔': ['V', 'Taehyung'],
-  'Jungkook': ['Jungkook', 'JK', '정국'],
-  '정국': ['Jungkook', 'JK'],
-  'Jimin': ['Jimin', '지민'],
-  '지민': ['Jimin'],
-  '태연': ['Taeyeon', 'TAEYEON'],
-  'Taeyeon': ['Taeyeon', '태연'],
-  '백현': ['Baekhyun', 'BAEKHYUN'],
-  'Baekhyun': ['Baekhyun', '백현'],
-  'PSY': ['PSY', 'Psy', '싸이'],
-  '싸이': ['PSY'],
-  'ZICO': ['ZICO', 'Zico', '지코'],
-  '지코': ['ZICO'],
-  'Crush': ['Crush', '크러쉬'],
-  '크러쉬': ['Crush'],
-  'DEAN': ['DEAN', 'Dean', '딘'],
-  '딘': ['DEAN'],
-  '헤이즈': ['Heize', 'HEIZE'],
-  'Heize': ['Heize', '헤이즈'],
-  '볼빨간사춘기': ['Bolbbalgan4', 'BOL4'],
-  'Bolbbalgan4': ['Bolbbalgan4', 'BOL4', '볼빨간사춘기'],
-  '악동뮤지션': ['Akdong Musician', 'AKMU'],
-  'AKMU': ['AKMU', 'Akdong Musician', '악동뮤지션'],
-};
-
-// ============ CHINESE ARTIST MAPPINGS ============
-
-const CHINESE_ARTIST_MAPPINGS: Record<string, string[]> = {
-  // Mandopop Artists
-  '周杰伦': ['Jay Chou', 'Zhou Jielun'],
-  'Jay Chou': ['Jay Chou', '周杰伦'],
-  '林俊杰': ['JJ Lin', 'Lin Junjie'],
-  'JJ Lin': ['JJ Lin', '林俊ie'],
-  '邓紫棋': ['G.E.M.', 'GEM', 'Deng Ziqi'],
-  'G.E.M.': ['G.E.M.', 'GEM', '邓紫棋'],
-  '周深': ['Zhou Shen', 'Charlie Zhou'],
-  'Zhou Shen': ['Zhou Shen', '周深'],
-  '毛不易': ['Mao Buyi', 'Mao Bu Yi'],
-  'Mao Buyi': ['Mao Buyi', '毛不易'],
-  '薛之谦': ['Joker Xue', 'Xue Zhiqian'],
-  'Joker Xue': ['Joker Xue', '薛之谦'],
-  '华晨宇': ['Hua Chenyu'],
-  'Hua Chenyu': ['Hua Chenyu', '华晨宇'],
-  '蔡徐坤': ['Cai Xukun', 'Kun'],
-  '王嘉尔': ['Jackson Wang', 'Wang Jiaer'],
-  'Jackson Wang': ['Jackson Wang', '王嘉尔'],
-  '张艺兴': ['Lay Zhang', 'Zhang Yixing'],
-  'Lay Zhang': ['Lay Zhang', '张艺兴', 'LAY'],
-  '鹿晗': ['Lu Han', 'Luhan'],
-  'Luhan': ['Lu Han', 'Luhan', '鹿晗'],
-  '蔡依林': ['Jolin Tsai', 'Cai Yilin'],
-  'Jolin Tsai': ['Jolin Tsai', '蔡依林'],
-  '张惠妹': ['A-Mei', 'Chang Hui-mei', 'aMEI'],
-  'A-Mei': ['A-Mei', '张惠妹'],
-  '孙燕姿': ['Stefanie Sun', 'Sun Yanzi'],
-  'Stefanie Sun': ['Stefanie Sun', '孙燕姿'],
-  '五月天': ['Mayday', 'Wu Yue Tian'],
-  'Mayday': ['Mayday', '五月天'],
-  '陈奕迅': ['Eason Chan', 'Chen Yixun'],
-  'Eason Chan': ['Eason Chan', '陈奕迅'],
-  '张学友': ['Jacky Cheung', 'Zhang Xueyou'],
-  'Jacky Cheung': ['Jacky Cheung', '张学友'],
-  '刘德华': ['Andy Lau', 'Liu Dehua'],
-  'Andy Lau': ['Andy Lau', '刘德华'],
-  '王菲': ['Faye Wong', 'Wang Fei'],
-  'Faye Wong': ['Faye Wong', '王菲'],
-  '李荣浩': ['Li Ronghao', 'Ronghao Li'],
-  'Li Ronghao': ['Li Ronghao', '李荣浩'],
-  '王力宏': ['Wang Leehom', 'Leehom Wang'],
-  'Wang Leehom': ['Wang Leehom', '王力宏'],
-  'TFBOYS': ['TFBOYS', 'TF Boys'],
-  'EXO-M': ['EXO-M', 'EXO M'],
-  '鄧紫棋': ['G.E.M.', 'GEM'], // Traditional Chinese
-  '張惠妹': ['A-Mei', 'aMEI'], // Traditional Chinese
-  '張學友': ['Jacky Cheung'], // Traditional Chinese
-  '劉德華': ['Andy Lau'], // Traditional Chinese
-};
-
-// Common Thai song title patterns - for better extraction
-const THAI_TITLE_PATTERNS = [
-  // Pattern: "Thai Title (English Title)"
-  /^([\u0E00-\u0E7F][\u0E00-\u0E7F\s]+)\s*\([^)]+\)/,
-  // Pattern: "Thai Title - Artist"
-  /^([\u0E00-\u0E7F][\u0E00-\u0E7F\s]+)\s*[-–—]/,
-  // Pattern: Just Thai text at start
-  /^([\u0E00-\u0E7F][\u0E00-\u0E7F\s]+)/,
-];
-
 // Get romanized variations for Thai artist
 function getThaiArtistVariations(artist: string): string[] {
   const variations: string[] = [];
   
   for (const [thai, romanized] of Object.entries(THAI_ARTIST_MAPPINGS)) {
-    if (artist.toLowerCase().includes(thai.toLowerCase())) {
+    if (artist.includes(thai)) {
       variations.push(...romanized);
     }
   }
   
   return variations;
-}
-
-// Get romanized variations for Japanese artist
-function getJapaneseArtistVariations(artist: string): string[] {
-  const variations: string[] = [];
-  
-  for (const [jpn, romanized] of Object.entries(JAPANESE_ARTIST_MAPPINGS)) {
-    if (artist.toLowerCase().includes(jpn.toLowerCase())) {
-      variations.push(...romanized);
-    }
-  }
-  
-  return variations;
-}
-
-// Get romanized variations for Korean artist
-function getKoreanArtistVariations(artist: string): string[] {
-  const variations: string[] = [];
-  
-  for (const [kor, romanized] of Object.entries(KOREAN_ARTIST_MAPPINGS)) {
-    if (artist.toLowerCase().includes(kor.toLowerCase())) {
-      variations.push(...romanized);
-    }
-  }
-  
-  return variations;
-}
-
-// Get romanized variations for Chinese artist
-function getChineseArtistVariations(artist: string): string[] {
-  const variations: string[] = [];
-  
-  for (const [chn, romanized] of Object.entries(CHINESE_ARTIST_MAPPINGS)) {
-    if (artist.toLowerCase().includes(chn.toLowerCase())) {
-      variations.push(...romanized);
-    }
-  }
-  
-  return variations;
-}
-
-// Get all artist variations (unified function for any Asian language)
-function getAsianArtistVariations(artist: string): string[] {
-  const variations: string[] = [];
-  
-  if (containsThai(artist)) {
-    variations.push(...getThaiArtistVariations(artist));
-  }
-  if (containsJapanese(artist)) {
-    variations.push(...getJapaneseArtistVariations(artist));
-  }
-  if (containsKorean(artist)) {
-    variations.push(...getKoreanArtistVariations(artist));
-  }
-  if (containsChinese(artist)) {
-    variations.push(...getChineseArtistVariations(artist));
-  }
-  
-  // Also check romanized input against mappings
-  const romanized = extractRomanized(artist);
-  if (romanized && romanized.length > 2) {
-    variations.push(...getThaiArtistVariations(romanized));
-    variations.push(...getJapaneseArtistVariations(romanized));
-    variations.push(...getKoreanArtistVariations(romanized));
-    variations.push(...getChineseArtistVariations(romanized));
-  }
-  
-  // Remove duplicates
-  return [...new Set(variations)];
 }
 
 // Clean YouTube-specific patterns from title
@@ -684,26 +316,10 @@ function cleanTitle(title: string): string {
     .replace(/Full\s*Lyrics/gi, '')
     .replace(/\|\s*.*$/g, '')
     .replace(/#\w+/g, '')
-    .replace(/[''""\u201C\u201D]/g, "'")
+    .replace(/[''""]/g, "'")
     .replace(/'([^']+)'/g, '$1')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-// IMPROVED: Extract Thai song title more accurately
-function extractThaiSongTitle(title: string): string | null {
-  // Try each pattern
-  for (const pattern of THAI_TITLE_PATTERNS) {
-    const match = title.match(pattern);
-    if (match && match[1]) {
-      const extracted = match[1].trim();
-      // Ensure it's meaningful (at least 2 Thai characters)
-      if (extracted.length >= 2) {
-        return extracted;
-      }
-    }
-  }
-  return null;
 }
 
 // Extract the FIRST part before any dash (usually the actual song name)
@@ -715,22 +331,11 @@ function extractFirstPart(title: string): string {
   return title;
 }
 
-// IMPROVED: Better song name extraction
+// Extract song name from title (often in quotes or after dash)
 function extractSongName(title: string, artist?: string): string {
   const cleanedTitle = cleanTitle(title);
   
-  // PRIORITY 1: For Thai songs, extract Thai title first
-  if (containsThai(cleanedTitle)) {
-    const thaiTitle = extractThaiSongTitle(cleanedTitle);
-    if (thaiTitle && thaiTitle.length >= 2) {
-      // Make sure it's not just the artist name
-      if (!artist || !containsThai(artist) || similarity(thaiTitle, extractThai(artist)) < 0.6) {
-        return thaiTitle;
-      }
-    }
-  }
-  
-  // PRIORITY 2: Extract the first part before any dash
+  // First try: extract the first part before any dash
   const firstPart = extractFirstPart(cleanedTitle);
   if (firstPart && firstPart.length >= 2 && firstPart !== cleanedTitle) {
     // Make sure it's not just the artist name
@@ -739,15 +344,23 @@ function extractSongName(title: string, artist?: string): string {
     }
   }
   
-  // PRIORITY 3: Try to find quoted song name
-  const quotedMatch = cleanedTitle.match(/[''"""]([^''""\(\)]+)[''"""]/) ||
+  // For Thai songs: extract the Thai portion as the primary song name
+  if (containsThai(cleanedTitle)) {
+    const thaiPart = extractThai(cleanedTitle);
+    if (thaiPart && thaiPart.length >= 3) {
+      return thaiPart;
+    }
+  }
+  
+  // Try to find quoted song name
+  const quotedMatch = cleanedTitle.match(/[''""]([^''""\(\)]+)[''""]/) ||
                       cleanedTitle.match(/'([^'\(\)]+)'/) ||
                       cleanedTitle.match(/"([^"\(\)]+)"/);
   if (quotedMatch) {
     return quotedMatch[1].trim();
   }
   
-  // PRIORITY 4: Try "Artist - Song" format (after the dash)
+  // Try "Artist - Song" format
   const dashMatch = cleanedTitle.match(/[-–—]\s*(.+?)(?:\s*[\(\[\|]|$)/);
   if (dashMatch) {
     const extracted = dashMatch[1].trim();
@@ -805,124 +418,28 @@ function removeAsianParentheses(text: string): string {
     .trim();
 }
 
-// IMPROVED: Calculate similarity score between two strings (0-1)
+// Calculate similarity score between two strings (0-1)
 function similarity(s1: string, s2: string): number {
-  if (!s1 || !s2) return 0;
-  const str1 = s1.toLowerCase().trim();
-  const str2 = s2.toLowerCase().trim();
+  const str1 = s1.toLowerCase();
+  const str2 = s2.toLowerCase();
   
   if (str1 === str2) return 1;
+  if (str1.includes(str2) || str2.includes(str1)) return 0.8;
   
-  // For Thai text, use character-level comparison
-  if (containsThai(str1) && containsThai(str2)) {
-    const thai1 = extractThai(str1);
-    const thai2 = extractThai(str2);
-    if (thai1 === thai2) return 0.95;
-    if (thai1.includes(thai2) || thai2.includes(thai1)) {
-      const ratio = Math.min(thai1.length, thai2.length) / Math.max(thai1.length, thai2.length);
-      return 0.8 * ratio;
-    }
-  }
-  
-  if (str1.includes(str2) || str2.includes(str1)) {
-    // Penalize very short matches being found in long strings
-    const ratio = Math.min(str1.length, str2.length) / Math.max(str1.length, str2.length);
-    return 0.75 * ratio + 0.1;
-  }
-  
-  const words1 = str1.split(/[\s-]+/).filter(w => w.length > 1);
-  const words2 = str2.split(/[\s-]+/).filter(w => w.length > 1);
+  const words1 = str1.split(/\s+/);
+  const words2 = str2.split(/\s+/);
   const commonWords = words1.filter(w => words2.some(w2 => w2.includes(w) || w.includes(w2)));
-  
-  if (words1.length === 0 || words2.length === 0) return 0;
   
   return commonWords.length / Math.max(words1.length, words2.length);
 }
 
-// IMPROVED: More aggressive scoring with better validation
-function scoreResult(result: any, queryArtist: string, queryTitle: string, originalTitle: string): number {
-  const resultArtist = (result.artistName || '').toLowerCase();
-  const resultTrack = (result.trackName || '').toLowerCase();
-  const queryArtistLower = queryArtist.toLowerCase();
-  const queryTitleLower = queryTitle.toLowerCase();
-  const originalTitleLower = originalTitle.toLowerCase();
+// Score a result based on how well it matches our query
+function scoreResult(result: any, queryArtist: string, queryTitle: string): number {
+  const artistScore = similarity(result.artistName || '', queryArtist);
+  const titleScore = similarity(result.trackName || '', queryTitle);
+  const hasSynced = result.syncedLyrics ? 0.5 : 0;
   
-  // Calculate base scores
-  let artistScore = similarity(resultArtist, queryArtistLower);
-  let titleScore = similarity(resultTrack, queryTitleLower);
-
-  // Improve artist matching by checking Romanized variations (for all Asian languages)
-  if (artistScore < 0.85) {
-    // Get all variations (Thai, Japanese, Korean, Chinese)
-    const allVariations = getAsianArtistVariations(queryArtist);
-    for (const v of allVariations) {
-      const vScore = similarity(resultArtist, v.toLowerCase());
-      if (vScore > artistScore) artistScore = vScore;
-    }
-  }
-  
-  // Also try matching against original title (sometimes has more context)
-  const originalTitleScore = similarity(resultTrack, originalTitleLower);
-  if (originalTitleScore > titleScore) {
-    titleScore = originalTitleScore * 0.9; // Slight penalty for using original
-  }
-  
-  // STRICT VALIDATION: Penalize mismatched content heavily
-  
-  // If neither title nor artist match at all, reject
-  if (artistScore < 0.2 && titleScore < 0.2) {
-    console.log(`  Rejecting: "${resultArtist}" - "${resultTrack}" (no match)`);
-    return 0;
-  }
-  
-  // If artist is completely different and title only partial match, reduce score significantly
-  if (artistScore < 0.3 && titleScore < 0.5) {
-    console.log(`  Low score: "${resultArtist}" - "${resultTrack}" (weak match)`);
-    return (titleScore * 0.3) + (artistScore * 0.1);
-  }
-
-  // Bonus for native script characters matching if query had them
-  let asianBonus = 0;
-  
-  // Thai bonus
-  if (containsThai(queryArtist) && containsThai(resultArtist)) {
-    asianBonus += 0.12;
-  }
-  if (containsThai(queryTitle) && containsThai(resultTrack)) {
-    asianBonus += 0.12;
-  }
-  
-  // Japanese bonus
-  if (containsJapanese(queryArtist) && containsJapanese(resultArtist)) {
-    asianBonus += 0.12;
-  }
-  if (containsJapanese(queryTitle) && containsJapanese(resultTrack)) {
-    asianBonus += 0.12;
-  }
-  
-  // Korean bonus
-  if (containsKorean(queryArtist) && containsKorean(resultArtist)) {
-    asianBonus += 0.12;
-  }
-  if (containsKorean(queryTitle) && containsKorean(resultTrack)) {
-    asianBonus += 0.12;
-  }
-  
-  // Chinese bonus
-  if (containsChinese(queryArtist) && containsChinese(resultArtist)) {
-    asianBonus += 0.12;
-  }
-  if (containsChinese(queryTitle) && containsChinese(resultTrack)) {
-    asianBonus += 0.12;
-  }
-
-  // Reduced synced bonus
-  const hasSynced = result.syncedLyrics ? 0.1 : 0;
-  
-  // Weighted score: Title is most important, then Artist
-  const baseScore = (titleScore * 0.50) + (artistScore * 0.35) + hasSynced + Math.min(asianBonus, 0.2);
-  
-  return Math.min(1, baseScore);
+  return (artistScore * 0.4) + (titleScore * 0.4) + hasSynced;
 }
 
 // Search LRCLIB with given parameters
@@ -949,124 +466,6 @@ async function searchLRCLIB(trackName: string, artistName?: string): Promise<any
   } catch (err) {
     console.error('LRCLIB fetch error:', err);
     return [];
-  }
-}
-
-// FREE: Search Lyrics.ovh API (no API key needed)
-async function searchLyricsOvh(artistName: string, trackName: string): Promise<{ lyrics: string | null; artist: string | null; title: string | null }> {
-  console.log(`Searching Lyrics.ovh: "${artistName}" - "${trackName}"`);
-  
-  try {
-    // Lyrics.ovh uses URL path format: /v1/{artist}/{title}
-    const encodedArtist = encodeURIComponent(artistName);
-    const encodedTrack = encodeURIComponent(trackName);
-    const url = `${LYRICS_OVH_API}/${encodedArtist}/${encodedTrack}`;
-    
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'KaraokeApp/1.0' },
-    });
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        console.log('Lyrics.ovh: No lyrics found');
-      } else {
-        console.error('Lyrics.ovh search failed:', response.status);
-      }
-      return { lyrics: null, artist: artistName, title: trackName };
-    }
-
-    const data = await response.json();
-    
-    if (!data.lyrics) {
-      console.log('Lyrics.ovh: Empty lyrics response');
-      return { lyrics: null, artist: artistName, title: trackName };
-    }
-
-    console.log(`Lyrics.ovh found lyrics: ${data.lyrics.length} chars`);
-    return {
-      lyrics: data.lyrics.trim(),
-      artist: artistName,
-      title: trackName
-    };
-  } catch (err) {
-    console.error('Lyrics.ovh fetch error:', err);
-    return { lyrics: null, artist: artistName, title: trackName };
-  }
-}
-
-// FREE: Scrape AZLyrics (no API key needed)
-async function scrapeAZLyrics(artistName: string, trackName: string): Promise<{ lyrics: string | null; artist: string | null; title: string | null }> {
-  console.log(`Scraping AZLyrics: "${artistName}" - "${trackName}"`);
-  
-  try {
-    // AZLyrics URL format: https://www.azlyrics.com/lyrics/{artist}/{song}.html
-    // Artist and song names need to be lowercase, no spaces, no special chars
-    const cleanArtist = artistName.toLowerCase()
-      .replace(/^the\s+/i, '') // Remove leading "The"
-      .replace(/[^a-z0-9]/g, '');
-    const cleanTrack = trackName.toLowerCase()
-      .replace(/[^a-z0-9]/g, '');
-    
-    if (!cleanArtist || !cleanTrack) {
-      console.log('AZLyrics: Cannot form valid URL');
-      return { lyrics: null, artist: artistName, title: trackName };
-    }
-    
-    const url = `https://www.azlyrics.com/lyrics/${cleanArtist}/${cleanTrack}.html`;
-    console.log(`AZLyrics URL: ${url}`);
-    
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-      },
-    });
-
-    if (!response.ok) {
-      console.log('AZLyrics: Page not found or blocked');
-      return { lyrics: null, artist: artistName, title: trackName };
-    }
-
-    const html = await response.text();
-    
-    // AZLyrics lyrics are in a div without id or class, after the comment
-    // <!-- Usage of azlyrics.com content by any third-party lyrics provider is prohibited by our licensing agreement. Sorry about that. -->
-    const lyricsMatch = html.match(/<!-- Usage of azlyrics\.com content.*?-->\s*([\s\S]*?)<\/div>/i);
-    
-    if (!lyricsMatch || !lyricsMatch[1]) {
-      // Try alternate pattern
-      const altMatch = html.match(/<div[^>]*>\s*<!-- Usage of azlyrics\.com.*?-->([\s\S]*?)<\/div>/i);
-      if (!altMatch || !altMatch[1]) {
-        console.log('AZLyrics: Could not extract lyrics from page');
-        return { lyrics: null, artist: artistName, title: trackName };
-      }
-    }
-
-    let lyrics = (lyricsMatch?.[1] || '')
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#x27;/g, "'")
-      .replace(/&nbsp;/g, ' ')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-
-    if (lyrics.length < 50) {
-      console.log('AZLyrics: Extracted lyrics too short');
-      return { lyrics: null, artist: artistName, title: trackName };
-    }
-
-    console.log(`AZLyrics found lyrics: ${lyrics.length} chars`);
-    return {
-      lyrics,
-      artist: artistName,
-      title: trackName
-    };
-  } catch (err) {
-    console.error('AZLyrics scrape error:', err);
-    return { lyrics: null, artist: artistName, title: trackName };
   }
 }
 
@@ -1120,13 +519,9 @@ async function searchGenius(query: string, apiKey: string): Promise<{ lyrics: st
 
     const html = await lyricsResponse.text();
     
-    // Extract lyrics from Genius HTML - try multiple patterns
-    let lyricsMatch = html.match(/data-lyrics-container="true"[^>]*>([\s\S]*?)<\/div>/g);
-    
-    if (!lyricsMatch) {
-      // Try alternate pattern
-      lyricsMatch = html.match(/<div class="[^"]*Lyrics__Container[^"]*"[^>]*>([\s\S]*?)<\/div>/g);
-    }
+    // Extract lyrics from Genius HTML
+    // Look for data-lyrics-container="true" divs
+    const lyricsMatch = html.match(/data-lyrics-container="true"[^>]*>([\s\S]*?)<\/div>/g);
     
     if (!lyricsMatch) {
       console.log('Could not parse Genius lyrics from HTML');
@@ -1156,181 +551,6 @@ async function searchGenius(query: string, apiKey: string): Promise<{ lyrics: st
   }
 }
 
-// ============ SIAMZONE THAI LYRICS SCRAPER ============
-
-// Search Siamzone.com for Thai lyrics
-async function searchSiamzone(query: string): Promise<Array<{ artist: string; title: string; url: string }>> {
-  console.log(`Searching Siamzone: "${query}"`);
-  
-  try {
-    const searchUrl = `https://www.siamzone.com/music/search?q=${encodeURIComponent(query)}`;
-    
-    const response = await fetch(searchUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'th-TH,th;q=0.9,en;q=0.8',
-      },
-    });
-
-    if (!response.ok) {
-      console.log('Siamzone search failed:', response.status);
-      return [];
-    }
-
-    const html = await response.text();
-    
-    // Parse search results - Siamzone uses specific HTML structure for song listings
-    const results: Array<{ artist: string; title: string; url: string }> = [];
-    
-    // Pattern to match song links in search results
-    // Format: <a href="/music/lyrics/xxxxx">Song Title</a> - Artist
-    const songMatches = html.matchAll(/<a\s+href="(\/music\/lyrics\/[^"]+)"[^>]*>([^<]+)<\/a>\s*[-–—]\s*([^<\n]+)/gi);
-    
-    for (const match of songMatches) {
-      const url = `https://www.siamzone.com${match[1]}`;
-      const title = match[2].trim();
-      const artist = match[3].trim().replace(/<[^>]+>/g, '');
-      
-      if (title && artist) {
-        results.push({ artist, title, url });
-      }
-      
-      if (results.length >= 5) break;
-    }
-    
-    // Alternate pattern for different Siamzone layout
-    if (results.length === 0) {
-      const altMatches = html.matchAll(/<div[^>]*class="[^"]*song-item[^"]*"[^>]*>[\s\S]*?<a\s+href="([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?<span[^>]*class="[^"]*artist[^"]*"[^>]*>([^<]+)<\/span>/gi);
-      
-      for (const match of altMatches) {
-        const url = match[1].startsWith('http') ? match[1] : `https://www.siamzone.com${match[1]}`;
-        const title = match[2].trim();
-        const artist = match[3].trim();
-        
-        if (title && artist) {
-          results.push({ artist, title, url });
-        }
-        
-        if (results.length >= 5) break;
-      }
-    }
-    
-    console.log(`Siamzone found ${results.length} results`);
-    return results;
-  } catch (err) {
-    console.error('Siamzone search error:', err);
-    return [];
-  }
-}
-
-// Scrape lyrics from Siamzone song page
-async function scrapeSiamzoneLyrics(url: string): Promise<string | null> {
-  console.log(`Scraping Siamzone lyrics: ${url}`);
-  
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'th-TH,th;q=0.9,en;q=0.8',
-      },
-    });
-
-    if (!response.ok) {
-      console.log('Siamzone lyrics page failed:', response.status);
-      return null;
-    }
-
-    const html = await response.text();
-    
-    // Pattern to extract lyrics - Siamzone typically has lyrics in a specific div
-    let lyricsMatch = html.match(/<div[^>]*class="[^"]*lyrics[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
-    
-    if (!lyricsMatch) {
-      // Try alternate pattern
-      lyricsMatch = html.match(/<div[^>]*id="[^"]*lyrics[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
-    }
-    
-    if (!lyricsMatch) {
-      // Try pre tag pattern (some sites use this)
-      lyricsMatch = html.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
-    }
-    
-    if (!lyricsMatch) {
-      console.log('Siamzone: Could not find lyrics container');
-      return null;
-    }
-    
-    const lyrics = lyricsMatch[1]
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#x27;/g, "'")
-      .replace(/&nbsp;/g, ' ')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-    
-    if (lyrics.length < 50) {
-      console.log('Siamzone: Lyrics too short');
-      return null;
-    }
-    
-    console.log(`Siamzone extracted lyrics: ${lyrics.length} chars`);
-    return lyrics;
-  } catch (err) {
-    console.error('Siamzone lyrics scrape error:', err);
-    return null;
-  }
-}
-
-// Full Siamzone search and scrape
-async function getSiamzoneLyrics(artist: string, title: string): Promise<{ lyrics: string | null; artist: string | null; title: string | null }> {
-  // Try different search queries
-  const queries = [
-    `${title} ${artist}`,
-    title,
-    containsThai(title) ? extractThai(title) : title,
-  ].filter((q, i, arr) => q && q.length >= 2 && arr.indexOf(q) === i);
-  
-  for (const query of queries) {
-    const results = await searchSiamzone(query);
-    
-    for (const result of results) {
-      // Check if this result seems to match
-      const titleSim = similarity(result.title, title);
-      const artistSim = similarity(result.artist, artist);
-      
-      if (titleSim > 0.3 || artistSim > 0.3) {
-        const lyrics = await scrapeSiamzoneLyrics(result.url);
-        if (lyrics) {
-          return {
-            lyrics,
-            artist: result.artist,
-            title: result.title,
-          };
-        }
-      }
-    }
-  }
-  
-  return { lyrics: null, artist: null, title: null };
-}
-
-// ============ LYRICS MATCH INTERFACE ============
-
-interface LyricsMatch {
-  artistName: string;
-  trackName: string;
-  syncedLyrics: string | null;
-  plainLyrics: string | null;
-  score: number;
-  source: string;
-}
-
 // Generate Thai-specific search strategies
 function generateThaiSearchStrategies(
   artist: string,
@@ -1348,8 +568,7 @@ function generateThaiSearchStrategies(
   
   console.log('Thai content detected, adding Thai-specific strategies');
   
-  // Extract Thai song title using improved patterns
-  const thaiTitle = extractThaiSongTitle(title) || extractThai(title);
+  const thaiTitle = extractThai(title);
   const romanizedTitle = extractNonThai(title)
     .replace(new RegExp(cleanedArtist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '')
     .replace(/^[-–—\s]+|[-–—\s]+$/g, '')
@@ -1360,39 +579,33 @@ function generateThaiSearchStrategies(
   
   const artistVariations = getThaiArtistVariations(artist);
   
-  // Strategy: Thai title + Thai artist
-  if (thaiTitle && thaiTitle.length >= 2) {
-    if (thaiArtist && thaiArtist.length >= 2) {
+  if (thaiTitle && thaiTitle.length >= 3) {
+    if (thaiArtist) {
       strategies.push({ track: thaiTitle, artist: thaiArtist });
     }
-    // Thai title + romanized artist
-    if (romanizedArtist && romanizedArtist.length >= 2 && romanizedArtist !== thaiArtist) {
+    if (romanizedArtist && romanizedArtist !== thaiArtist) {
       strategies.push({ track: thaiTitle, artist: romanizedArtist });
     }
-    // Thai title only
     strategies.push({ track: thaiTitle, artist: undefined });
   }
   
-  // Look for English title in parentheses
   const englishInParens = title.match(/\(([A-Za-z][^)]*)\)/);
   if (englishInParens) {
     const englishTitle = englishInParens[1].trim();
     if (englishTitle.length >= 3) {
-      if (romanizedArtist && romanizedArtist.length >= 2) {
+      if (romanizedArtist) {
         strategies.push({ track: englishTitle, artist: romanizedArtist });
       }
       strategies.push({ track: englishTitle, artist: undefined });
     }
   }
   
-  // Romanized title + romanized artist
-  if (romanizedTitle && romanizedTitle.length >= 3 && romanizedArtist && romanizedArtist.length >= 2) {
+  if (romanizedTitle && romanizedTitle.length >= 3 && romanizedArtist) {
     strategies.push({ track: romanizedTitle, artist: romanizedArtist });
   }
   
-  // Try with artist mapping variations
   for (const romanizedVariation of artistVariations) {
-    if (thaiTitle && thaiTitle.length >= 2) {
+    if (thaiTitle && thaiTitle.length >= 3) {
       strategies.push({ track: thaiTitle, artist: romanizedVariation });
     }
     if (romanizedTitle && romanizedTitle.length >= 3) {
@@ -1401,110 +614,6 @@ function generateThaiSearchStrategies(
   }
   
   return strategies;
-}
-
-// Generate Japanese/Korean/Chinese search strategies
-function generateAsianSearchStrategies(
-  artist: string,
-  title: string,
-  cleanedArtist: string,
-  cleanedTitle: string
-): Array<{ track: string; artist: string | undefined }> {
-  const strategies: Array<{ track: string; artist: string | undefined }> = [];
-  
-  const hasJapanese = containsJapanese(artist) || containsJapanese(title);
-  const hasKorean = containsKorean(artist) || containsKorean(title);
-  const hasChinese = containsChinese(artist) || containsChinese(title);
-  
-  if (!hasJapanese && !hasKorean && !hasChinese) {
-    return strategies;
-  }
-  
-  console.log('Asian content detected (JP/KR/CN), adding Asian-specific strategies');
-  
-  // Extract native and romanized parts
-  const nativeTitle = extractJapanese(title) || extractKorean(title) || extractChinese(title) || '';
-  const romanizedTitle = extractRomanized(title);
-  const nativeArtist = extractJapanese(artist) || extractKorean(artist) || extractChinese(artist) || '';
-  const romanizedArtist = extractRomanized(artist);
-  
-  // Get artist variations from mappings
-  const artistVariations: string[] = [];
-  if (hasJapanese) artistVariations.push(...getJapaneseArtistVariations(artist));
-  if (hasKorean) artistVariations.push(...getKoreanArtistVariations(artist));
-  if (hasChinese) artistVariations.push(...getChineseArtistVariations(artist));
-  
-  // Strategy: Native title + native artist
-  if (nativeTitle && nativeTitle.length >= 2) {
-    if (nativeArtist && nativeArtist.length >= 2) {
-      strategies.push({ track: nativeTitle, artist: nativeArtist });
-    }
-    // Native title + romanized artist
-    if (romanizedArtist && romanizedArtist.length >= 2 && romanizedArtist !== nativeArtist) {
-      strategies.push({ track: nativeTitle, artist: romanizedArtist });
-    }
-    // Native title only
-    strategies.push({ track: nativeTitle, artist: undefined });
-  }
-  
-  // Strategy: Romanized title + romanized artist
-  if (romanizedTitle && romanizedTitle.length >= 3) {
-    if (romanizedArtist && romanizedArtist.length >= 2) {
-      strategies.push({ track: romanizedTitle, artist: romanizedArtist });
-    }
-    // Romanized title + native artist
-    if (nativeArtist && nativeArtist.length >= 2) {
-      strategies.push({ track: romanizedTitle, artist: nativeArtist });
-    }
-    strategies.push({ track: romanizedTitle, artist: undefined });
-  }
-  
-  // Look for English title in parentheses
-  const englishInParens = title.match(/\(([A-Za-z][^)]*)\)/);
-  if (englishInParens) {
-    const englishTitle = englishInParens[1].trim();
-    if (englishTitle.length >= 3) {
-      if (romanizedArtist && romanizedArtist.length >= 2) {
-        strategies.push({ track: englishTitle, artist: romanizedArtist });
-      }
-      strategies.push({ track: englishTitle, artist: undefined });
-    }
-  }
-  
-  // Try with artist mapping variations
-  for (const variation of artistVariations.slice(0, 3)) {
-    if (nativeTitle && nativeTitle.length >= 2) {
-      strategies.push({ track: nativeTitle, artist: variation });
-    }
-    if (romanizedTitle && romanizedTitle.length >= 3) {
-      strategies.push({ track: romanizedTitle, artist: variation });
-    }
-  }
-  
-  return strategies;
-}
-
-// IMPROVED: Validate that lyrics look reasonable for the query
-function validateLyrics(lyrics: string, queryTitle: string, queryArtist: string): boolean {
-  if (!lyrics || lyrics.length < 50) {
-    console.log('Validation: Lyrics too short');
-    return false;
-  }
-  
-  // Check if lyrics contain at least some content
-  const lines = lyrics.split('\n').filter(l => l.trim().length > 0);
-  if (lines.length < 4) {
-    console.log('Validation: Too few lines');
-    return false;
-  }
-  
-  // For Thai songs, check if lyrics contain Thai characters
-  if (containsThai(queryTitle) || containsThai(queryArtist)) {
-    // It's okay if lyrics are romanized (transliterated) - don't require Thai chars
-    console.log('Validation: Thai query - allowing any lyrics');
-  }
-  
-  return true;
 }
 
 serve(async (req) => {
@@ -1539,39 +648,30 @@ serve(async (req) => {
     console.log(`Cleaned artist: "${cleanedArtist}" | Primary: "${primaryArtist}"`);
     console.log(`Cleaned title: "${cleanedTitle}" | Song name: "${songName}" | First part: "${firstPart}"`);
 
-    // API Keys (only Genius requires a key, Lyrics.ovh is free)
-    const geniusApiKey = Deno.env.get('GENIUS_API_KEY');
-
-    // IMPROVED: Search strategies - prioritize exact matches first
+    // IMPROVED: Search strategies - prioritize simple song name first
     const searchStrategies: Array<{ track: string; artist: string | undefined }> = [
-      // Strategy 0: Extracted song name (most accurate) + cleaned artist
-      { track: songName, artist: cleanedArtist },
-      // Strategy 1: First part of title + artist variations
+      // Strategy 0: PRIORITY - Just the first part of the title (before any dash)
+      { track: firstPart, artist: undefined },
+      // Strategy 1: First part + any artist variation
       { track: firstPart, artist: cleanedArtist },
       { track: firstPart, artist: primaryArtist },
-      // Strategy 2: Cleaned title + cleaned artist  
+      // Strategy 2: Extracted song name + cleaned artist
+      { track: songName, artist: cleanedArtist },
+      // Strategy 3: Cleaned title + cleaned artist  
       { track: cleanedTitle, artist: cleanedArtist },
-      // Strategy 3: Title without featuring + primary artist
+      // Strategy 4: Title without featuring + primary artist
       { track: titleNoFeat, artist: primaryArtist },
-      // Strategy 4: Title without Asian text + artist without Asian text
+      // Strategy 5: Title without Asian text + artist without Asian text
       { track: titleNoAsian, artist: artistNoAsian },
-      // Strategy 5: Broader searches (artist-agnostic)
+      // Strategy 6: Just the song name (broader search)
       { track: songName, artist: undefined },
-      { track: firstPart, artist: undefined },
+      // Strategy 7: Cleaned title only
+      { track: cleanedTitle, artist: undefined },
     ];
     
     // Add Thai-specific strategies
     const thaiStrategies = generateThaiSearchStrategies(artist, title, cleanedArtist, cleanedTitle);
-    // Insert Thai strategies after the first few to prioritize them for Thai content
-    if (thaiStrategies.length > 0) {
-      searchStrategies.splice(2, 0, ...thaiStrategies);
-    }
-
-    // Add Japanese/Korean/Chinese strategies
-    const asianStrategies = generateAsianSearchStrategies(artist, title, cleanedArtist, cleanedTitle);
-    if (asianStrategies.length > 0) {
-      searchStrategies.splice(2, 0, ...asianStrategies);
-    }
+    searchStrategies.push(...thaiStrategies);
 
     // Remove duplicate searches
     const uniqueSearches = searchStrategies.filter((search, index, self) => 
@@ -1581,12 +681,7 @@ serve(async (req) => {
     );
 
     let allResults: any[] = [];
-    let foundSynced = false;
 
-    // Collect ALL matches from all sources for the selector
-    const allMatches: LyricsMatch[] = [];
-
-    // LRCLIB Search
     for (const search of uniqueSearches) {
       if (!search.track || search.track.length < 2) continue;
       
@@ -1595,186 +690,85 @@ serve(async (req) => {
         allResults = [...allResults, ...results];
         if (results.some((r: any) => r.syncedLyrics)) {
           console.log(`Found synced lyrics on strategy: track="${search.track}" artist="${search.artist || 'any'}"`);
-          foundSynced = true;
           break;
         }
       }
-      
-      // Early exit if we have enough results
-      if (allResults.length >= 10) break;
     }
 
-    // Score and add LRCLIB results to allMatches
+    // If LRCLIB found results, use them
     if (allResults.length > 0) {
       const uniqueResults = allResults.filter((result, index, self) =>
         index === self.findIndex(r => r.id === result.id)
       );
 
       const scoredResults = uniqueResults.map(result => ({
-        artistName: result.artistName || '',
-        trackName: result.trackName || '',
-        syncedLyrics: result.syncedLyrics || null,
-        plainLyrics: result.plainLyrics || null,
-        score: scoreResult(result, cleanedArtist, songName || cleanedTitle, title),
-        source: 'lrclib'
-      } as LyricsMatch))
-        .filter(r => r.score > 0.15)
-        .sort((a, b) => b.score - a.score);
+        ...result,
+        score: scoreResult(result, cleanedArtist, songName || cleanedTitle)
+      })).sort((a, b) => b.score - a.score);
 
-      allMatches.push(...scoredResults.slice(0, 5));
-    }
+      const bestMatch = scoredResults[0];
 
-    // FALLBACK 1: Try Lyrics.ovh (FREE, no API key needed)
-    console.log('Trying Lyrics.ovh (free)...');
-    
-    const lyricsOvhQueries = [
-      { artist: primaryArtist, track: songName },
-      { artist: cleanedArtist, track: firstPart },
-      { artist: primaryArtist, track: firstPart },
-    ];
-    
-    // Add romanized artist variations for Thai
-    if (containsThai(artist)) {
-      const variations = getThaiArtistVariations(artist);
-      for (const v of variations.slice(0, 2)) {
-        lyricsOvhQueries.push({ artist: v, track: songName });
-        lyricsOvhQueries.push({ artist: v, track: firstPart });
-      }
-    }
-    
-    // Add romanized artist variations for Japanese/Korean/Chinese
-    const asianVariations = getAsianArtistVariations(artist);
-    for (const v of asianVariations.slice(0, 3)) {
-      lyricsOvhQueries.push({ artist: v, track: songName });
-      lyricsOvhQueries.push({ artist: v, track: firstPart });
-      const romanizedTitle = extractRomanized(title);
-      if (romanizedTitle && romanizedTitle.length >= 2) {
-        lyricsOvhQueries.push({ artist: v, track: romanizedTitle });
-      }
-    }
-    
-    for (const query of lyricsOvhQueries) {
-      if (!query.artist || !query.track || query.artist.length < 2 || query.track.length < 2) continue;
-      
-      const result = await searchLyricsOvh(query.artist, query.track);
-      if (result.lyrics && validateLyrics(result.lyrics, title, artist)) {
-        const lyricsOvhMatch: LyricsMatch = {
-          artistName: result.artist || query.artist,
-          trackName: result.title || query.track,
-          syncedLyrics: null,
-          plainLyrics: result.lyrics,
-          score: 0.6, // Base score for Lyrics.ovh
-          source: 'lyrics.ovh'
-        };
-        
-        // Add to allMatches if not duplicate
-        if (!allMatches.some(m => 
-          similarity(m.trackName, lyricsOvhMatch.trackName) > 0.9 && 
-          similarity(m.artistName, lyricsOvhMatch.artistName) > 0.9
-        )) {
-          allMatches.push(lyricsOvhMatch);
-        }
-        break; // Only add one Lyrics.ovh result
-      }
-    }
+      console.log(`Found ${uniqueResults.length} unique results, best match score: ${bestMatch.score.toFixed(2)}`);
+      console.log(`Best match: "${bestMatch.artistName}" - "${bestMatch.trackName}"`);
+      console.log(`Has synced: ${!!bestMatch.syncedLyrics}, Has plain: ${!!bestMatch.plainLyrics}`);
 
-    // FALLBACK 2: Try Genius API
-    if (geniusApiKey) {
-      console.log('Trying Genius API...');
-      
-      const geniusQueries = [
-        `${songName} ${primaryArtist}`,
-        `${firstPart} ${primaryArtist}`,
-        songName,
-        firstPart,
-      ].filter((q, i, arr) => q && q.length >= 3 && arr.indexOf(q) === i);
-
-      for (const query of geniusQueries) {
-        const geniusResult = await searchGenius(query, geniusApiKey);
-        
-        if (geniusResult.lyrics && validateLyrics(geniusResult.lyrics, title, artist)) {
-          const geniusMatch: LyricsMatch = {
-            artistName: geniusResult.artist || primaryArtist,
-            trackName: geniusResult.title || songName,
-            syncedLyrics: null,
-            plainLyrics: geniusResult.lyrics,
-            score: 0.55,
-            source: 'genius'
-          };
-          
-          if (!allMatches.some(m => 
-            similarity(m.trackName, geniusMatch.trackName) > 0.9 && 
-            similarity(m.artistName, geniusMatch.artistName) > 0.9
-          )) {
-            allMatches.push(geniusMatch);
-          }
-          break;
-        }
-      }
-    }
-
-    // FALLBACK 3: Try Siamzone for Thai songs
-    if (containsThai(artist) || containsThai(title)) {
-      console.log('Trying Siamzone (Thai lyrics)...');
-      
-      const siamzoneResult = await getSiamzoneLyrics(cleanedArtist, songName || cleanedTitle);
-      
-      if (siamzoneResult.lyrics && validateLyrics(siamzoneResult.lyrics, title, artist)) {
-        const siamzoneMatch: LyricsMatch = {
-          artistName: siamzoneResult.artist || cleanedArtist,
-          trackName: siamzoneResult.title || songName,
-          syncedLyrics: null,
-          plainLyrics: siamzoneResult.lyrics,
-          score: 0.7, // Higher score for Thai-specific source
-          source: 'siamzone'
-        };
-        
-        if (!allMatches.some(m => 
-          similarity(m.trackName, siamzoneMatch.trackName) > 0.9 && 
-          similarity(m.artistName, siamzoneMatch.artistName) > 0.9
-        )) {
-          allMatches.push(siamzoneMatch);
-        }
-      }
-    }
-
-    // Sort all matches by score and take top 5
-    allMatches.sort((a, b) => b.score - a.score);
-    const topMatches = allMatches.slice(0, 5);
-
-    // Return response with best match and all matches
-    if (topMatches.length > 0) {
-      const bestMatch = topMatches[0];
-      
-      console.log(`Returning ${topMatches.length} matches, best: "${bestMatch.artistName}" - "${bestMatch.trackName}" (${bestMatch.source})`);
-      
       return new Response(
         JSON.stringify({
-          syncedLyrics: bestMatch.syncedLyrics,
-          plainLyrics: bestMatch.plainLyrics,
+          syncedLyrics: bestMatch.syncedLyrics || null,
+          plainLyrics: bestMatch.plainLyrics || null,
           trackName: bestMatch.trackName,
           artistName: bestMatch.artistName,
-          source: bestMatch.source,
-          allMatches: topMatches, // NEW: Return all matches for selector
+          source: 'lrclib',
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    // FALLBACK: Try Genius API
+    console.log('LRCLIB found nothing, trying Genius API...');
+    const geniusApiKey = Deno.env.get('GENIUS_API_KEY');
+    
+    if (geniusApiKey) {
+      // Try multiple Genius search queries
+      const geniusQueries = [
+        firstPart, // Just song name
+        `${firstPart} ${primaryArtist}`, // Song + artist
+        songName,
+        `${songName} ${cleanedArtist}`,
+      ].filter((q, i, arr) => q && q.length >= 2 && arr.indexOf(q) === i);
+
+      for (const query of geniusQueries) {
+        const geniusResult = await searchGenius(query, geniusApiKey);
+        
+        if (geniusResult.lyrics) {
+          console.log(`Genius found lyrics for: "${geniusResult.artist}" - "${geniusResult.title}"`);
+          return new Response(
+            JSON.stringify({
+              syncedLyrics: null,
+              plainLyrics: geniusResult.lyrics,
+              trackName: geniusResult.title,
+              artistName: geniusResult.artist,
+              source: 'genius',
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+      console.log('Genius also found nothing');
+    } else {
+      console.log('GENIUS_API_KEY not configured, skipping Genius fallback');
+    }
+
     console.log('No lyrics found after all strategies');
     return new Response(
-      JSON.stringify({ 
-        syncedLyrics: null, 
-        plainLyrics: null,
-        allMatches: [], // Empty array when no matches
-      }),
+      JSON.stringify({ syncedLyrics: null, plainLyrics: null }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
     const error = err as Error;
     console.error('Error in fetch-lyrics function:', error);
     return new Response(
-      JSON.stringify({ error: error.message, syncedLyrics: null, plainLyrics: null, allMatches: [] }),
+      JSON.stringify({ error: error.message, syncedLyrics: null, plainLyrics: null }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

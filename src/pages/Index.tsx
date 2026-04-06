@@ -4,33 +4,60 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AvatarPicker } from '@/components/AvatarPicker';
 import { generateRoomCode, isValidRoomCode } from '@/lib/roomCode';
-import { useUserSetup } from '@/hooks/useUserSetup';
+import { avatarConfigToId, generateRandomAvatar } from '@/data/avatars';
 import { Music, Users } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 const Index = () => {
   const navigate = useNavigate();
   const [mode, setMode] = useState<'home' | 'create' | 'join'>('home');
+  const [nickname, setNickname] = useState('');
+  const [avatarId, setAvatarId] = useState(() => avatarConfigToId(generateRandomAvatar()));
   const [roomCode, setRoomCode] = useState('');
+  const [customAvatarNormal, setCustomAvatarNormal] = useState<string | undefined>();
+  const [customAvatarSpeaking, setCustomAvatarSpeaking] = useState<string | undefined>();
 
-  const {
-    nickname, setNickname,
-    avatarId, setAvatarId,
-    customAvatarNormal, customAvatarSpeaking,
-    handleCustomAvatarsChange, saveUser,
-  } = useUserSetup();
+  const handleCustomAvatarsChange = (normal: string | undefined, speaking: string | undefined) => {
+    setCustomAvatarNormal(normal);
+    setCustomAvatarSpeaking(speaking);
+  };
 
   const handleCreate = () => {
-    if (!saveUser()) return;
-    navigate(`/room/${generateRoomCode()}`);
+    if (!nickname.trim()) {
+      toast({ title: 'Enter a nickname', variant: 'destructive' });
+      return;
+    }
+    const code = generateRoomCode();
+    const userData = { 
+      id: crypto.randomUUID(), 
+      nickname: nickname.trim(), 
+      avatarId, 
+      customAvatarNormal,
+      customAvatarSpeaking,
+      isSpeaking: false 
+    };
+    sessionStorage.setItem('karaoke_user', JSON.stringify(userData));
+    navigate(`/room/${code}`);
   };
 
   const handleJoin = () => {
+    if (!nickname.trim()) {
+      toast({ title: 'Enter a nickname', variant: 'destructive' });
+      return;
+    }
     if (!isValidRoomCode(roomCode)) {
       toast({ title: 'Invalid room code', variant: 'destructive' });
       return;
     }
-    if (!saveUser()) return;
+    const userData = { 
+      id: crypto.randomUUID(), 
+      nickname: nickname.trim(), 
+      avatarId, 
+      customAvatarNormal,
+      customAvatarSpeaking,
+      isSpeaking: false 
+    };
+    sessionStorage.setItem('karaoke_user', JSON.stringify(userData));
     navigate(`/room/${roomCode.toUpperCase()}`);
   };
 
@@ -59,6 +86,7 @@ const Index = () => {
                 title: "Logging in with Discord...",
                 description: "This will link your profile in a future update."
               });
+              // Mock auth
               setTimeout(() => {
                 setNickname("DiscordUser");
                 toast({ title: "Linked Discord Account!" });

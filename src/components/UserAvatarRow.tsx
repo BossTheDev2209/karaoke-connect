@@ -1,207 +1,17 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { User, RoomMode, BattleFormat } from '@/types/karaoke';
 import { UserAvatar } from './UserAvatar';
 import { LightStick, LIGHTSTICK_COLORS } from './effects/LightStick';
 import { VoteKickButton } from './VoteKick';
-import { MusicNotesEffect } from './effects/SingerEffects';
+import { SingerSpotlight, MusicNotesEffect, DustFallEffect } from './effects/SingerEffects';
 import { cn } from '@/lib/utils';
-import { useTheme } from '@/contexts/ThemeContext';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
-import { Volume2, VolumeX, ArrowLeftRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-
-interface UserAvatarItemProps {
-  user: User;
-  currentUserId: string | null;
-  usersCount: number;
-  isWaving: boolean;
-  audioIntensity: number;
-  beatPhase: number;
-  isBeat: boolean;
-  bpm: number;
-  roomMode: RoomMode;
-  activeMainSingerId: string | null;
-  activeTeam: string | null;
-  voteKickDisabled: boolean;
-  onStartVoteKick?: (user: User) => void;
-  userVolume: number;
-  onVolumeChange?: (userId: string, volume: number) => void;
-  color: string;
-  isHost?: boolean;
-  onSwapTeam?: (userId: string) => void;
-  activeReaction: string | null;
-  partyMode: boolean;
-}
-
-const UserAvatarItem: React.FC<UserAvatarItemProps> = ({
-  user,
-  currentUserId,
-  usersCount,
-  isWaving,
-  audioIntensity,
-  beatPhase,
-  isBeat,
-  bpm,
-  roomMode,
-  activeMainSingerId,
-  activeTeam,
-  voteKickDisabled,
-  onStartVoteKick,
-  userVolume,
-  onVolumeChange,
-  color,
-  isHost,
-  onSwapTeam,
-  activeReaction,
-  partyMode,
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const isMainSinger = user.id === activeMainSingerId;
-  const userAudioLevel = user.audioLevel || 0;
-  
-  // Cheerleader effect: jump if member of other team is singing (only in party mode)
-  const isCheerleader = partyMode && roomMode === 'team-battle' && activeTeam && user.team !== activeTeam && activeMainSingerId;
-
-  // Two-level sing react - LOWERED THRESHOLDS for more responsive feedback:
-  const isNormalLoud = userAudioLevel > 0.25;
-  const isExtraLoud = userAudioLevel > 0.50;
-  
-  // Discord-style: No jumping/scaling, just static
-  const dynamicScale = 1;
-  const translateY = 0;
-
-  // If popover is open, we can still subtly bounce for rhythm but avoid heavy transforms
-  // or just stay static. Static is safest for UI interaction.
-
-  return (
-    <div className={cn(
-      "flex items-end gap-1 group relative",
-      isMainSinger && isExtraLoud && "z-30",
-      isMainSinger && !isExtraLoud && "z-20",
-      !isMainSinger && "z-10",
-      !isOpen && isCheerleader && "animate-bounce" // Only bounce in party mode
-    )}
-    style={{
-      transform: `scale(${dynamicScale}) translateY(${translateY}px)`,
-      transition: 'transform 0.12s cubic-bezier(0.2, 0.8, 0.2, 1)', // Smoother spring-like ease
-      willChange: 'transform',
-    }}
-    >
-      {/* Music notes floating effect for loud singing (only in party mode) */}
-      {partyMode && <MusicNotesEffect isActive={isMainSinger && user.isSpeaking && isNormalLoud} audioLevel={userAudioLevel} />}
-
-
-
-      {/* Zoom-style active reaction badge */}
-      {activeReaction && (
-        <div className="absolute -top-3 -left-3 z-50 animate-in zoom-in fade-in duration-300">
-          <div className="text-4xl filter drop-shadow-md animate-bounce-subtle">
-            {activeReaction}
-          </div>
-        </div>
-      )}
-
-      {/* Light stick on left side - synced to BPM (only in party mode) */}
-      {partyMode && isWaving && (
-        <div className="relative -mr-2 z-10">
-          <LightStick
-            color={color}
-            isWaving={true}
-            intensity={audioIntensity}
-            beatPhase={beatPhase}
-            isBeat={isBeat}
-            bpm={bpm}
-            size="sm"
-            className="transform -rotate-12"
-          />
-        </div>
-      )}
-      
-      <div className={cn(
-        'transition-transform duration-300',
-        partyMode && !isOpen && (isWaving || isCheerleader) && 'animate-bounce-subtle'
-      )}>
-        <Popover open={isOpen} onOpenChange={setIsOpen}>
-          <PopoverTrigger asChild>
-            <button className="relative outline-none focus:ring-2 focus:ring-primary rounded-full transition-transform active:scale-95">
-              {/* Discord-style Speaking Ring - instant on/off */}
-              {user.isSpeaking && (
-                <div className="absolute -inset-1 rounded-full border-[3px] border-neon-green z-0" />
-              )}
-              
-              <div className="relative z-10">
-                <UserAvatar
-                  user={user}
-                  size="lg"
-                  showName
-                  isMainSinger={isMainSinger}
-                  audioLevel={userAudioLevel}
-                  isExtraLoud={isExtraLoud}
-                />
-              </div>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-64 p-4 glass backdrop-blur-xl border-primary/20" side="top">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                    <Volume2 className="w-4 h-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold">{user.nickname}</p>
-                    <p className="text-[10px] text-muted-foreground uppercase">User Volume</p>
-                  </div>
-                </div>
-                <span className="text-xs font-mono font-bold text-primary">
-                  {Math.round(userVolume)}%
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <VolumeX className="w-4 h-4 text-muted-foreground" />
-                <Slider
-                  value={[userVolume]}
-                  max={200}
-                  step={1}
-                  onValueChange={([val]) => onVolumeChange?.(user.id, val)}
-                  className="flex-1"
-                />
-                <Volume2 className="w-4 h-4 text-primary" />
-              </div>
-              
-              <p className="text-[10px] text-center text-muted-foreground italic">
-                Volume changes are saved locally to your browser.
-              </p>
-              
-              {/* Team Swap Button - Host only, Team Battle mode only */}
-              {isHost && roomMode === 'team-battle' && user.team && onSwapTeam && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full gap-2"
-                  onClick={() => {
-                    onSwapTeam(user.id);
-                    setIsOpen(false);
-                  }}
-                >
-                  <ArrowLeftRight className="w-4 h-4" />
-                  Swap to {user.team === 'left' ? 'Blue' : 'Pink'} Team
-                </Button>
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
-      </div>
-    </div>
-  );
-};
+import { Volume2, VolumeX } from 'lucide-react';
 
 interface UserAvatarRowProps {
   users: User[];
@@ -217,9 +27,6 @@ interface UserAvatarRowProps {
   battleFormat?: BattleFormat;
   userVolumes?: Record<string, number>;
   onVolumeChange?: (userId: string, volume: number) => void;
-  isHost?: boolean;
-  onSwapTeam?: (userId: string) => void;
-  activeReactions?: Map<string, string>;
 }
 
 export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({ 
@@ -236,11 +43,7 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
   battleFormat,
   userVolumes = {},
   onVolumeChange,
-  isHost = false,
-  onSwapTeam,
-  activeReactions = new Map(),
 }) => {
-  const { partyMode } = useTheme();
   // Sort to put current user first
   const sortedUsers = [...users].sort((a, b) => {
     if (a.id === currentUserId) return -1;
@@ -265,76 +68,180 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
     : null;
 
   const mainSingerUser = users.find(u => u.id === activeMainSingerId);
-  const activeTeam = mainSingerUser?.team || null;
+  const activeTeam = mainSingerUser?.team;
 
   // Split users for Team Battle
   const leftTeam = users.filter(u => u.team === 'left');
   const rightTeam = users.filter(u => u.team === 'right');
   const unassigned = users.filter(u => !u.team);
 
-  const renderUser = (user: User) => (
-    <UserAvatarItem 
-      key={user.id}
-      user={user}
-      currentUserId={currentUserId}
-      usersCount={users.length}
-      isWaving={wavingUsers.has(user.id)}
-      color={getUserColor(user.id)}
-      audioIntensity={audioIntensity}
-      beatPhase={beatPhase}
-      isBeat={isBeat}
-      bpm={bpm}
-      roomMode={roomMode || 'free-sing'}
-      activeMainSingerId={activeMainSingerId}
-      activeTeam={activeTeam}
-      voteKickDisabled={voteKickDisabled}
-      onStartVoteKick={onStartVoteKick}
-      userVolume={userVolumes[user.id] ?? 100}
-      onVolumeChange={onVolumeChange}
-      isHost={isHost}
-      onSwapTeam={onSwapTeam}
-      activeReaction={activeReactions.get(user.id) || null}
-      partyMode={partyMode}
-    />
-  );
+  const renderUser = (user: User) => {
+    const isWaving = wavingUsers.has(user.id);
+    const color = getUserColor(user.id);
+    const isMainSinger = user.id === activeMainSingerId;
+    const userAudioLevel = user.audioLevel || 0;
+    
+    // Cheerleader effect: jump if member of other team is singing
+    const isCheerleader = roomMode === 'team-battle' && activeTeam && user.team !== activeTeam && activeMainSingerId;
+
+    // Dynamic scale based on audio level for main singer
+    const dynamicScale = isMainSinger ? 1.15 + (userAudioLevel * 0.15) : 1;
+    const translateY = isMainSinger ? -8 - (userAudioLevel * 8) : 0;
+
+    return (
+      <div key={user.id} className={cn(
+        "flex items-end gap-1 group relative transition-all duration-300",
+        isMainSinger ? "z-20" : "z-10",
+        isCheerleader && "animate-bounce"
+      )}
+      style={{
+        transform: `scale(${dynamicScale}) translateY(${translateY}px)`,
+      }}
+      >
+        {/* Spotlight effect for main singer */}
+        <SingerSpotlight isMainSinger={isMainSinger} audioLevel={userAudioLevel} />
+        
+        {/* Music notes floating effect */}
+        <MusicNotesEffect isActive={isMainSinger && user.isSpeaking} audioLevel={userAudioLevel} />
+
+        {/* Vote kick button */}
+        {onStartVoteKick && users.length >= 2 && (
+          <div className="absolute -top-1 -right-1 z-10">
+            <VoteKickButton
+              user={user}
+              currentUserId={currentUserId || ''}
+              onStartVote={onStartVoteKick}
+              disabled={voteKickDisabled}
+            />
+          </div>
+        )}
+
+        {/* Light stick on left side - synced to BPM */}
+        {isWaving && (
+          <div className="relative -mr-2 z-10">
+            <LightStick
+              color={color}
+              isWaving={true}
+              intensity={audioIntensity}
+              beatPhase={beatPhase}
+              isBeat={isBeat}
+              bpm={bpm}
+              size="sm"
+              className="transform -rotate-12"
+            />
+          </div>
+        )}
+        
+        <div className={cn(
+          'transition-transform duration-300',
+          (isWaving || isCheerleader) && 'animate-bounce-subtle'
+        )}>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="outline-none focus:ring-2 focus:ring-primary rounded-full transition-transform active:scale-95">
+                <UserAvatar
+                  user={user}
+                  size="lg"
+                  showName
+                  isMainSinger={isMainSinger}
+                  audioLevel={userAudioLevel}
+                />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-4 glass backdrop-blur-xl border-primary/20" side="top">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                      <Volume2 className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">{user.nickname}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase">User Volume</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-primary">
+                    {Math.round((userVolumes[user.id] ?? 100))}%
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <VolumeX className="w-4 h-4 text-muted-foreground" />
+                  <Slider
+                    value={[userVolumes[user.id] ?? 100]}
+                    max={200}
+                    step={1}
+                    onValueChange={([val]) => onVolumeChange?.(user.id, val)}
+                    className="flex-1"
+                  />
+                  <Volume2 className="w-4 h-4 text-primary" />
+                </div>
+                
+                <p className="text-[10px] text-center text-muted-foreground italic">
+                  Volume changes are saved locally to your browser.
+                </p>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="glass rounded-2xl p-6 bg-gradient-to-t from-background/80 to-transparent backdrop-blur-xl">
       {roomMode === 'team-battle' ? (
-        <div className="flex flex-col gap-4">
-          {/* Team Battle Singers - Simplified layout without duplicate scores */}
-          <div className="flex flex-col lg:flex-row items-stretch justify-between gap-4 lg:gap-8">
-            {/* Left Team (Pink) */}
-            <div className="flex-1 flex flex-col gap-3 p-4 rounded-xl bg-gradient-to-br from-pink-500/10 to-purple-500/5 border border-pink-500/20">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-gradient-to-r from-pink-500 to-purple-500" />
-                <span className="text-xs font-black text-pink-400 uppercase tracking-widest">Team Pink</span>
+        <div className="flex flex-col gap-8">
+          <div className="flex items-stretch justify-between gap-0 min-h-[200px]">
+            {/* Left Team */}
+            <div className="flex-1 flex flex-col gap-6 pr-8 border-r border-blue-500/20">
+              <div className="flex items-center justify-between h-12">
+                <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Team Blue</span>
+                <div className="flex flex-col items-end">
+                  <span className="text-3xl font-black text-blue-500 leading-none">
+                    {leftTeam.reduce((acc, u) => acc + (u.score || 0), 0)}
+                  </span>
+                  <span className="text-[10px] text-blue-400/40 uppercase font-black tracking-tighter">Points</span>
+                </div>
               </div>
               
-              <div className="flex items-center justify-start gap-3 flex-wrap min-h-[80px]">
+              <div className="flex-1 flex items-start justify-start gap-4 flex-wrap">
                 {leftTeam.length > 0 ? (
                   leftTeam.map(renderUser)
                 ) : (
-                  <div className="w-full h-20 flex items-center justify-center border-2 border-dashed border-pink-500/20 rounded-xl bg-pink-500/5">
-                    <p className="text-[10px] text-pink-500/40 uppercase font-bold tracking-widest">Waiting...</p>
+                  <div className="w-full h-32 flex items-center justify-center border-2 border-dashed border-blue-500/10 rounded-2xl bg-blue-500/5 self-start">
+                    <p className="text-[10px] text-blue-500/30 uppercase font-bold tracking-widest">Awaiting Blue Fleet</p>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Right Team (Blue) */}
-            <div className="flex-1 flex flex-col gap-3 p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/5 border border-blue-500/20">
-              <div className="flex items-center justify-end gap-2">
-                <span className="text-xs font-black text-blue-400 uppercase tracking-widest">Team Blue</span>
-                <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
+            {/* VS Divider Container */}
+            <div className="flex flex-col items-center justify-center px-4 relative">
+              <div className="w-20 h-20 rounded-full bg-background/60 backdrop-blur-xl flex items-center justify-center border-2 border-primary shadow-[0_0_30px_rgba(var(--primary),0.2)] relative group cursor-default transition-transform hover:scale-110 z-10">
+                <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping [animation-duration:3s]" />
+                <span className="text-2xl font-black italic tracking-tighter text-primary z-10">VS</span>
+              </div>
+            </div>
+
+            {/* Right Team */}
+            <div className="flex-1 flex flex-col gap-6 pl-8 border-l border-red-500/20 text-right">
+              <div className="flex items-center justify-between h-12">
+                <div className="flex flex-col items-start text-left">
+                  <span className="text-3xl font-black text-red-500 leading-none">
+                    {rightTeam.reduce((acc, u) => acc + (u.score || 0), 0)}
+                  </span>
+                  <span className="text-[10px] text-red-400/40 uppercase font-black tracking-tighter">Points</span>
+                </div>
+                <span className="text-[10px] font-black text-red-400 uppercase tracking-[0.2em]">Team Red</span>
               </div>
               
-              <div className="flex items-center justify-end gap-3 flex-wrap min-h-[80px]">
+              <div className="flex-1 flex items-start justify-end gap-4 flex-wrap">
                 {rightTeam.length > 0 ? (
                   rightTeam.map(renderUser)
                 ) : (
-                  <div className="w-full h-20 flex items-center justify-center border-2 border-dashed border-blue-500/20 rounded-xl bg-blue-500/5">
-                    <p className="text-[10px] text-blue-500/40 uppercase font-bold tracking-widest">Waiting...</p>
+                  <div className="w-full h-32 flex items-center justify-center border-2 border-dashed border-red-500/10 rounded-2xl bg-red-500/5 self-start">
+                    <p className="text-[10px] text-red-500/30 uppercase font-bold tracking-widest">Awaiting Red Legion</p>
                   </div>
                 )}
               </div>
@@ -342,9 +249,9 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
           </div>
           
           {unassigned.length > 0 && (
-            <div className="pt-4 border-t border-white/5">
-              <p className="text-[10px] text-center text-muted-foreground uppercase tracking-[0.2em] font-bold mb-3 opacity-50">Bench</p>
-              <div className="flex items-end justify-center gap-4 flex-wrap">
+            <div className="pt-6 border-t border-white/5">
+              <p className="text-[10px] text-center text-muted-foreground uppercase tracking-[0.3em] font-bold mb-4 opacity-50">Bench / Unassigned</p>
+              <div className="flex items-end justify-center gap-6 flex-wrap">
                 {unassigned.map(renderUser)}
               </div>
             </div>
@@ -353,7 +260,7 @@ export const UserAvatarRow: React.FC<UserAvatarRowProps> = ({
       ) : (
         <>
           <h3 className="text-center text-xs uppercase tracking-widest text-muted-foreground mb-4">Singers</h3>
-          <div className="flex items-end justify-start lg:justify-center gap-4 lg:gap-8 flex-nowrap lg:flex-wrap overflow-x-auto lg:overflow-visible pb-4 lg:pb-0 scrollbar-hide">
+          <div className="flex items-end justify-center gap-8 flex-wrap">
             {sortedUsers.map(renderUser)}
             {users.length === 0 && (
               <p className="text-muted-foreground">No singers yet — invite friends!</p>
