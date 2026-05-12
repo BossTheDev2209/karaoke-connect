@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 
 // Theme presets
 export type ThemePreset = 'auto' | 'neon' | 'ocean' | 'sunset' | 'forest' | 'galaxy' | 'retro' | 'midnight' | 'candy' | 'ember';
-export type BackgroundEffect = 'none' | 'beat-sync' | 'particles' | 'neon-grid' | 'wave-form';
 
 interface ThemeColors {
   primary: string;   // HSL format: "280 100% 65%"
@@ -13,8 +12,6 @@ interface ThemeColors {
 interface ThemeContextValue {
   preset: ThemePreset;
   setPreset: (preset: ThemePreset) => void;
-  backgroundEffect: BackgroundEffect;
-  setBackgroundEffect: (effect: BackgroundEffect) => void;
   karaokeFilterEnabled: boolean;
   setKaraokeFilterEnabled: (enabled: boolean) => void;
   setVideoId: (videoId: string | null) => void;
