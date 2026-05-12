@@ -149,6 +149,7 @@ const Room = () => {
 
   return (
     <div className="min-h-screen flex flex-col p-4 gap-4">
+      <FloatingReactions reactions={reactions} />
       <header className="flex items-center justify-between">
         <RoomCodeDisplay code={code} />
         <div className="flex items-center gap-2">
