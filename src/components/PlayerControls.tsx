@@ -6,13 +6,10 @@ import {
   SkipBack,
   Volume2, 
   VolumeX,
-  Mic,
-  MicOff,
   RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { cn } from '@/lib/utils';
 
 interface PlayerControlsProps {
   isPlaying: boolean;
@@ -20,7 +17,6 @@ interface PlayerControlsProps {
   volume: number;
   currentTime: number;
   duration: number;
-  isMicEnabled: boolean;
   canGoPrevious: boolean;
   canGoNext: boolean;
   onPlayPause: () => void;
@@ -29,7 +25,6 @@ interface PlayerControlsProps {
   onSeek: (time: number) => void;
   onVolumeChange: (volume: number) => void;
   onMuteToggle: () => void;
-  onMicToggle: () => void;
   onSync: () => void;
 }
 
@@ -39,7 +34,6 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   volume,
   currentTime,
   duration,
-  isMicEnabled,
   canGoPrevious,
   canGoNext,
   onPlayPause,
@@ -48,7 +42,6 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   onSeek,
   onVolumeChange,
   onMuteToggle,
-  onMicToggle,
   onSync,
 }) => {
   const formatTime = (seconds: number) => {
@@ -59,7 +52,6 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Progress bar */}
       <div className="space-y-2">
         <Slider
           value={[currentTime]}
@@ -74,20 +66,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         </div>
       </div>
 
-      {/* Main controls */}
       <div className="flex items-center justify-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onMicToggle}
-          className={cn(
-            'rounded-full transition-all',
-            isMicEnabled && 'bg-neon-green/20 text-neon-green'
-          )}
-        >
-          {isMicEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-        </Button>
-
         <Button
           variant="ghost"
           size="icon"
