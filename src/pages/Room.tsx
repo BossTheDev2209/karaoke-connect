@@ -245,7 +245,7 @@ const Room = () => {
           />
 
           <div className="mt-auto pt-4">
-            <ReactionBar onReact={sendReaction} isWaving={isWaving} onWaveToggle={toggleWaving} />
+            <ReactionBar onReact={sendReaction} />
           </div>
         </div>
       </div>
@@ -253,7 +253,6 @@ const Room = () => {
       <UserAvatarRow 
         users={users} 
         currentUserId={user.id} 
-        wavingUsers={wavingUsers} 
         userVolumes={userVolumes}
         onVolumeChange={handleUserVolumeChange}
       />
