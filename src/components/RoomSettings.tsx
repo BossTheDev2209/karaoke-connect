@@ -9,18 +9,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { useTheme, THEME_PRESETS } from '@/contexts/ThemeContext';
 
 export const RoomSettings: React.FC = () => {
-  const {
-    preset,
-    setPreset,
-    karaokeFilterEnabled,
-    setKaraokeFilterEnabled
-  } = useTheme();
+  const { preset, setPreset } = useTheme();
 
   return (
     <Sheet>
