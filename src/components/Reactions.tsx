@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Sparkles } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface FloatingReaction {
   id: string;
@@ -14,11 +12,9 @@ const REACTION_EMOJIS = ['🔥', '❤️', '👏', '🎉', '😍', '🎤', '✨'
 
 interface ReactionBarProps {
   onReact: (emoji: string) => void;
-  isWaving: boolean;
-  onWaveToggle: () => void;
 }
 
-export const ReactionBar: React.FC<ReactionBarProps> = ({ onReact, isWaving, onWaveToggle }) => {
+export const ReactionBar: React.FC<ReactionBarProps> = ({ onReact }) => {
   return (
     <div className="flex items-center gap-2">
       <div className="flex gap-1 p-2 rounded-full glass border border-border/50">
@@ -34,23 +30,6 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({ onReact, isWaving, onW
           </Button>
         ))}
       </div>
-      
-      {/* Wave button */}
-      <Button
-        variant={isWaving ? 'default' : 'outline'}
-        size="sm"
-        onClick={onWaveToggle}
-        className={cn(
-          'gap-1.5 transition-all',
-          isWaving && 'bg-primary shadow-lg shadow-primary/50'
-        )}
-      >
-        <Sparkles className={cn(
-          'w-4 h-4',
-          isWaving && 'animate-pulse'
-        )} />
-        {isWaving ? '🎵' : 'Wave'}
-      </Button>
     </div>
   );
 };
