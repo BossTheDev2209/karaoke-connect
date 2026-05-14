@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Plus, X, Loader2, Music, User, ArrowLeft } from 'lucide-react';
+import { Search, Plus, X, Loader2, Music, User, ArrowLeft, Mic2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
