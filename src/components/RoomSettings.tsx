@@ -35,10 +35,10 @@ export const RoomSettings: React.FC = () => {
 
         <div className="mt-6 space-y-6">
           <div className="space-y-3">
-            <Label className="text-sm font-medium flex items-center gap-2">
+            <div className="text-sm font-medium flex items-center gap-2">
               <Palette className="w-4 h-4 text-primary" />
               Theme
-            </Label>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               {THEME_PRESETS.map((theme) => (
                 <button
