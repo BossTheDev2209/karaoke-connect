@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Palette, Sparkles, Music } from 'lucide-react';
+import { Settings, Palette, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
