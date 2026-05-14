@@ -82,27 +82,6 @@ export const RoomSettings: React.FC = () => {
               ))}
             </div>
           </div>
-
-          <div className="flex items-center justify-between p-4 rounded-lg bg-card border border-border">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-primary/20">
-                <Music className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <Label htmlFor="search-filter-toggle" className="text-sm font-medium">
-                  Search Filter
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Only show Instrumental/Karaoke versions
-                </p>
-              </div>
-            </div>
-            <Switch
-              id="search-filter-toggle"
-              checked={karaokeFilterEnabled}
-              onCheckedChange={setKaraokeFilterEnabled}
-            />
-          </div>
         </div>
       </SheetContent>
     </Sheet>
