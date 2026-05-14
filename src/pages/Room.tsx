@@ -13,7 +13,7 @@ import { SongSearch } from '@/components/SongSearch';
 import { UserAvatarRow } from '@/components/UserAvatarRow';
 import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
 import { RoomSettings } from '@/components/RoomSettings';
-import { ReactionBar, FloatingReactions, useReactions, useWaving } from '@/components/Reactions';
+import { ReactionBar, FloatingReactions, useReactions } from '@/components/Reactions';
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
