@@ -64,7 +64,7 @@ const Room = () => {
   }, [currentSong?.videoId, setVideoId]);
 
   const { reactions, sendReaction } = useReactions(channel, user?.id || '');
-  const { isWaving, toggleWaving, wavingUsers } = useWaving(channel, user?.id || '');
+  
 
   const handleStateChange = useCallback((isPlaying: boolean) => {
     updatePlayback({ isPlaying });
