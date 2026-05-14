@@ -22,19 +22,6 @@ const Room = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [volume, setVolume] = useState(80);
-  const [userVolumes, setUserVolumes] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem('karaoke_user_volumes');
-    return saved ? JSON.parse(saved) : {};
-  });
-
-  useEffect(() => {
-    localStorage.setItem('karaoke_user_volumes', JSON.stringify(userVolumes));
-  }, [userVolumes]);
-
-  const handleUserVolumeChange = (userId: string, volume: number) => {
-    setUserVolumes(prev => ({ ...prev, [userId]: volume }));
-  };
-
   const { setVideoId } = useTheme();
 
   useEffect(() => {
