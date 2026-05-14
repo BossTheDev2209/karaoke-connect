@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Plus, X, Loader2, Music, User, ArrowLeft } from 'lucide-react';
+import { Search, Plus, X, Loader2, Music, User, ArrowLeft, Mic2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,7 +15,7 @@ interface SongSearchProps {
 type SearchTab = 'songs' | 'artists';
 
 export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => {
-  const { karaokeFilterEnabled } = useTheme();
+  const { karaokeFilterEnabled, setKaraokeFilterEnabled } = useTheme();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<YouTubeSearchResult[]>([]);
   const [channels, setChannels] = useState<YouTubeChannel[]>([]);
@@ -165,6 +165,19 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
         >
           <User className="w-3.5 h-3.5" />
           Artists
+        </button>
+        <button
+          onClick={() => setKaraokeFilterEnabled(!karaokeFilterEnabled)}
+          title="Only show Instrumental/Karaoke versions"
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ml-auto',
+            karaokeFilterEnabled
+              ? 'bg-accent text-accent-foreground'
+              : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+          )}
+        >
+          <Mic2 className="w-3.5 h-3.5" />
+          Karaoke
         </button>
       </div>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Palette, Sparkles, Music } from 'lucide-react';
+import { Settings, Palette, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -9,18 +9,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { useTheme, THEME_PRESETS } from '@/contexts/ThemeContext';
 
 export const RoomSettings: React.FC = () => {
-  const {
-    preset,
-    setPreset,
-    karaokeFilterEnabled,
-    setKaraokeFilterEnabled
-  } = useTheme();
+  const { preset, setPreset } = useTheme();
 
   return (
     <Sheet>
@@ -42,10 +35,10 @@ export const RoomSettings: React.FC = () => {
 
         <div className="mt-6 space-y-6">
           <div className="space-y-3">
-            <Label className="text-sm font-medium flex items-center gap-2">
+            <div className="text-sm font-medium flex items-center gap-2">
               <Palette className="w-4 h-4 text-primary" />
               Theme
-            </Label>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               {THEME_PRESETS.map((theme) => (
                 <button
@@ -88,27 +81,6 @@ export const RoomSettings: React.FC = () => {
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="flex items-center justify-between p-4 rounded-lg bg-card border border-border">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-primary/20">
-                <Music className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <Label htmlFor="search-filter-toggle" className="text-sm font-medium">
-                  Search Filter
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Only show Instrumental/Karaoke versions
-                </p>
-              </div>
-            </div>
-            <Switch
-              id="search-filter-toggle"
-              checked={karaokeFilterEnabled}
-              onCheckedChange={setKaraokeFilterEnabled}
-            />
           </div>
         </div>
       </SheetContent>
