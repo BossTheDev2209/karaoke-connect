@@ -237,12 +237,7 @@ const Room = () => {
         </div>
       </div>
 
-      <UserAvatarRow 
-        users={users} 
-        currentUserId={user.id} 
-        userVolumes={userVolumes}
-        onVolumeChange={handleUserVolumeChange}
-      />
+      <UserAvatarRow users={users} currentUserId={user.id} />
     </div>
   );
 };
