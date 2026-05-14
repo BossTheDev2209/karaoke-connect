@@ -15,7 +15,7 @@ interface SongSearchProps {
 type SearchTab = 'songs' | 'artists';
 
 export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => {
-  const { karaokeFilterEnabled } = useTheme();
+  const { karaokeFilterEnabled, setKaraokeFilterEnabled } = useTheme();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<YouTubeSearchResult[]>([]);
   const [channels, setChannels] = useState<YouTubeChannel[]>([]);
