@@ -13,7 +13,7 @@ import { SongSearch } from '@/components/SongSearch';
 import { UserAvatarRow } from '@/components/UserAvatarRow';
 import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
 import { RoomSettings } from '@/components/RoomSettings';
-import { ReactionBar, FloatingReactions, useReactions, useWaving } from '@/components/Reactions';
+import { ReactionBar, FloatingReactions, useReactions } from '@/components/Reactions';
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -64,7 +64,7 @@ const Room = () => {
   }, [currentSong?.videoId, setVideoId]);
 
   const { reactions, sendReaction } = useReactions(channel, user?.id || '');
-  const { isWaving, toggleWaving, wavingUsers } = useWaving(channel, user?.id || '');
+  
 
   const handleStateChange = useCallback((isPlaying: boolean) => {
     updatePlayback({ isPlaying });
@@ -245,7 +245,7 @@ const Room = () => {
           />
 
           <div className="mt-auto pt-4">
-            <ReactionBar onReact={sendReaction} isWaving={isWaving} onWaveToggle={toggleWaving} />
+            <ReactionBar onReact={sendReaction} />
           </div>
         </div>
       </div>
@@ -253,7 +253,6 @@ const Room = () => {
       <UserAvatarRow 
         users={users} 
         currentUserId={user.id} 
-        wavingUsers={wavingUsers} 
         userVolumes={userVolumes}
         onVolumeChange={handleUserVolumeChange}
       />
