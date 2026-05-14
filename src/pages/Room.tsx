@@ -115,7 +115,27 @@ const Room = () => {
   };
 
   const handleRemoveSong = (songId: string) => {
-    updateQueue(queue.filter(s => s.id !== songId));
+    const removedIndex = queue.findIndex(s => s.id === songId);
+    if (removedIndex === -1) return;
+    const newQueue = queue.filter(s => s.id !== songId);
+    updateQueue(newQueue);
+
+    const currentIndex = playbackState.currentSongIndex;
+
+    if (newQueue.length === 0) {
+      // Nothing left — stop and reset
+      updatePlayback({ currentSongIndex: 0, currentTime: 0, isPlaying: false });
+      return;
+    }
+
+    if (removedIndex < currentIndex) {
+      // Shift index down so we keep playing the same song
+      updatePlayback({ currentSongIndex: currentIndex - 1 });
+    } else if (removedIndex === currentIndex) {
+      // Removed the currently playing song — advance to the song now at this index
+      const nextIndex = Math.min(currentIndex, newQueue.length - 1);
+      updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
+    }
   };
 
   const handleSelectSong = (index: number) => {
