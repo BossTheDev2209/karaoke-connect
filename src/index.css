@@ -457,3 +457,8 @@
     }
   }
 }
+
+/* Block all interaction with YouTube iframe so chrome (channel title, pause overlay, share, end cards, branding) never appears on hover/click */
+iframe#youtube-player {
+  pointer-events: none !important;
+}
