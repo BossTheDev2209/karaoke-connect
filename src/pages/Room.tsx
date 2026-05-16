@@ -10,7 +10,7 @@ import { LyricsDisplay } from '@/components/LyricsDisplay';
 import { PlayerControls } from '@/components/PlayerControls';
 import { SongQueue } from '@/components/SongQueue';
 import { SongSearch } from '@/components/SongSearch';
-import { UserAvatarRow } from '@/components/UserAvatarRow';
+import { UserAvatars } from '@/components/ui/user-avatars';
 import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
 import { RoomSettings } from '@/components/RoomSettings';
 import { ReactionBar, FloatingReactions, useReactions } from '@/components/Reactions';
