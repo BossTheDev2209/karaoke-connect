@@ -267,21 +267,6 @@ const Room = () => {
 
           <div className="mt-auto pt-4 flex flex-col gap-4">
             <ReactionBar onReact={sendReaction} />
-            {users.length > 0 && (
-              <div className="flex justify-center pt-2">
-                <UserAvatars
-                  size={40}
-                  maxVisible={6}
-                  users={users.map((u) => ({
-                    id: u.id,
-                    name: u.nickname,
-                    image:
-                      u.customAvatarNormal ||
-                      `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(u.avatarId || u.id)}`,
-                  }))}
-                />
-              </div>
-            )}
           </div>
         </div>
       </div>
