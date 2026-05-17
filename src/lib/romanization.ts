@@ -97,7 +97,12 @@ export const romanizeJapanese = async (text: string): Promise<string> => {
     return toRomaji(text);
   } catch (error) {
     console.warn('Advanced romanization failed, falling back to basic:', error);
-    return toRomaji(text);
+    try {
+      const { toRomaji } = await import('wanakana');
+      return toRomaji(text);
+    } catch {
+      return text;
+    }
   }
 };
 
