@@ -458,7 +458,18 @@
   }
 }
 
-/* Block all interaction with YouTube iframe so chrome (channel title, pause overlay, share, end cards, branding) never appears on hover/click */
-iframe#youtube-player {
+/* Block all interaction with YouTube iframe so chrome (channel title, pause overlay, share, end cards, branding) never appears on hover/click or programmatic seek */
+#youtube-player {
+  position: relative;
+  overflow: hidden;
+}
+
+#youtube-player iframe {
   pointer-events: none !important;
+  /* Scale up so YouTube's top title bar and bottom gradient (which briefly reappear on seek) are cropped out of view */
+  position: absolute;
+  top: -60px;
+  left: -10%;
+  width: 120% !important;
+  height: calc(100% + 120px) !important;
 }
