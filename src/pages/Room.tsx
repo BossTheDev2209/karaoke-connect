@@ -202,7 +202,9 @@ const Room = () => {
 
         <div className="lg:col-span-6 flex flex-col gap-4">
           <div className="card-karaoke aspect-video relative flex-1">
-            <div id="youtube-player" className="w-full h-full rounded-lg overflow-hidden [&_iframe]:pointer-events-none" />
+            <div className="absolute inset-0 rounded-lg overflow-hidden" id="youtube-player-wrapper">
+              <div id="youtube-player" className="w-full h-full" />
+            </div>
             {/* Blocks all YouTube chrome (channel header, pause overlay, share, end cards, branding) by preventing iframe interaction */}
             <div className="absolute inset-0 rounded-lg z-10" aria-hidden="true" />
 
