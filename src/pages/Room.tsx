@@ -188,20 +188,23 @@ const Room = () => {
         </div>
       </header>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-3 card-karaoke overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="lg:col-span-3 card-karaoke overflow-hidden flex flex-col min-h-0">
           <h3 className="font-semibold mb-3 text-primary">Queue</h3>
           <div className="mb-3">
             <SongSearch onAddSong={handleAddSong} userId={user.id} />
           </div>
-          <div className="flex-1 overflow-y-auto">
-            <SongQueue 
-              queue={queue} 
-              currentIndex={playbackState.currentSongIndex} 
-              onRemove={handleRemoveSong} 
-              onSelect={handleSelectSong}
-              getLyricStatus={getStatusForSong}
-            />
+          <div className="relative flex-1 min-h-0">
+            <div className="absolute inset-0 overflow-y-auto pr-1">
+              <SongQueue 
+                queue={queue} 
+                currentIndex={playbackState.currentSongIndex} 
+                onRemove={handleRemoveSong} 
+                onSelect={handleSelectSong}
+                getLyricStatus={getStatusForSong}
+              />
+            </div>
+            <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-card to-transparent" />
           </div>
         </div>
 
