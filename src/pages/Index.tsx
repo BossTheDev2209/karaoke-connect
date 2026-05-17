@@ -98,16 +98,8 @@ const Index = () => {
           <h2 className="text-2xl font-bold mb-2">
             {mode === 'create' ? 'Create a Room' : 'Join a Room'}
           </h2>
-          <p className="text-muted-foreground text-sm">Customize your avatar and nickname</p>
+          <p className="text-muted-foreground text-sm">Pick a nickname to get started</p>
         </div>
-
-        <AvatarPicker 
-          selectedId={avatarId} 
-          onSelect={setAvatarId}
-          customAvatarNormal={customAvatarNormal}
-          customAvatarSpeaking={customAvatarSpeaking}
-          onCustomAvatarsChange={handleCustomAvatarsChange}
-        />
 
         <Input
           value={nickname}
