@@ -2,9 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { AvatarPicker } from '@/components/AvatarPicker';
 import { generateRoomCode, isValidRoomCode } from '@/lib/roomCode';
-import { avatarConfigToId, generateRandomAvatar } from '@/data/avatars';
 import { Music, Users } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
@@ -12,15 +10,7 @@ const Index = () => {
   const navigate = useNavigate();
   const [mode, setMode] = useState<'home' | 'create' | 'join'>('home');
   const [nickname, setNickname] = useState('');
-  const [avatarId, setAvatarId] = useState(() => avatarConfigToId(generateRandomAvatar()));
   const [roomCode, setRoomCode] = useState('');
-  const [customAvatarNormal, setCustomAvatarNormal] = useState<string | undefined>();
-  const [customAvatarSpeaking, setCustomAvatarSpeaking] = useState<string | undefined>();
-
-  const handleCustomAvatarsChange = (normal: string | undefined, speaking: string | undefined) => {
-    setCustomAvatarNormal(normal);
-    setCustomAvatarSpeaking(speaking);
-  };
 
   const handleCreate = () => {
     if (!nickname.trim()) {
@@ -28,13 +18,11 @@ const Index = () => {
       return;
     }
     const code = generateRoomCode();
-    const userData = { 
-      id: crypto.randomUUID(), 
-      nickname: nickname.trim(), 
-      avatarId, 
-      customAvatarNormal,
-      customAvatarSpeaking,
-      isSpeaking: false 
+    const userData = {
+      id: crypto.randomUUID(),
+      nickname: nickname.trim(),
+      avatarId: '',
+      isSpeaking: false,
     };
     sessionStorage.setItem('karaoke_user', JSON.stringify(userData));
     navigate(`/room/${code}`);
@@ -49,13 +37,11 @@ const Index = () => {
       toast({ title: 'Invalid room code', variant: 'destructive' });
       return;
     }
-    const userData = { 
-      id: crypto.randomUUID(), 
-      nickname: nickname.trim(), 
-      avatarId, 
-      customAvatarNormal,
-      customAvatarSpeaking,
-      isSpeaking: false 
+    const userData = {
+      id: crypto.randomUUID(),
+      nickname: nickname.trim(),
+      avatarId: '',
+      isSpeaking: false,
     };
     sessionStorage.setItem('karaoke_user', JSON.stringify(userData));
     navigate(`/room/${roomCode.toUpperCase()}`);
@@ -112,16 +98,8 @@ const Index = () => {
           <h2 className="text-2xl font-bold mb-2">
             {mode === 'create' ? 'Create a Room' : 'Join a Room'}
           </h2>
-          <p className="text-muted-foreground text-sm">Customize your avatar and nickname</p>
+          <p className="text-muted-foreground text-sm">Pick a nickname to get started</p>
         </div>
-
-        <AvatarPicker 
-          selectedId={avatarId} 
-          onSelect={setAvatarId}
-          customAvatarNormal={customAvatarNormal}
-          customAvatarSpeaking={customAvatarSpeaking}
-          onCustomAvatarsChange={handleCustomAvatarsChange}
-        />
 
         <Input
           value={nickname}
