@@ -1,13 +1,22 @@
-import Kuroshiro from 'kuroshiro';
-import KuromojiAnalyzer from 'kuroshiro-analyzer-kuromoji';
-import { pinyin } from 'pinyin-pro';
-import { isJapanese, toRomaji } from 'wanakana';
-
 // Singleton instance for Kuroshiro
-let kuroshiro: any = null;
+type KuroshiroEngine = {
+  init: (analyzer: unknown) => Promise<void>;
+  convert: (
+    text: string,
+    options: { to: 'romaji'; mode: 'spaced'; romajiSystem: 'passport' }
+  ) => Promise<string>;
+};
+
+type KuroshiroConstructor = new () => KuroshiroEngine;
+type KuromojiAnalyzerConstructor = new (options: { dictPath: string }) => unknown;
+
+let kuroshiro: KuroshiroEngine | null = null;
 let isInitializing = false;
 let initPromise: Promise<void> | null = null;
 let initializationFailed = false;
+
+const hasJapaneseKana = (text: string): boolean => /[\u3040-\u309f\u30a0-\u30ff]/.test(text);
+const hasHanCharacters = (text: string): boolean => /[\u4e00-\u9fff]/.test(text);
 
 // Initialize Kuroshiro engine
 export const initRomanization = async (): Promise<void> => {
@@ -17,11 +26,14 @@ export const initRomanization = async (): Promise<void> => {
   isInitializing = true;
   initPromise = (async () => {
     try {
-      console.log('Initializing Kuroshiro with Kuromoji analyzer...');
+      const [{ default: Kuroshiro }, { default: KuromojiAnalyzer }] = await Promise.all([
+        import('kuroshiro'),
+        import('kuroshiro-analyzer-kuromoji'),
+      ]);
       
       // In Vite/ESM, we need to handle the .default export carefully
-      const KClass = (Kuroshiro as any).default || Kuroshiro;
-      const AClass = (KuromojiAnalyzer as any).default || KuromojiAnalyzer;
+      const KClass = Kuroshiro as unknown as KuroshiroConstructor;
+      const AClass = KuromojiAnalyzer as unknown as KuromojiAnalyzerConstructor;
       
       const instance = new KClass();
       await instance.init(new AClass({
@@ -29,7 +41,6 @@ export const initRomanization = async (): Promise<void> => {
       }));
       
       kuroshiro = instance;
-      console.log('Kuroshiro engine ready.');
     } catch (error) {
       console.error('Kuroshiro initialization failed:', error);
       initializationFailed = true;
@@ -44,12 +55,12 @@ export const initRomanization = async (): Promise<void> => {
 
 // Check if text contains Chinese characters
 export const containsChinese = (text: string): boolean => {
-  return /[\u4e00-\u9fff]/.test(text) && !isJapanese(text);
+  return hasHanCharacters(text) && !hasJapaneseKana(text);
 };
 
 // Check if text contains Japanese
 export const containsJapanese = (text: string): boolean => {
-  return isJapanese(text) || /[\u3040-\u309f\u30a0-\u30ff]/.test(text);
+  return hasJapaneseKana(text);
 };
 
 // Check if text contains Korean
@@ -65,6 +76,8 @@ export const containsCJK = (text: string): boolean => {
 // Romanize Japanese text
 export const romanizeJapanese = async (text: string): Promise<string> => {
   try {
+    const { toRomaji } = await import('wanakana');
+
     // If not initialized, start it but don't block yet (we'll use fallback)
     if (!kuroshiro && !isInitializing && !initializationFailed) {
       initRomanization();
@@ -91,6 +104,15 @@ export const romanizeJapanese = async (text: string): Promise<string> => {
 // Romanize Chinese text to Pinyin
 export const romanizeChinese = (text: string): string => {
   try {
+    return text;
+  } catch {
+    return text;
+  }
+};
+
+export const romanizeChineseAsync = async (text: string): Promise<string> => {
+  try {
+    const { pinyin } = await import('pinyin-pro');
     return pinyin(text, { toneType: 'num', type: 'array' }).join(' ');
   } catch {
     return text;
@@ -153,7 +175,7 @@ export const romanize = async (text: string): Promise<string | null> => {
   if (!containsCJK(text)) return null;
   if (containsJapanese(text)) return await romanizeJapanese(text);
   if (containsKorean(text)) return romanizeKorean(text);
-  if (containsChinese(text)) return romanizeChinese(text);
+  if (containsChinese(text)) return await romanizeChineseAsync(text);
   return null;
 };
 

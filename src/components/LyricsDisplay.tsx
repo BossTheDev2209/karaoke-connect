@@ -140,7 +140,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [lyrics, showRomanization, hasCJK]);
+  }, [lyrics, showRomanization, hasCJK, calculatedRomanizations]);
 
   // Sync getRomanization helper
   const getRomanizedText = (text: string): string | null => {
@@ -158,7 +158,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
       
       container.scrollTo({
         top: lineTop - containerHeight / 2 + lineHeight / 2,
-        behavior: 'smooth',
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
       });
     }
   }, [currentLineIndex]);
@@ -265,7 +265,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
                   )}
                 </DialogTitle>
               </DialogHeader>
-              <div className="flex-1 overflow-y-auto pr-2 space-y-3">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden pr-2 space-y-3 scrollbar-karaoke">
                 {lyrics.map((line, index) => {
                   const romanization = showRomanization ? getRomanizedText(line.text) : null;
                   return (

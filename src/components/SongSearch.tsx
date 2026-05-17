@@ -182,7 +182,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
       </div>
 
       {isOpen && hasResults && (
-        <div className="absolute top-full left-0 right-0 mt-2 z-50 glass rounded-xl max-h-96 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-2 z-50 glass rounded-xl max-h-96 overflow-y-auto overflow-x-hidden scrollbar-karaoke pr-1">
           <div className="p-2 flex justify-between items-center border-b border-border">
             {selectedChannel ? (
               <button 
@@ -241,6 +241,8 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
                   src={channel.thumbnail}
                   alt={channel.title}
                   className="w-12 h-12 rounded-full object-cover"
+                  loading="lazy"
+                  decoding="async"
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{channel.title}</p>
@@ -271,6 +273,8 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
                   src={result.thumbnail}
                   alt={result.title}
                   className="w-16 h-12 object-cover rounded"
+                  loading="lazy"
+                  decoding="async"
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{result.title}</p>

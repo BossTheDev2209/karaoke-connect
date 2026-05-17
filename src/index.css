@@ -356,6 +356,48 @@
     display: none;
   }
 
+  /* Slim neon scrollbar for popovers and lyric sheets */
+  .scrollbar-karaoke {
+    scrollbar-color: hsl(var(--primary) / 0.75) hsl(var(--card) / 0.28);
+    scrollbar-width: thin;
+  }
+
+  .scrollbar-karaoke::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .scrollbar-karaoke::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .scrollbar-karaoke::-webkit-scrollbar-track {
+    margin: 10px 0;
+    border-radius: 999px;
+    background: linear-gradient(
+      180deg,
+      hsl(var(--card) / 0.16),
+      hsl(var(--primary) / 0.08),
+      hsl(var(--card) / 0.16)
+    );
+    border: 1px solid hsl(var(--border) / 0.28);
+  }
+
+  .scrollbar-karaoke::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background:
+      linear-gradient(180deg, hsl(var(--neon-pink) / 0.95), hsl(var(--neon-purple) / 0.95), hsl(var(--neon-blue) / 0.9));
+    border: 2px solid hsl(var(--card) / 0.72);
+    box-shadow: 0 0 14px hsl(var(--primary) / 0.45);
+  }
+
+  .scrollbar-karaoke::-webkit-scrollbar-thumb:hover {
+    background:
+      linear-gradient(180deg, hsl(var(--neon-yellow) / 0.95), hsl(var(--neon-pink) / 0.95), hsl(var(--neon-blue) / 0.95));
+    box-shadow: 0 0 18px hsl(var(--accent) / 0.55);
+  }
+
   /* Light stick wave animation */
   @keyframes lightstick-wave {
     0%, 100% {
@@ -472,4 +514,15 @@
   left: -10% !important;
   width: 120% !important;
   height: calc(100% + 120px) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

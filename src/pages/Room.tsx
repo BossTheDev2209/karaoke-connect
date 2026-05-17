@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { User, Song } from '@/types/karaoke';
 import { useRoom } from '@/hooks/useRoom';
@@ -51,6 +51,17 @@ const Room = () => {
   }, [currentSong?.videoId, setVideoId]);
 
   const { reactions, sendReaction } = useReactions(channel, user?.id || '');
+  const avatarUsers = useMemo(
+    () =>
+      users.map((u) => ({
+        id: u.id,
+        name: u.nickname,
+        image:
+          u.customAvatarNormal ||
+          `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(u.avatarId || u.id)}`,
+      })),
+    [users]
+  );
   
 
   const handleStateChange = useCallback((isPlaying: boolean) => {
@@ -167,13 +178,7 @@ const Room = () => {
               size={28}
               maxVisible={6}
               overlap={40}
-              users={users.map((u) => ({
-                id: u.id,
-                name: u.nickname,
-                image:
-                  u.customAvatarNormal ||
-                  `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(u.avatarId || u.id)}`,
-              }))}
+              users={avatarUsers}
             />
           )}
           <RoomSettings />

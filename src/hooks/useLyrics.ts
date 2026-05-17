@@ -35,7 +35,6 @@ export const useLyrics = (
 
     // Use preloaded data if available and loaded
     if (preloadedData && preloadedData.status === 'loaded') {
-      console.log('Using preloaded lyrics for:', title);
       setLyrics(preloadedData.lyrics);
       setIsSynced(preloadedData.isSynced);
       setError(null);
@@ -115,13 +114,22 @@ export const useLyrics = (
     
     // Apply offset: if lyrics are ahead, we need to delay them (subtract offset from currentTime)
     const adjustedTime = currentTime - offset;
-    
-    for (let i = lyrics.length - 1; i >= 0; i--) {
-      if (adjustedTime >= lyrics[i].time) {
-        return i;
+
+    let low = 0;
+    let high = lyrics.length - 1;
+    let currentIndex = -1;
+
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      if (adjustedTime >= lyrics[mid].time) {
+        currentIndex = mid;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
       }
     }
-    return -1;
+
+    return currentIndex;
   }, [lyrics, currentTime, offset]);
 
   return { lyrics, currentLineIndex, isLoading, error, offset, setOffset, isSynced };
