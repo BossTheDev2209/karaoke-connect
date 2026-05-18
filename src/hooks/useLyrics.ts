@@ -14,7 +14,7 @@ interface UseLyricsReturn {
   source: string | null;
 }
 
-// removed old single-line
+
 
 export const useLyrics = (
   artist: string | null,
