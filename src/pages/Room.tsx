@@ -242,6 +242,8 @@ const Room = () => {
               currentTime={currentTime} 
               isLoading={lyricsLoading} 
               error={lyricsError}
+              isSynced={lyricsSynced}
+              source={lyricsSource}
               offset={lyricsOffset}
               onOffsetChange={setLyricsOffset}
               areCaptionsEnabled={areCaptionsEnabled}
