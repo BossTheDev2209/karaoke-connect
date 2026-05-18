@@ -11,7 +11,10 @@ interface UseLyricsReturn {
   offset: number;
   setOffset: (offset: number) => void;
   isSynced: boolean;
+  source: string | null;
 }
+
+// removed old single-line
 
 export const useLyrics = (
   artist: string | null,
