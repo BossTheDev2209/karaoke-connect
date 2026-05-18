@@ -18,6 +18,8 @@ interface LyricsDisplayProps {
   currentTime: number;
   isLoading: boolean;
   error: string | null;
+  isSynced?: boolean;
+  source?: string | null;
   offset?: number;
   onOffsetChange?: (offset: number) => void;
   areCaptionsEnabled?: boolean;
@@ -25,6 +27,11 @@ interface LyricsDisplayProps {
   onEnableCaptions?: () => void;
   onDisableCaptions?: () => void;
 }
+
+const PROVIDER_LABELS: Record<string, string> = {
+  lrclib: 'LRCLIB',
+  genius: 'Genius',
+};
 
 // Simulate loading progress
 const useLoadingProgress = (isLoading: boolean) => {
