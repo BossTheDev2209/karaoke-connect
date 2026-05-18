@@ -64,13 +64,6 @@ const useLoadingProgress = (isLoading: boolean) => {
   return progress;
 };
 
-// Check if lyrics are plain (no real timestamps)
-const isPlainLyrics = (lyrics: LyricLine[]): boolean => {
-  if (lyrics.length <= 1) return true;
-  // Plain lyrics have minimal time differences (set in useLyrics)
-  const timeDiffs = lyrics.slice(1).map((l, i) => l.time - lyrics[i].time);
-  return timeDiffs.every(diff => diff < 0.1);
-};
 
 // Check if lyrics contain CJK characters
 const hasCJKLyrics = (lyrics: LyricLine[]): boolean => {
