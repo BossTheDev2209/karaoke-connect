@@ -137,7 +137,7 @@ export const useLyrics = (
     return currentIndex;
   }, [lyrics, currentTime, offset]);
 
-  return { lyrics, currentLineIndex, isLoading, error, offset, setOffset, isSynced };
+  return { lyrics, currentLineIndex, isLoading, error, offset, setOffset, isSynced, source };
 };
 
 // Parse LRC format: [mm:ss.xx] lyrics text
