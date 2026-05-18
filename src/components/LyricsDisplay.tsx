@@ -318,49 +318,58 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
         )}
       </div>
 
-      {/* Plain lyrics indicator */}
-      {hasPlainLyrics && (
+      {/* Provider badge */}
+      {providerLabel && (
         <div className="absolute top-1 left-1 z-10">
-          <span className="text-[10px] text-muted-foreground bg-background/80 backdrop-blur rounded px-1.5 py-0.5">
-            No sync available
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground bg-background/80 backdrop-blur rounded px-1.5 py-0.5">
+            via {providerLabel}
           </span>
         </div>
       )}
-      
-      <div 
-        ref={containerRef}
-        className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4"
-      >
-        <div className="space-y-1 text-center">
-          {lyrics.map((line, index) => {
-            const romanization = showRomanization ? getRomanizedText(line.text) : null;
-            const isActive = !hasPlainLyrics && index === currentLineIndex;
-            const isPast = !hasPlainLyrics && index < currentLineIndex;
-            
-            return (
-              <div
-                key={index}
-                ref={index === currentLineIndex ? activeLineRef : null}
-                className={cn(
-                  'lyric-line transition-all duration-300',
-                  isActive && 'active',
-                  isPast && 'past'
-                )}
-              >
-                <div>{line.text}</div>
-                {romanization && (
-                  <div className={cn(
-                    'text-xs mt-0.5 transition-all duration-300',
-                    isActive ? 'text-primary/80' : 'text-muted-foreground/60 italic'
-                  )}>
-                    {romanization}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+
+      {hasPlainLyrics ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-2 px-4 text-center">
+          <Music className="w-6 h-6 opacity-50" />
+          <p className="text-sm">Sync not available for this song</p>
+          <p className="text-[11px] opacity-70">Open Full Lyrics to read the text</p>
         </div>
-      </div>
+      ) : (
+        <div
+          ref={containerRef}
+          className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4"
+        >
+          <div className="space-y-1 text-center">
+            {lyrics.map((line, index) => {
+              const romanization = showRomanization ? getRomanizedText(line.text) : null;
+              const isActive = index === currentLineIndex;
+              const isPast = index < currentLineIndex;
+
+              return (
+                <div
+                  key={index}
+                  ref={index === currentLineIndex ? activeLineRef : null}
+                  className={cn(
+                    'lyric-line transition-all duration-300',
+                    isActive && 'active',
+                    isPast && 'past'
+                  )}
+                >
+                  <div>{line.text}</div>
+                  {romanization && (
+                    <div className={cn(
+                      'text-xs mt-0.5 transition-all duration-300',
+                      isActive ? 'text-primary/80' : 'text-muted-foreground/60 italic'
+                    )}>
+                      {romanization}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
