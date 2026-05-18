@@ -79,6 +79,7 @@ const hasCJKLyrics = (lyrics: LyricLine[]): boolean => {
 
 
 
+
 // Get language label
 const getLanguageLabel = (lyrics: LyricLine[]): string | null => {
   for (const line of lyrics) {
