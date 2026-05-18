@@ -26,6 +26,7 @@ export const useLyrics = (
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSynced, setIsSynced] = useState(false);
+  const [source, setSource] = useState<string | null>(null);
   // Offset in seconds: positive = lyrics delayed (for lyrics ahead of audio)
   const [offset, setOffset] = useState(0);
 
