@@ -178,6 +178,7 @@ export const useLyricsPreload = (
             status: 'pending',
             lyrics: [],
             isSynced: false,
+            source: null,
           });
           return next;
         });
