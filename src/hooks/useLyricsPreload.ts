@@ -9,6 +9,7 @@ export interface PreloadedLyrics {
   status: LyricStatus;
   lyrics: LyricLine[];
   isSynced: boolean;
+  source: string | null;
 }
 
 interface UseLyricsPreloadReturn {
@@ -42,17 +43,14 @@ function parseSyncedLyrics(lrc: string): LyricLine[] {
   return result;
 }
 
-// Parse plain lyrics into separate lines
+// Parse plain lyrics into separate lines (no fake timestamps)
 function parsePlainLyrics(plainLyrics: string): LyricLine[] {
   const lines = plainLyrics
     .split(/\r?\n/)
     .map(line => line.trim())
     .filter(line => line.length > 0);
 
-  return lines.map((text, index) => ({
-    time: index * 0.001,
-    text,
-  }));
+  return lines.map((text) => ({ time: 0, text }));
 }
 
 export const useLyricsPreload = (
@@ -79,6 +77,7 @@ export const useLyricsPreload = (
         status: 'loading',
         lyrics: [],
         isSynced: false,
+        source: null,
       });
       return next;
     });
@@ -93,6 +92,7 @@ export const useLyricsPreload = (
       let lyrics: LyricLine[] = [];
       let isSynced = false;
       let status: LyricStatus = 'not_found';
+      const source: string | null = data?.source || null;
 
       if (data.syncedLyrics) {
         lyrics = parseSyncedLyrics(data.syncedLyrics);
@@ -111,6 +111,7 @@ export const useLyricsPreload = (
           status,
           lyrics,
           isSynced,
+          source,
         });
         return next;
       });
@@ -123,6 +124,7 @@ export const useLyricsPreload = (
           status: 'error',
           lyrics: [],
           isSynced: false,
+          source: null,
         });
         return next;
       });
@@ -130,6 +132,7 @@ export const useLyricsPreload = (
       loadingRef.current.delete(song.id);
     }
   }, [preloadedLyrics]);
+
 
   // Preload lyrics for songs in queue
   useEffect(() => {
@@ -175,6 +178,7 @@ export const useLyricsPreload = (
             status: 'pending',
             lyrics: [],
             isSynced: false,
+            source: null,
           });
           return next;
         });

@@ -11,7 +11,10 @@ interface UseLyricsReturn {
   offset: number;
   setOffset: (offset: number) => void;
   isSynced: boolean;
+  source: string | null;
 }
+
+
 
 export const useLyrics = (
   artist: string | null,
@@ -23,6 +26,7 @@ export const useLyrics = (
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSynced, setIsSynced] = useState(false);
+  const [source, setSource] = useState<string | null>(null);
   // Offset in seconds: positive = lyrics delayed (for lyrics ahead of audio)
   const [offset, setOffset] = useState(0);
 
@@ -37,6 +41,7 @@ export const useLyrics = (
     if (preloadedData && preloadedData.status === 'loaded') {
       setLyrics(preloadedData.lyrics);
       setIsSynced(preloadedData.isSynced);
+      setSource(preloadedData.source ?? null);
       setError(null);
       setIsLoading(false);
       setOffset(0);
@@ -80,6 +85,7 @@ export const useLyrics = (
 
         if (fnError) throw fnError;
 
+        setSource(data?.source ?? null);
         if (data.syncedLyrics) {
           const parsed = parseSyncedLyrics(data.syncedLyrics);
           setLyrics(parsed);
@@ -132,7 +138,7 @@ export const useLyrics = (
     return currentIndex;
   }, [lyrics, currentTime, offset]);
 
-  return { lyrics, currentLineIndex, isLoading, error, offset, setOffset, isSynced };
+  return { lyrics, currentLineIndex, isLoading, error, offset, setOffset, isSynced, source };
 };
 
 // Parse LRC format: [mm:ss.xx] lyrics text
@@ -160,18 +166,12 @@ function parseSyncedLyrics(lrc: string): LyricLine[] {
   return result;
 }
 
-// Parse plain lyrics into separate lines
+// Parse plain lyrics into separate lines (no fake timestamps)
 function parsePlainLyrics(plainLyrics: string): LyricLine[] {
-  // Split by newlines and filter empty lines
   const lines = plainLyrics
     .split(/\r?\n/)
     .map(line => line.trim())
     .filter(line => line.length > 0);
 
-  // For plain lyrics without timestamps, assign sequential "fake" times
-  // so users can at least scroll through manually
-  return lines.map((text, index) => ({
-    time: index * 0.001, // Minimal time differences so they appear in order
-    text,
-  }));
+  return lines.map((text) => ({ time: 0, text }));
 }

@@ -85,7 +85,7 @@ const Room = () => {
   const { getStatusForSong, getLyricsForSong } = useLyricsPreload(queue, playbackState.currentSongIndex);
   const preloadedLyrics = currentSong ? getLyricsForSong(currentSong.id) : undefined;
 
-  const { lyrics, currentLineIndex, isLoading: lyricsLoading, error: lyricsError, offset: lyricsOffset, setOffset: setLyricsOffset } = useLyrics(
+  const { lyrics, currentLineIndex, isLoading: lyricsLoading, error: lyricsError, offset: lyricsOffset, setOffset: setLyricsOffset, isSynced: lyricsSynced, source: lyricsSource } = useLyrics(
     currentSong?.artist || null,
     currentSong?.title || null,
     currentTime,
@@ -242,6 +242,8 @@ const Room = () => {
               currentTime={currentTime} 
               isLoading={lyricsLoading} 
               error={lyricsError}
+              isSynced={lyricsSynced}
+              source={lyricsSource}
               offset={lyricsOffset}
               onOffsetChange={setLyricsOffset}
               areCaptionsEnabled={areCaptionsEnabled}
