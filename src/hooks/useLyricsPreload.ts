@@ -9,6 +9,7 @@ export interface PreloadedLyrics {
   status: LyricStatus;
   lyrics: LyricLine[];
   isSynced: boolean;
+  source: string | null;
 }
 
 interface UseLyricsPreloadReturn {
