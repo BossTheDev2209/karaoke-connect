@@ -41,6 +41,7 @@ export const useLyrics = (
     if (preloadedData && preloadedData.status === 'loaded') {
       setLyrics(preloadedData.lyrics);
       setIsSynced(preloadedData.isSynced);
+      setSource(preloadedData.source ?? null);
       setError(null);
       setIsLoading(false);
       setOffset(0);
