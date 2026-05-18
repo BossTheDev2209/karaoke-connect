@@ -85,6 +85,7 @@ export const useLyrics = (
 
         if (fnError) throw fnError;
 
+        setSource(data?.source ?? null);
         if (data.syncedLyrics) {
           const parsed = parseSyncedLyrics(data.syncedLyrics);
           setLyrics(parsed);
