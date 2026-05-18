@@ -93,6 +93,8 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   currentLineIndex,
   isLoading,
   error,
+  isSynced = true,
+  source = null,
   offset = 0,
   onOffsetChange,
   areCaptionsEnabled = false,
@@ -103,7 +105,8 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const activeLineRef = useRef<HTMLDivElement>(null);
   const loadingProgress = useLoadingProgress(isLoading);
-  const hasPlainLyrics = isPlainLyrics(lyrics);
+  const hasPlainLyrics = !isSynced;
+  const providerLabel = source ? (PROVIDER_LABELS[source] ?? source) : null;
   const [showRomanization, setShowRomanization] = useState(true);
   const [calculatedRomanizations, setCalculatedRomanizations] = useState<Record<string, string>>({});
   
