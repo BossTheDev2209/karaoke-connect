@@ -14,7 +14,36 @@ interface UseLyricsReturn {
   source: string | null;
 }
 
+// Detect karaoke/cover/remix/etc. variations whose timing won't match the
+// original release the lyrics provider has timestamps for.
+const VARIATION_PATTERNS = [
+  /\bkaraoke\b/i,
+  /\binstrumental\b/i,
+  /\bcover(ed)?\b/i,
+  /\blive\b/i,
+  /\bacoustic\b/i,
+  /\bunplugged\b/i,
+  /\bremix\b/i,
+  /\bmashup\b/i,
+  /\bsped[\s-]?up\b/i,
+  /\bspedup\b/i,
+  /\bslowed\b/i,
+  /\bnightcore\b/i,
+  /\breverb\b/i,
+  /\b8d\b/i,
+  /\bpiano\s+(version|cover)\b/i,
+  /\bguitar\s+(version|cover)\b/i,
+  /\bparody\b/i,
+  /\btutorial\b/i,
+  /\bbackingtrack\b/i,
+  /\bbacking\s+track\b/i,
+  /\breaction\b/i,
+];
 
+const isLikelyVariation = (title: string | null): boolean => {
+  if (!title) return false;
+  return VARIATION_PATTERNS.some((rx) => rx.test(title));
+};
 
 export const useLyrics = (
   artist: string | null,
