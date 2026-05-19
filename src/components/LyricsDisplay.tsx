@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { LyricLine } from '@/types/karaoke';
 import { cn } from '@/lib/utils';
-import { Music, Minus, Plus, Subtitles, List, Languages } from 'lucide-react';
+import { Music, Subtitles, List, Languages, Crosshair } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
