@@ -22,6 +22,7 @@ interface LyricsDisplayProps {
   source?: string | null;
   offset?: number;
   onOffsetChange?: (offset: number) => void;
+  onSeek?: (time: number) => void;
   areCaptionsEnabled?: boolean;
   hasCaptionsAvailable?: boolean;
   onEnableCaptions?: () => void;
