@@ -288,34 +288,36 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
           </Dialog>
         )}
 
-        {/* Offset controls - only show if synced lyrics exist */}
+        {/* Sync-to-selected control - only show if synced lyrics exist */}
         {!hasPlainLyrics && lyrics.length > 1 && onOffsetChange && (
           <div className="flex items-center gap-1 bg-background/80 backdrop-blur rounded-lg px-1.5 py-0.5">
             <Button
               variant="ghost"
-              size="icon"
-              className="h-5 w-5"
-              onClick={() => adjustOffset(-0.01)}
-              title="Fine tune: -0.01s"
+              size="sm"
+              className="h-6 px-2 text-xs"
+              disabled={selectedLineIndex === null}
+              onClick={() => {
+                if (selectedLineIndex === null) return;
+                const line = lyrics[selectedLineIndex];
+                if (!line) return;
+                // Make selected line correspond to current playback time
+                onOffsetChange(currentTime - line.time);
+                setSelectedLineIndex(null);
+              }}
+              title={selectedLineIndex === null ? 'Click a lyric line first' : 'Sync selected line to now'}
             >
-              <Minus className="w-3 h-3" />
+              <Crosshair className="w-3 h-3 mr-1" />
+              Sync here
             </Button>
-            <span 
-              className="text-[10px] font-mono min-w-[50px] text-center text-muted-foreground cursor-pointer hover:text-foreground"
-              onClick={() => onOffsetChange(0)}
-              title="Click to reset"
-            >
-              {offset >= 0 ? '+' : ''}{offset.toFixed(2)}s
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-5 w-5"
-              onClick={() => adjustOffset(0.01)}
-              title="Fine tune: +0.01s"
-            >
-              <Plus className="w-3 h-3" />
-            </Button>
+            {offset !== 0 && (
+              <span
+                className="text-[10px] font-mono min-w-[40px] text-center text-muted-foreground cursor-pointer hover:text-foreground"
+                onClick={() => onOffsetChange(0)}
+                title="Click to reset offset"
+              >
+                {offset >= 0 ? '+' : ''}{offset.toFixed(2)}s
+              </span>
+            )}
           </div>
         )}
       </div>
