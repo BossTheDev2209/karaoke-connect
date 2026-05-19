@@ -115,6 +115,11 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   const hasCJK = hasCJKLyrics(lyrics);
   const languageLabel = getLanguageLabel(lyrics);
 
+  // Reset selected line when the lyrics list changes (e.g. song change)
+  useEffect(() => {
+    setSelectedLineIndex(null);
+  }, [lyrics]);
+
   // Pre-generate romanizations for all lines when lyrics change or romanization is enabled
   useEffect(() => {
     if (!hasCJK || !showRomanization || lyrics.length === 0) return;
