@@ -91,6 +91,7 @@ const getLanguageLabel = (lyrics: LyricLine[]): string | null => {
 export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   lyrics,
   currentLineIndex,
+  currentTime,
   isLoading,
   error,
   isSynced = true,
@@ -108,6 +109,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   const hasPlainLyrics = !isSynced;
   const providerLabel = source ? (PROVIDER_LABELS[source] ?? source) : null;
   const [showRomanization, setShowRomanization] = useState(true);
+  const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(null);
   const [calculatedRomanizations, setCalculatedRomanizations] = useState<Record<string, string>>({});
   
   const hasCJK = hasCJKLyrics(lyrics);
