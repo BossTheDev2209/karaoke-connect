@@ -347,15 +347,18 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
               const romanization = showRomanization ? getRomanizedText(line.text) : null;
               const isActive = index === currentLineIndex;
               const isPast = index < currentLineIndex;
+              const isSelected = index === selectedLineIndex;
 
               return (
                 <div
                   key={index}
                   ref={index === currentLineIndex ? activeLineRef : null}
+                  onClick={() => setSelectedLineIndex(isSelected ? null : index)}
                   className={cn(
-                    'lyric-line transition-all duration-300',
+                    'lyric-line transition-all duration-300 cursor-pointer rounded-md px-2 py-0.5',
                     isActive && 'active',
-                    isPast && 'past'
+                    isPast && 'past',
+                    isSelected && 'ring-2 ring-primary bg-primary/10'
                   )}
                 >
                   <div>{line.text}</div>
