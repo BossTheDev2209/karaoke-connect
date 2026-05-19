@@ -346,7 +346,12 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
                 <div
                   key={index}
                   ref={index === currentLineIndex ? activeLineRef : null}
-                  onClick={() => setSelectedLineIndex(isSelected ? null : index)}
+                  onClick={() => {
+                    setSelectedLineIndex(isSelected ? null : index);
+                    if (seekOnClick && onSeek && Number.isFinite(line.time)) {
+                      onSeek(Math.max(0, line.time));
+                    }
+                  }}
                   className={cn(
                     'lyric-line transition-all duration-300 cursor-pointer rounded-md px-2 py-0.5',
                     isActive && 'active',
