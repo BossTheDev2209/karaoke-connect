@@ -22,6 +22,7 @@ interface LyricsDisplayProps {
   source?: string | null;
   offset?: number;
   onOffsetChange?: (offset: number) => void;
+  onSeek?: (time: number) => void;
   areCaptionsEnabled?: boolean;
   hasCaptionsAvailable?: boolean;
   onEnableCaptions?: () => void;
@@ -98,6 +99,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   source = null,
   offset = 0,
   onOffsetChange,
+  onSeek,
   areCaptionsEnabled = false,
   hasCaptionsAvailable = false,
   onEnableCaptions,
@@ -110,6 +112,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   const providerLabel = source ? (PROVIDER_LABELS[source] ?? source) : null;
   const [showRomanization, setShowRomanization] = useState(true);
   const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(null);
+  const [seekOnClick, setSeekOnClick] = useState(false);
   const [calculatedRomanizations, setCalculatedRomanizations] = useState<Record<string, string>>({});
   
   const hasCJK = hasCJKLyrics(lyrics);
@@ -293,39 +296,24 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
           </Dialog>
         )}
 
-        {/* Sync-to-selected control - only show if synced lyrics exist */}
-        {!hasPlainLyrics && lyrics.length > 1 && onOffsetChange && (
-          <div className="flex items-center gap-1 bg-background/80 backdrop-blur rounded-lg px-1.5 py-0.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-xs"
-              disabled={selectedLineIndex === null}
-              onClick={() => {
-                if (selectedLineIndex === null) return;
-                const line = lyrics[selectedLineIndex];
-                if (!line) return;
-                // Make selected line correspond to current playback time
-                onOffsetChange(currentTime - line.time);
-                setSelectedLineIndex(null);
-              }}
-              title={selectedLineIndex === null ? 'Click a lyric line first' : 'Sync selected line to now'}
-            >
-              <Crosshair className="w-3 h-3 mr-1" />
-              Sync here
-            </Button>
-            {offset !== 0 && (
-              <span
-                className="text-[10px] font-mono min-w-[40px] text-center text-muted-foreground cursor-pointer hover:text-foreground"
-                onClick={() => onOffsetChange(0)}
-                title="Click to reset offset"
-              >
-                {offset >= 0 ? '+' : ''}{offset.toFixed(2)}s
-              </span>
-            )}
-          </div>
+        {/* Click-to-seek toggle - only show for synced lyrics */}
+        {!hasPlainLyrics && lyrics.length > 1 && onSeek && (
+          <label
+            className="flex items-center gap-1 bg-background/80 backdrop-blur rounded-md px-1.5 h-5 text-[10px] cursor-pointer select-none"
+            title="When on, clicking a lyric line seeks the video to that time"
+          >
+            <Crosshair className="w-2.5 h-2.5" />
+            <span>Seek</span>
+            <input
+              type="checkbox"
+              checked={seekOnClick}
+              onChange={(e) => setSeekOnClick(e.target.checked)}
+              className="ml-0.5 h-2.5 w-2.5 accent-primary cursor-pointer"
+            />
+          </label>
         )}
       </div>
+
 
       {/* Provider badge */}
       {providerLabel && (
@@ -358,7 +346,12 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
                 <div
                   key={index}
                   ref={index === currentLineIndex ? activeLineRef : null}
-                  onClick={() => setSelectedLineIndex(isSelected ? null : index)}
+                  onClick={() => {
+                    setSelectedLineIndex(isSelected ? null : index);
+                    if (seekOnClick && onSeek && Number.isFinite(line.time)) {
+                      onSeek(Math.max(0, line.time));
+                    }
+                  }}
                   className={cn(
                     'lyric-line transition-all duration-300 cursor-pointer rounded-md px-2 py-0.5',
                     isActive && 'active',
