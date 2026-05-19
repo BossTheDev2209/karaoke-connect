@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { User, Song } from '@/types/karaoke';
 import { useRoom } from '@/hooks/useRoom';
@@ -14,7 +14,7 @@ import { UserAvatars } from '@/components/ui/user-avatars';
 import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
 import { RoomSettings } from '@/components/RoomSettings';
 import { ReactionBar, FloatingReactions, useReactions } from '@/components/Reactions';
-import { LogOut } from 'lucide-react';
+import { LogOut, Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Room = () => {
@@ -22,6 +22,8 @@ const Room = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [volume, setVolume] = useState(80);
+  const [isVideoFullscreen, setIsVideoFullscreen] = useState(false);
+  const videoStageRef = useRef<HTMLDivElement>(null);
   const { setVideoId } = useTheme();
 
   useEffect(() => {
@@ -91,6 +93,18 @@ const Room = () => {
     currentTime,
     preloadedLyrics
   );
+  const fullscreenLyric = lyricsSynced && currentLineIndex >= 0
+    ? lyrics[currentLineIndex]?.text
+    : null;
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsVideoFullscreen(document.fullscreenElement === videoStageRef.current);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   const handlePlayPause = () => {
     if (isPlaying) {
@@ -163,6 +177,18 @@ const Room = () => {
     navigate('/');
   };
 
+  const handleVideoFullscreen = async () => {
+    const stage = videoStageRef.current;
+    if (!stage) return;
+
+    if (document.fullscreenElement === stage) {
+      await document.exitFullscreen();
+      return;
+    }
+
+    await stage.requestFullscreen();
+  };
+
   if (!user || !code) return null;
 
   return (
@@ -210,30 +236,51 @@ const Room = () => {
 
         <div className="lg:col-span-6 flex flex-col gap-4">
           <div className="card-karaoke aspect-video relative flex-1">
-            <div className="absolute inset-0 rounded-lg overflow-hidden" id="youtube-player-wrapper">
-              <div id="youtube-player" className="w-full h-full" />
-            </div>
-            {/* Blocks all YouTube chrome (channel header, pause overlay, share, end cards, branding) by preventing iframe interaction */}
-            <div className="absolute inset-0 rounded-lg z-10" aria-hidden="true" />
+            <div ref={videoStageRef} className="karaoke-fullscreen-stage absolute inset-6 overflow-hidden rounded-lg bg-black">
+              <div className="absolute inset-0 rounded-lg overflow-hidden" id="youtube-player-wrapper">
+                <div id="youtube-player" className="w-full h-full" />
+              </div>
+              {/* Blocks all YouTube chrome (channel header, pause overlay, share, end cards, branding) by preventing iframe interaction */}
+              <div className="absolute inset-0 rounded-lg z-10" aria-hidden="true" />
 
-            {showCountdown && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="rounded-2xl bg-card/70 backdrop-blur border border-border shadow-lg px-6 py-4">
-                  <div className="text-6xl font-black text-primary tabular-nums text-center">
-                    {remainingSeconds}
-                  </div>
-                  <div className="mt-1 text-[10px] uppercase tracking-[0.3em] text-muted-foreground text-center">
-                    seconds
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleVideoFullscreen}
+                className="absolute right-3 top-3 z-30 h-9 w-9 rounded-full bg-background/70 text-foreground backdrop-blur hover:bg-background/90"
+                title={isVideoFullscreen ? 'Exit fullscreen' : 'Watch fullscreen'}
+                aria-label={isVideoFullscreen ? 'Exit video fullscreen' : 'Watch video fullscreen'}
+              >
+                {isVideoFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </Button>
+
+              {showCountdown && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                  <div className="rounded-2xl bg-card/70 backdrop-blur border border-border shadow-lg px-6 py-4">
+                    <div className="text-6xl font-black text-primary tabular-nums text-center">
+                      {remainingSeconds}
+                    </div>
+                    <div className="mt-1 text-[10px] uppercase tracking-[0.3em] text-muted-foreground text-center">
+                      seconds
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {!currentSong && (
-              <div className="absolute inset-0 flex items-center justify-center bg-card/80 rounded-lg">
-                <p className="text-muted-foreground">Add songs to start!</p>
-              </div>
-            )}
+              {isVideoFullscreen && fullscreenLyric && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-4 pb-5 pt-20 karaoke-fullscreen-lyrics">
+                  <div className="max-w-5xl text-center text-2xl font-semibold leading-relaxed text-white md:text-4xl">
+                    {fullscreenLyric}
+                  </div>
+                </div>
+              )}
+
+              {!currentSong && (
+                <div className="absolute inset-0 z-20 flex items-center justify-center bg-card/80 rounded-lg">
+                  <p className="text-muted-foreground">Add songs to start!</p>
+                </div>
+              )}
+            </div>
           </div>
           <div className="card-karaoke h-[160px] shrink-0">
             <LyricsDisplay 

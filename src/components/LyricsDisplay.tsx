@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { LyricLine } from '@/types/karaoke';
 import { cn } from '@/lib/utils';
-import { Music, Subtitles, List, Languages, Crosshair } from 'lucide-react';
+import { Music, Subtitles, List, Languages } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -299,17 +299,20 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
         {/* Click-to-seek toggle - only show for synced lyrics */}
         {!hasPlainLyrics && lyrics.length > 1 && onSeek && (
           <label
-            className="flex items-center gap-1 bg-background/80 backdrop-blur rounded-md px-1.5 h-5 text-[10px] cursor-pointer select-none"
+            className="group flex h-6 items-center gap-2 rounded-full bg-background/80 px-1.5 pr-2 text-[11px] text-foreground/85 backdrop-blur cursor-pointer select-none transition-colors hover:bg-background/90"
             title="When on, clicking a lyric line seeks the video to that time"
           >
-            <Crosshair className="w-2.5 h-2.5" />
-            <span>Seek</span>
             <input
               type="checkbox"
               checked={seekOnClick}
               onChange={(e) => setSeekOnClick(e.target.checked)}
-              className="ml-0.5 h-2.5 w-2.5 accent-primary cursor-pointer"
+              className="peer sr-only"
             />
+            <span
+              aria-hidden="true"
+              className="relative h-5 w-9 rounded-full bg-slate-300/80 shadow-inner transition-colors duration-200 after:absolute after:left-0.5 after:top-1/2 after:h-4 after:w-4 after:-translate-y-1/2 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200 peer-checked:bg-primary peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background"
+            />
+            <span>Seek</span>
           </label>
         )}
       </div>

@@ -516,6 +516,38 @@
   height: calc(100% + 120px) !important;
 }
 
+.karaoke-fullscreen-stage:fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  background: #000;
+}
+
+.karaoke-fullscreen-stage:fullscreen #youtube-player-wrapper {
+  border-radius: 0;
+}
+
+.karaoke-fullscreen-stage:fullscreen .karaoke-fullscreen-lyrics {
+  padding-bottom: clamp(2rem, 7vh, 5rem);
+  background: linear-gradient(
+    to top,
+    hsl(0 0% 0% / 0.82),
+    hsl(0 0% 0% / 0.42),
+    transparent
+  );
+}
+
+.karaoke-fullscreen-stage:fullscreen .karaoke-fullscreen-lyrics > div {
+  max-width: min(92vw, 72rem);
+  font-size: clamp(2rem, 5vw, 4.75rem);
+  line-height: 1.25;
+  text-shadow:
+    0 4px 18px hsl(0 0% 0% / 0.95),
+    0 0 28px hsl(var(--primary) / 0.85);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
