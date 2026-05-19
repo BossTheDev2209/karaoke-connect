@@ -99,6 +99,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   source = null,
   offset = 0,
   onOffsetChange,
+  onSeek,
   areCaptionsEnabled = false,
   hasCaptionsAvailable = false,
   onEnableCaptions,
@@ -111,6 +112,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   const providerLabel = source ? (PROVIDER_LABELS[source] ?? source) : null;
   const [showRomanization, setShowRomanization] = useState(true);
   const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(null);
+  const [seekOnClick, setSeekOnClick] = useState(false);
   const [calculatedRomanizations, setCalculatedRomanizations] = useState<Record<string, string>>({});
   
   const hasCJK = hasCJKLyrics(lyrics);
