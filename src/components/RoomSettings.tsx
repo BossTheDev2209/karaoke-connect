@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, Palette, Sparkles } from 'lucide-react';
+import { Search, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -9,11 +9,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { cn } from '@/lib/utils';
-import { useTheme, THEME_PRESETS } from '@/contexts/ThemeContext';
+import { Switch } from '@/components/ui/switch';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export const RoomSettings: React.FC = () => {
-  const { preset, setPreset } = useTheme();
+  const { karaokeFilterEnabled, setKaraokeFilterEnabled } = useTheme();
 
   return (
     <Sheet>
@@ -29,58 +29,26 @@ export const RoomSettings: React.FC = () => {
             Room Settings
           </SheetTitle>
           <SheetDescription>
-            Customize your karaoke experience
+            Tune shared-room controls
           </SheetDescription>
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
-          <div className="space-y-3">
-            <div className="text-sm font-medium flex items-center gap-2">
-              <Palette className="w-4 h-4 text-primary" />
-              Theme
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card/60 p-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Search className="w-4 h-4 text-primary" />
+                Karaoke search filter
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Add karaoke terms when searching songs.
+              </p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {THEME_PRESETS.map((theme) => (
-                <button
-                  key={theme.id}
-                  onClick={() => setPreset(theme.id)}
-                  className={cn(
-                    'p-3 rounded-lg border-2 transition-all hover:scale-[1.02]',
-                    preset === theme.id
-                      ? 'border-primary bg-primary/20 shadow-lg shadow-primary/20'
-                      : 'border-border bg-card hover:border-muted-foreground/50'
-                  )}
-                >
-                  {theme.id === 'auto' ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="relative">
-                        <Sparkles className="w-6 h-6 text-accent animate-pulse" />
-                        <div className="absolute inset-0 w-6 h-6 bg-accent/30 rounded-full blur-md" />
-                      </div>
-                      <span className="text-sm font-medium bg-gradient-to-r from-accent via-primary to-secondary bg-clip-text text-transparent">
-                        {theme.name}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="flex gap-1">
-                        {theme.colors.map((color, i) => (
-                          <div
-                            key={i}
-                            className="w-5 h-5 rounded-full border border-border/50 shadow-sm"
-                            style={{
-                              backgroundColor: color,
-                              boxShadow: preset === theme.id ? `0 0 10px ${color}` : 'none',
-                            }}
-                          />
-                        ))}
-                      </div>
-                      <span className="text-sm font-medium">{theme.name}</span>
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
+            <Switch
+              checked={karaokeFilterEnabled}
+              onCheckedChange={setKaraokeFilterEnabled}
+              aria-label="Toggle karaoke search filter"
+            />
           </div>
         </div>
       </SheetContent>

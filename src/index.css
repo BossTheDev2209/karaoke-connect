@@ -16,18 +16,17 @@
     --popover: 30 22% 8%;
     --popover-foreground: 36 33% 94%;
 
-    /* Keep UI accent fixed while legacy ThemeContext presets are removed in Task 2. */
-    --primary: 40 100% 56% !important;
+    --primary: 40 100% 56%;
     --primary-foreground: 30 20% 7%;
     --primary-hover: 40 92% 50%;
 
-    --secondary: 30 14% 12% !important;
+    --secondary: 30 14% 12%;
     --secondary-foreground: 36 33% 94%;
 
     --muted: 30 14% 12%;
     --muted-foreground: 36 9% 62%;
 
-    --accent: 30 14% 12% !important;
+    --accent: 30 14% 12%;
     --accent-foreground: 36 33% 94%;
 
     --destructive: 0 72% 58%;
@@ -38,14 +37,14 @@
 
     --border: 33 12% 16%;
     --input: 33 12% 16%;
-    --ring: 40 100% 56% !important;
+    --ring: 40 100% 56%;
 
     --radius: 0.875rem;
 
     /* Legacy aliases: one amber spotlight, status colors only where semantic. */
-    --neon-pink: 40 100% 56% !important;
-    --neon-blue: 40 100% 56% !important;
-    --neon-purple: 40 100% 56% !important;
+    --neon-pink: 40 100% 56%;
+    --neon-blue: 40 100% 56%;
+    --neon-purple: 40 100% 56%;
     --neon-green: 150 55% 48%;
     --neon-yellow: 40 100% 56%;
     --neon-orange: 40 100% 56%;

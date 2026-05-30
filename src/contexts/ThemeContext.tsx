@@ -1,41 +1,15 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
-// Theme presets
-export type ThemePreset = 'auto' | 'neon' | 'ocean' | 'sunset' | 'forest' | 'galaxy' | 'retro' | 'midnight' | 'candy' | 'ember';
-
-interface ThemeColors {
-  primary: string;   // HSL format: "280 100% 65%"
-  secondary: string;
-  accent: string;
-}
+const DEFAULT_AMBIENT = '40 100% 56%';
 
 interface ThemeContextValue {
-  preset: ThemePreset;
-  setPreset: (preset: ThemePreset) => void;
   karaokeFilterEnabled: boolean;
   setKaraokeFilterEnabled: (enabled: boolean) => void;
   setVideoId: (videoId: string | null) => void;
-  colors: ThemeColors;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-// Preset color definitions (HSL values)
-const PRESET_COLORS: Record<Exclude<ThemePreset, 'auto'>, ThemeColors> = {
-  neon: { primary: '280 100% 65%', secondary: '200 100% 55%', accent: '320 100% 60%' },
-  ocean: { primary: '200 100% 55%', secondary: '210 100% 50%', accent: '190 95% 50%' },
-  sunset: { primary: '0 85% 55%', secondary: '35 100% 55%', accent: '20 100% 55%' },
-  forest: { primary: '150 80% 50%', secondary: '170 75% 45%', accent: '160 85% 45%' },
-  galaxy: { primary: '240 80% 60%', secondary: '270 90% 65%', accent: '260 85% 65%' },
-  retro: { primary: '280 90% 70%', secondary: '185 90% 55%', accent: '330 90% 65%' },
-  midnight: { primary: '250 75% 55%', secondary: '230 85% 60%', accent: '220 80% 50%' },
-  candy: { primary: '340 85% 65%', secondary: '330 80% 70%', accent: '350 90% 60%' },
-  ember: { primary: '20 90% 55%', secondary: '35 95% 55%', accent: '0 85% 50%' },
-};
-
-const DEFAULT_COLORS: ThemeColors = PRESET_COLORS.neon;
-
-// RGB to HSL conversion
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   r /= 255;
   g /= 255;
@@ -60,8 +34,7 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
 }
 
-// Extract colors from YouTube thumbnail
-async function extractColorsFromThumbnail(videoId: string): Promise<ThemeColors> {
+async function extractColorsFromThumbnail(videoId: string): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -70,7 +43,7 @@ async function extractColorsFromThumbnail(videoId: string): Promise<ThemeColors>
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        resolve(DEFAULT_COLORS);
+        resolve(DEFAULT_AMBIENT);
         return;
       }
 
@@ -79,28 +52,21 @@ async function extractColorsFromThumbnail(videoId: string): Promise<ThemeColors>
       canvas.height = size;
       ctx.drawImage(img, 0, 0, size, size);
 
-      const imageData = ctx.getImageData(0, 0, size, size);
-      const pixels = imageData.data;
-
-      // Color bucket extraction
+      const pixels = ctx.getImageData(0, 0, size, size).data;
       const colorCounts: Record<string, { count: number; r: number; g: number; b: number }> = {};
 
       for (let i = 0; i < pixels.length; i += 4) {
         const r = pixels[i];
         const g = pixels[i + 1];
         const b = pixels[i + 2];
-
-        // Skip very dark or very light colors
         const brightness = (r + g + b) / 3;
         if (brightness < 30 || brightness > 225) continue;
 
-        // Skip low saturation colors
         const max = Math.max(r, g, b);
         const min = Math.min(r, g, b);
         const saturation = max === 0 ? 0 : (max - min) / max;
         if (saturation < 0.2) continue;
 
-        // Quantize to reduce color variations
         const key = `${Math.floor(r / 32)}-${Math.floor(g / 32)}-${Math.floor(b / 32)}`;
         if (!colorCounts[key]) {
           colorCounts[key] = { count: 0, r, g, b };
@@ -108,67 +74,19 @@ async function extractColorsFromThumbnail(videoId: string): Promise<ThemeColors>
         colorCounts[key].count++;
       }
 
-      const sortedColors = Object.values(colorCounts)
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 3);
-
-      if (sortedColors.length < 1) {
-        resolve(DEFAULT_COLORS);
+      const dominant = Object.values(colorCounts).sort((a, b) => b.count - a.count)[0];
+      if (!dominant) {
+        resolve(DEFAULT_AMBIENT);
         return;
       }
 
-      const c1 = sortedColors[0];
-      const c2 = sortedColors[1] || { r: c1.g, g: c1.b, b: c1.r };
-      const c3 = sortedColors[2] || { r: c1.b, g: c1.r, b: c1.g };
-
-      const [h1, s1, l1] = rgbToHsl(c1.r, c1.g, c1.b);
-      const [h2, s2, l2] = rgbToHsl(c2.r, c2.g, c2.b);
-      const [h3, s3, l3] = rgbToHsl(c3.r, c3.g, c3.b);
-
-      resolve({
-        primary: `${h1} ${Math.min(s1 + 20, 100)}% ${Math.max(Math.min(l1 + 10, 65), 45)}%`,
-        secondary: `${h2} ${Math.min(s2 + 20, 100)}% ${Math.max(Math.min(l2 + 10, 60), 45)}%`,
-        accent: `${h3} ${Math.min(s3 + 20, 100)}% ${Math.max(Math.min(l3 + 10, 55), 45)}%`,
-      });
+      const [h, s, l] = rgbToHsl(dominant.r, dominant.g, dominant.b);
+      resolve(`${h} ${Math.min(s + 20, 100)}% ${Math.max(Math.min(l + 10, 65), 45)}%`);
     };
 
-    img.onerror = () => resolve(DEFAULT_COLORS);
+    img.onerror = () => resolve(DEFAULT_AMBIENT);
     img.src = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
   });
-}
-
-// Apply theme colors to CSS variables
-function applyThemeToDOM(colors: ThemeColors) {
-  const root = document.documentElement;
-  const { primary, secondary, accent } = colors;
-
-  // Core colors
-  root.style.setProperty('--primary', primary);
-  root.style.setProperty('--secondary', secondary);
-  root.style.setProperty('--accent', accent);
-  root.style.setProperty('--ring', primary);
-
-  // Neon color aliases
-  root.style.setProperty('--neon-purple', primary);
-  root.style.setProperty('--neon-blue', secondary);
-  root.style.setProperty('--neon-pink', accent);
-
-  // Computed gradients and shadows
-  root.style.setProperty('--gradient-neon', `linear-gradient(135deg, hsl(${primary}), hsl(${accent}), hsl(${secondary}))`);
-  root.style.setProperty('--gradient-glow', `radial-gradient(ellipse at center, hsl(${primary} / 0.3), transparent 70%)`);
-  root.style.setProperty('--shadow-neon', `0 0 20px hsl(${primary} / 0.5), 0 0 40px hsl(${accent} / 0.3)`);
-  root.style.setProperty('--shadow-glow', `0 4px 30px hsl(${primary} / 0.4)`);
-}
-
-// Clear inline theme styles (restore to CSS defaults)
-function clearThemeFromDOM() {
-  const root = document.documentElement;
-  const vars = [
-    '--primary', '--secondary', '--accent', '--ring',
-    '--neon-purple', '--neon-blue', '--neon-pink',
-    '--gradient-neon', '--gradient-glow', '--shadow-neon', '--shadow-glow'
-  ];
-  vars.forEach(v => root.style.removeProperty(v));
 }
 
 interface ThemeProviderProps {
@@ -176,72 +94,58 @@ interface ThemeProviderProps {
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  const [preset, setPresetState] = useState<ThemePreset>('neon');
-  const [karaokeFilterEnabled, setKaraokeFilterEnabledState] = useState<boolean>(true);
+  const [karaokeFilterEnabled, setKaraokeFilterEnabledState] = useState(true);
   const [videoId, setVideoId] = useState<string | null>(null);
-  const [autoColors, setAutoColors] = useState<ThemeColors | null>(null);
+  const [ambient, setAmbient] = useState(DEFAULT_AMBIENT);
   const extractionRef = useRef<string | null>(null);
-
-  const colors: ThemeColors = preset === 'auto' && autoColors
-    ? autoColors
-    : PRESET_COLORS[preset === 'auto' ? 'neon' : preset];
-
-  const setPreset = useCallback((newPreset: ThemePreset) => {
-    setPresetState(newPreset);
-    try {
-      localStorage.setItem('karaoke_theme_preset', newPreset);
-    } catch {}
-  }, []);
 
   const setKaraokeFilterEnabled = useCallback((enabled: boolean) => {
     setKaraokeFilterEnabledState(enabled);
     try {
       localStorage.setItem('karaoke_search_filter', enabled ? 'true' : 'false');
-    } catch {}
+    } catch {
+      // Search still works if storage is unavailable.
+    }
   }, []);
 
   useEffect(() => {
     try {
-      const savedPreset = localStorage.getItem('karaoke_theme_preset') as ThemePreset | null;
-      if (savedPreset && (savedPreset === 'auto' || PRESET_COLORS[savedPreset])) {
-        setPresetState(savedPreset);
-      }
-
       const savedFilter = localStorage.getItem('karaoke_search_filter');
       if (savedFilter !== null) {
         setKaraokeFilterEnabledState(savedFilter === 'true');
       }
-    } catch {}
+    } catch {
+      // Keep default when storage is unavailable.
+    }
   }, []);
 
   useEffect(() => {
-    if (preset !== 'auto' || !videoId) {
-      setAutoColors(null);
+    if (!videoId) {
+      extractionRef.current = null;
+      setAmbient(DEFAULT_AMBIENT);
       return;
     }
     if (extractionRef.current === videoId) return;
     extractionRef.current = videoId;
 
-    extractColorsFromThumbnail(videoId).then(extracted => {
+    extractColorsFromThumbnail(videoId).then((extracted) => {
       if (extractionRef.current === videoId) {
-        setAutoColors(extracted);
+        setAmbient(extracted);
       }
     });
-  }, [preset, videoId]);
+  }, [videoId]);
 
   useEffect(() => {
-    applyThemeToDOM(colors);
-    return () => clearThemeFromDOM();
-  }, [colors]);
+    const root = document.documentElement;
+    root.style.setProperty('--ambient', ambient);
+    return () => root.style.removeProperty('--ambient');
+  }, [ambient]);
 
   return (
     <ThemeContext.Provider value={{
-      preset,
-      setPreset,
       karaokeFilterEnabled,
       setKaraokeFilterEnabled,
       setVideoId,
-      colors
     }}>
       {children}
     </ThemeContext.Provider>
@@ -255,17 +159,3 @@ export const useTheme = (): ThemeContextValue => {
   }
   return ctx;
 };
-
-// Export preset info for the picker component
-export const THEME_PRESETS: { id: ThemePreset; name: string; colors: string[] }[] = [
-  { id: 'auto', name: 'Match Thumbnail', colors: [] },
-  { id: 'neon', name: 'Neon Night', colors: ['#a855f7', '#ec4899', '#3b82f6'] },
-  { id: 'ocean', name: 'Ocean Wave', colors: ['#06b6d4', '#0ea5e9', '#3b82f6'] },
-  { id: 'sunset', name: 'Sunset Glow', colors: ['#f97316', '#ef4444', '#f59e0b'] },
-  { id: 'forest', name: 'Forest Mist', colors: ['#22c55e', '#10b981', '#14b8a6'] },
-  { id: 'galaxy', name: 'Galaxy', colors: ['#8b5cf6', '#6366f1', '#a855f7'] },
-  { id: 'retro', name: 'Retro Wave', colors: ['#f472b6', '#c084fc', '#22d3ee'] },
-  { id: 'midnight', name: 'Midnight Blue', colors: ['#1e3a8a', '#3730a3', '#4f46e5'] },
-  { id: 'candy', name: 'Candy Pop', colors: ['#f43f5e', '#fb7185', '#fda4af'] },
-  { id: 'ember', name: 'Ember Glow', colors: ['#dc2626', '#ea580c', '#f59e0b'] },
-];
