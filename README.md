@@ -1,73 +1,60 @@
-# Welcome to your Lovable project
+# KodHard Karaoke
 
-## Project info
+Sing karaoke together in real-time rooms. One person creates a room and gets a 4-character code; everyone who joins shares the same song queue, the same YouTube playback position, and live timed lyrics (with romanization for Japanese/Korean/Chinese). Voice chat happens wherever you like (e.g. Discord) — this app keeps the **music** in sync.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Tech stack
 
-## How can I edit this code?
+- **Vite** + **React 18** + **TypeScript**
+- **Tailwind CSS** + **shadcn/ui** (Radix primitives)
+- **React Router** for routing, **TanStack Query** for data
+- **Supabase** — Realtime channels for room state + two Deno edge functions (`youtube-search`, `fetch-lyrics`)
+- **YouTube IFrame API** for playback
 
-There are several ways of editing your application.
+## Getting started
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Requires [Bun](https://bun.sh) (an `npm install` also works).
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+bun install
+bun run dev      # http://localhost:8080
 ```
 
-**Edit a file directly in GitHub**
+Create a `.env` in the project root:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```sh
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_PUBLISHABLE_KEY=...
+VITE_SUPABASE_PROJECT_ID=...
+```
 
-**Use GitHub Codespaces**
+## Scripts
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+| Command | Description |
+| --- | --- |
+| `bun run dev` | Start the Vite dev server on port 8080 |
+| `bun run build` | Production build to `dist/` |
+| `bun run build:dev` | Build in development mode |
+| `bun run lint` | Run ESLint |
+| `bun run preview` | Serve the built `dist/` |
 
-## What technologies are used for this project?
+## Edge functions
 
-This project is built with:
+Deno functions live in `supabase/functions/` and deploy via the Supabase CLI:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```sh
+supabase functions deploy youtube-search
+supabase functions deploy fetch-lyrics
+```
 
-## How can I deploy this project?
+They read secrets from the Supabase environment (not `.env`):
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+- `YOUTUBE_API_KEY` — required for song search.
+- Lyrics come from [LRCLIB](https://lrclib.net) (free, no key), which provides synced (timestamped) lyrics.
 
-## Can I connect a custom domain to my Lovable project?
+## How it works
 
-Yes, you can!
+- **Rooms** are ephemeral: shared state (presence, queue, playback) lives in a Supabase Realtime channel named `room:${code}`. There is no login.
+- **Lyrics** are fetched per song, parsed from LRC timestamps, and the active line is found by binary search over the current playback time. Lyrics for upcoming queue songs are preloaded.
+- **Romanization** of CJK lyrics is done in the browser (Kuroshiro/Wanakana for Japanese, pinyin-pro for Chinese, a Hangul decomposer for Korean), all lazy-loaded.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+See [CLAUDE.md](CLAUDE.md) for a deeper architecture tour.
