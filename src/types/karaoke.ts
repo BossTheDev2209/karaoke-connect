@@ -1,5 +1,6 @@
 export type RoomMode = 'free-sing' | 'team-battle';
 export type BattleFormat = '1v1' | '2v2' | '3v3' | '4v4' | '5v5';
+export type RoomRole = 'player' | 'remote';
 
 export interface User {
   id: string;
@@ -9,6 +10,7 @@ export interface User {
   customAvatarSpeaking?: string;
   isSpeaking: boolean;
   audioLevel?: number;
+  role?: RoomRole;
   team?: 'left' | 'right';
   score?: number;
   discordId?: string;
