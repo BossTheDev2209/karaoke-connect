@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { User, Song, PlaybackState, RealtimePayload } from '@/types/karaoke';
+import { User, Song, PlaybackState, RealtimePayload, RoomRole } from '@/types/karaoke';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { detectDefaultRole, readDeviceEnv } from '@/lib/deviceRole';
+import { electClock } from '@/lib/playbackClock';
 
 interface UseRoomReturn {
   users: User[];
@@ -13,6 +15,9 @@ interface UseRoomReturn {
   updatePlayback: (state: Partial<PlaybackState>) => void;
   updateQueue: (queue: Song[]) => void;
   requestSync: () => void;
+  role: RoomRole;
+  setRole: (role: RoomRole) => void;
+  isClock: boolean;
 }
 
 const DEFAULT_PLAYBACK: PlaybackState = {
@@ -28,6 +33,7 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
   const [playbackState, setPlaybackState] = useState<PlaybackState>(DEFAULT_PLAYBACK);
   const [isConnected, setIsConnected] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const [role, setRoleState] = useState<RoomRole>(() => detectDefaultRole(readDeviceEnv()));
 
   useEffect(() => {
     if (!roomCode || !user) return;
@@ -58,7 +64,7 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          await channel.track(user);
+          await channel.track({ ...user, role });
           setIsConnected(true);
         }
       });
@@ -69,7 +75,7 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
       channel.unsubscribe();
       channelRef.current = null;
     };
-  }, [roomCode, user]);
+  }, [roomCode, user, role]);
 
   const updatePlayback = useCallback((state: Partial<PlaybackState>) => {
     const newState = { ...playbackState, ...state, lastUpdate: Date.now() };
@@ -98,6 +104,15 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
     });
   }, []);
 
+  const setRole = useCallback((next: RoomRole) => {
+    setRoleState(next);
+    if (channelRef.current && user) {
+      channelRef.current.track({ ...user, role: next });
+    }
+  }, [user]);
+
+  const isClock = !!user && electClock(users) === user.id;
+
   return {
     users,
     queue,
@@ -108,5 +123,8 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
     updatePlayback,
     updateQueue,
     requestSync,
+    role,
+    setRole,
+    isClock,
   };
 };
