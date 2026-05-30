@@ -6,55 +6,59 @@
 
 @layer base {
   :root {
-    --background: 240 15% 8%;
-    --foreground: 220 20% 95%;
+    --background: 30 16% 5%;
+    --foreground: 36 33% 94%;
 
-    --card: 240 12% 12%;
-    --card-foreground: 220 20% 95%;
+    --surface: 30 22% 8%;
+    --card: 30 22% 8%;
+    --card-foreground: 36 33% 94%;
 
-    --popover: 240 12% 10%;
-    --popover-foreground: 220 20% 95%;
+    --popover: 30 22% 8%;
+    --popover-foreground: 36 33% 94%;
 
-    --primary: 280 100% 65%;
-    --primary-foreground: 0 0% 100%;
+    /* Keep UI accent fixed while legacy ThemeContext presets are removed in Task 2. */
+    --primary: 40 100% 56% !important;
+    --primary-foreground: 30 20% 7%;
+    --primary-hover: 40 92% 50%;
 
-    --secondary: 200 100% 55%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 30 14% 12% !important;
+    --secondary-foreground: 36 33% 94%;
 
-    --muted: 240 10% 18%;
-    --muted-foreground: 220 15% 60%;
+    --muted: 30 14% 12%;
+    --muted-foreground: 36 9% 62%;
 
-    --accent: 320 100% 60%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 30 14% 12% !important;
+    --accent-foreground: 36 33% 94%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 72% 58%;
+    --destructive-foreground: 36 33% 96%;
+    --success: 150 55% 48%;
+    --warning: 40 100% 56%;
+    --ambient: 40 100% 56%;
 
-    --border: 240 10% 20%;
-    --input: 240 10% 15%;
-    --ring: 280 100% 65%;
+    --border: 33 12% 16%;
+    --input: 33 12% 16%;
+    --ring: 40 100% 56% !important;
 
-    --radius: 0.75rem;
+    --radius: 0.875rem;
 
-    /* Karaoke specific */
-    --neon-pink: 320 100% 60%;
-    --neon-blue: 200 100% 55%;
-    --neon-purple: 280 100% 65%;
-    --neon-green: 150 100% 50%;
-    --neon-yellow: 45 100% 60%;
-    --neon-orange: 25 100% 55%;
+    /* Legacy aliases: one amber spotlight, status colors only where semantic. */
+    --neon-pink: 40 100% 56% !important;
+    --neon-blue: 40 100% 56% !important;
+    --neon-purple: 40 100% 56% !important;
+    --neon-green: 150 55% 48%;
+    --neon-yellow: 40 100% 56%;
+    --neon-orange: 40 100% 56%;
 
-    --gradient-neon: linear-gradient(135deg, hsl(var(--neon-purple)), hsl(var(--neon-pink)), hsl(var(--neon-blue)));
-    --gradient-glow: radial-gradient(ellipse at center, hsl(var(--neon-purple) / 0.3), transparent 70%);
-    
-    --shadow-neon: 0 0 20px hsl(var(--neon-purple) / 0.5), 0 0 40px hsl(var(--neon-pink) / 0.3);
-    --shadow-glow: 0 4px 30px hsl(var(--neon-purple) / 0.4);
+    --gradient-neon: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-hover)));
+    --gradient-glow: radial-gradient(ellipse at center, hsl(var(--ambient) / 0.18), transparent 70%);
 
-    --font-display: 'IBM Plex Sans Thai', sans-serif;
-    --font-mono: 'Space Mono', monospace;
+    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-sans: 'IBM Plex Sans Thai', system-ui, sans-serif;
+    --font-mono: 'Space Mono', ui-monospace, monospace;
 
     /* Theme transition */
-    --theme-transition: 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    --theme-transition: 0.6s ease-in-out;
   }
 }
 
@@ -64,24 +68,25 @@
   }
 
   html {
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-weight: 400;
     letter-spacing: 0.01em;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
-    background-image: radial-gradient(ellipse at center, hsl(var(--primary) / 0.3), transparent 70%);
+    background-image: radial-gradient(ellipse at top, hsl(var(--ambient) / 0.16), transparent 58%);
     background-attachment: fixed;
     min-height: 100vh;
     transition: background-color var(--theme-transition), background-image var(--theme-transition);
-    font-size: 15px;
-    line-height: 1.6;
+    font-size: 16px;
+    line-height: 1.5;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-weight: 600;
-    letter-spacing: -0.01em;
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.03em;
     line-height: 1.3;
   }
 
@@ -120,28 +125,23 @@
 
 @layer utilities {
   .text-gradient {
-    background: var(--gradient-neon);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: hsl(var(--foreground));
   }
 
   .glow-text {
-    text-shadow: 0 0 10px hsl(var(--primary) / 0.8), 0 0 20px hsl(var(--accent) / 0.5);
-    transition: text-shadow var(--theme-transition);
+    color: hsl(var(--primary));
   }
 
   .neon-border {
-    border: 1px solid hsl(var(--primary) / 0.5);
-    box-shadow: inset 0 0 20px hsl(var(--primary) / 0.1), 0 0 20px hsl(var(--primary) / 0.2);
-    transition: border-color var(--theme-transition), box-shadow var(--theme-transition);
+    border: 1px solid hsl(var(--primary) / 0.65);
+    transition: border-color 150ms ease-out;
   }
 
   .glass {
-    background: hsl(var(--card) / 0.8);
-    backdrop-filter: blur(12px);
-    border: 1px solid hsl(var(--border) / 0.5);
-    transition: background var(--theme-transition), border-color var(--theme-transition);
+    background: hsl(var(--surface) / 0.6);
+    backdrop-filter: blur(24px);
+    border: 1px solid hsl(var(--border) / 0.6);
+    transition: background-color 150ms ease-out, border-color 150ms ease-out;
   }
 
   .font-mono {
@@ -159,6 +159,21 @@
 
   .animate-slide-up-delayed {
     animation: slide-up 0.4s ease-out 0.1s forwards;
+  }
+
+  .animate-ambient-drift {
+    animation: ambient-drift 14s ease-in-out infinite alternate;
+  }
+
+  @keyframes ambient-drift {
+    0% {
+      opacity: 0.72;
+      transform: translate3d(-1.5%, -1%, 0) scale(1);
+    }
+    100% {
+      opacity: 1;
+      transform: translate3d(1.5%, 1%, 0) scale(1.05);
+    }
   }
 
   @keyframes lyric-enter {
@@ -187,20 +202,24 @@
 @layer components {
   .btn-neon {
     @apply relative overflow-hidden px-6 py-3 rounded-xl font-semibold text-primary-foreground tracking-wide;
-    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
-    box-shadow: 0 0 20px hsl(var(--primary) / 0.4);
-    transition: all 0.3s ease, background var(--theme-transition), box-shadow var(--theme-transition);
+    background: hsl(var(--primary));
+    transition: background-color 150ms ease-out, transform 150ms ease-out;
   }
 
   .btn-neon:hover {
-    box-shadow: 0 0 30px hsl(var(--primary) / 0.6), 0 0 60px hsl(var(--accent) / 0.4);
-    transform: translateY(-2px);
+    background: hsl(var(--primary-hover));
+  }
+
+  .btn-neon:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
   }
 
   .card-karaoke {
-    @apply glass rounded-2xl p-6;
-    box-shadow: 0 4px 30px hsl(var(--primary) / 0.4);
-    transition: box-shadow var(--theme-transition), background var(--theme-transition);
+    @apply rounded-lg p-6 backdrop-blur-xl;
+    background: hsl(var(--surface) / 0.6);
+    border: 1px solid hsl(var(--border) / 0.6);
+    transition: background-color 150ms ease-out, border-color 150ms ease-out;
   }
 
   .lyric-line {

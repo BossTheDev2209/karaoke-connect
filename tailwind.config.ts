@@ -14,8 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['IBM Plex Sans Thai', 'sans-serif'],
-        mono: ['Space Mono', 'monospace'],
+        display: ['"Space Grotesk"', "system-ui", "sans-serif"],
+        sans: ['"IBM Plex Sans Thai"', "system-ui", "sans-serif"],
+        mono: ['"Space Mono"', "ui-monospace", "monospace"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -55,7 +56,7 @@ export default {
           pink: "hsl(var(--neon-pink))",
           blue: "hsl(var(--neon-blue))",
           purple: "hsl(var(--neon-purple))",
-          green: "hsl(var(--neon-green))",
+          green: "hsl(var(--success))",
           yellow: "hsl(var(--neon-yellow))",
           orange: "hsl(var(--neon-orange))",
         },
