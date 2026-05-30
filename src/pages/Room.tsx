@@ -14,8 +14,9 @@ import { UserAvatars } from '@/components/ui/user-avatars';
 import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
 import { RoomSettings } from '@/components/RoomSettings';
 import { ReactionBar, FloatingReactions, useReactions } from '@/components/Reactions';
-import { LogOut, Maximize2, Minimize2 } from 'lucide-react';
+import { LogOut, Maximize2, Minimize2, Monitor, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { expectedPosition, shouldCorrect } from '@/lib/playbackClock';
 
 const Room = () => {
   const { code } = useParams<{ code: string }>();
@@ -44,6 +45,9 @@ const Room = () => {
     updatePlayback,
     updateQueue,
     requestSync,
+    role,
+    setRole,
+    isClock,
   } = useRoom(code || '', user);
 
   const currentSong = queue[playbackState.currentSongIndex];
@@ -66,20 +70,70 @@ const Room = () => {
   );
   
 
-  const handleStateChange = useCallback((isPlaying: boolean) => {
-    updatePlayback({ isPlaying });
-  }, [updatePlayback]);
+  const handleStateChange = useCallback((playing: boolean) => {
+    if (isClock) updatePlayback({ isPlaying: playing });
+  }, [isClock, updatePlayback]);
 
   const handleVideoEnded = useCallback(() => {
+    if (!isClock) return;
     const nextIndex = playbackState.currentSongIndex + 1;
     if (nextIndex < queue.length) {
       updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
     } else {
       updatePlayback({ isPlaying: false });
     }
-  }, [queue.length, playbackState.currentSongIndex, updatePlayback]);
+  }, [isClock, queue.length, playbackState.currentSongIndex, updatePlayback]);
 
-  const { currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable } = useYouTubePlayer('youtube-player', currentSong?.videoId || null, handleStateChange, handleVideoEnded);
+  const playerVideoId = role === 'remote' ? null : (currentSong?.videoId || null);
+  const { player, isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable } = useYouTubePlayer('youtube-player', playerVideoId, handleStateChange, handleVideoEnded);
+  const currentTimeRef = useRef(currentTime);
+
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
+
+  // Remotes have no player; tick a local clock so lyrics + the scrubber advance.
+  const [, setRemoteTick] = useState(0);
+  useEffect(() => {
+    if (role !== 'remote') return;
+    const id = window.setInterval(() => setRemoteTick((t) => t + 1), 250);
+    return () => clearInterval(id);
+  }, [role]);
+
+  const effectiveTime = role === 'remote'
+    ? expectedPosition(playbackState, Date.now())
+    : currentTime;
+  const effectiveIsPlaying = role === 'remote' ? playbackState.isPlaying : isPlaying;
+
+  // Players follow shared play/pause, including clock commands sent by remotes.
+  useEffect(() => {
+    if (role === 'remote' || !isReady) return;
+    if (playbackState.isPlaying && !isPlaying) play();
+    if (!playbackState.isPlaying && isPlaying) pause();
+  }, [role, isReady, playbackState.isPlaying, isPlaying, play, pause]);
+
+  // Followers: seek back onto the shared timeline when drift is audible.
+  useEffect(() => {
+    if (isClock || role === 'remote' || !isReady || !playbackState.isPlaying) return;
+    const id = window.setInterval(() => {
+      const expected = expectedPosition(playbackState, Date.now());
+      const local = player?.getCurrentTime?.() ?? currentTimeRef.current;
+      const buffering = player?.getPlayerState?.() === window.YT?.PlayerState?.BUFFERING;
+      if (!buffering && shouldCorrect(local, expected)) {
+        seekTo(expected);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [isClock, role, isReady, playbackState, player, seekTo]);
+
+  // Clock: broadcast true position every 3s so followers re-anchor.
+  useEffect(() => {
+    if (!isClock || !isReady || !isPlaying) return;
+    const id = window.setInterval(() => {
+      updatePlayback({ currentTime: player?.getCurrentTime?.() ?? currentTimeRef.current, isPlaying: true });
+    }, 3000);
+    return () => clearInterval(id);
+  }, [isClock, isReady, isPlaying, player, updatePlayback]);
 
   const remainingSeconds = duration > 0 ? Math.ceil(duration - currentTime) : null;
   const showCountdown = isPlaying && remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 5;
@@ -90,7 +144,7 @@ const Room = () => {
   const { lyrics, currentLineIndex, isLoading: lyricsLoading, error: lyricsError, offset: lyricsOffset, setOffset: setLyricsOffset, isSynced: lyricsSynced, source: lyricsSource } = useLyrics(
     currentSong?.artist || null,
     currentSong?.title || null,
-    currentTime,
+    effectiveTime,
     preloadedLyrics
   );
   const fullscreenLyric = lyricsSynced && currentLineIndex >= 0
@@ -107,18 +161,20 @@ const Room = () => {
   }, []);
 
   const handlePlayPause = () => {
-    if (isPlaying) {
+    if (effectiveIsPlaying) {
       pause();
-      updatePlayback({ isPlaying: false, currentTime });
+      updatePlayback({ isPlaying: false, currentTime: effectiveTime });
     } else {
       play();
-      updatePlayback({ isPlaying: true, currentTime });
+      updatePlayback({ isPlaying: true, currentTime: effectiveTime });
     }
   };
 
   const handleSeek = (time: number) => {
     seekTo(time);
-    updatePlayback({ currentTime: time });
+    if (isClock || role === 'remote') {
+      updatePlayback({ currentTime: time });
+    }
   };
 
   const handleNext = () => {
@@ -207,6 +263,15 @@ const Room = () => {
               users={avatarUsers}
             />
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setRole(role === 'remote' ? 'player' : 'remote')}
+            title={role === 'remote' ? 'Remote (control only) - tap to play audio here' : 'Player (audio on) - tap to use as remote'}
+            aria-label="Toggle device role"
+          >
+            {role === 'remote' ? <Smartphone className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
+          </Button>
           <RoomSettings />
           <Button variant="ghost" size="icon" onClick={handleLeave}>
             <LogOut className="w-4 h-4" />
@@ -238,7 +303,7 @@ const Room = () => {
           <div className="card-karaoke aspect-video relative flex-1">
             <div ref={videoStageRef} className="karaoke-fullscreen-stage absolute inset-6 overflow-hidden rounded-lg bg-black">
               <div className="absolute inset-0 rounded-lg overflow-hidden" id="youtube-player-wrapper">
-                <div id="youtube-player" className="w-full h-full" />
+                {playerVideoId && <div id="youtube-player" className="w-full h-full" />}
               </div>
               {/* Blocks all YouTube chrome (channel header, pause overlay, share, end cards, branding) by preventing iframe interaction */}
               <div className="absolute inset-0 rounded-lg z-10" aria-hidden="true" />
@@ -280,6 +345,12 @@ const Room = () => {
                   <p className="text-muted-foreground">Add songs to start!</p>
                 </div>
               )}
+              {role === 'remote' && currentSong && (
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-card/85 rounded-lg text-center px-4">
+                  <Smartphone className="w-8 h-8 text-primary" />
+                  <p className="text-muted-foreground">Remote mode - audio plays on the room's screen. Tap the screen icon above to play here.</p>
+                </div>
+              )}
             </div>
           </div>
           <div className="card-karaoke h-[160px] shrink-0">
@@ -311,10 +382,10 @@ const Room = () => {
             </div>
           )}
           <PlayerControls
-            isPlaying={isPlaying}
+            isPlaying={effectiveIsPlaying}
             isMuted={isMuted}
             volume={volume}
-            currentTime={currentTime}
+            currentTime={effectiveTime}
             duration={duration}
             canGoPrevious={playbackState.currentSongIndex > 0}
             canGoNext={playbackState.currentSongIndex < queue.length - 1}

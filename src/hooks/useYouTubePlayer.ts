@@ -242,6 +242,13 @@ export const useYouTubePlayer = (
     };
   }, [destroyPlayer]);
 
+  // A null video means this device must not keep an old iframe or audio alive.
+  useEffect(() => {
+    if (!videoId) {
+      destroyPlayer();
+    }
+  }, [videoId, destroyPlayer]);
+
   // Load/crossfade to new video IDs without recreating the player
   useEffect(() => {
     if (!videoId) return;
