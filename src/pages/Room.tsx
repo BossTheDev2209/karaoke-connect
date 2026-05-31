@@ -299,6 +299,73 @@ const Room = () => {
 
   if (!user || !code) return null;
 
+  if (role === 'remote') {
+    return (
+      <div className="relative isolate min-h-screen overflow-y-auto">
+        <StageBackground />
+        <div className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-4 px-4 py-5">
+          <header className="flex items-center justify-between">
+            <RoomCodeDisplay code={code} />
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" onClick={() => setRole('player')} title="Play audio on this device" aria-label="Switch to player">
+                <Monitor className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={handleLeave} aria-label="Leave room">
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+          </header>
+
+          <section className="rounded-[var(--radius)] border border-[hsl(var(--border)/0.6)] bg-[hsl(var(--surface)/0.6)] p-4 backdrop-blur-xl">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.28em] text-primary">Now playing</p>
+            {currentSong ? (
+              <div className="mt-1">
+                <p className="truncate font-medium text-foreground">{currentSong.title}</p>
+                <p className="truncate text-sm text-muted-foreground">{currentSong.artist}</p>
+              </div>
+            ) : (
+              <p className="mt-1 text-sm text-muted-foreground">Add a song below.</p>
+            )}
+            <p className="mt-3 text-xs text-muted-foreground">Audio plays on room's screen. You're remote.</p>
+          </section>
+
+          <PlayerControls
+            isPlaying={effectiveIsPlaying}
+            isMuted={isMuted}
+            volume={volume}
+            currentTime={effectiveTime}
+            duration={duration}
+            canGoPrevious={playbackState.currentSongIndex > 0}
+            canGoNext={playbackState.currentSongIndex < queue.length - 1}
+            onPlayPause={handlePlayPause}
+            onNext={handleNext}
+            onPrevious={handlePrevious}
+            onSeek={handleSeek}
+            onVolumeChange={handleVolumeChange}
+            onMuteToggle={isMuted ? unmute : mute}
+            onSync={requestSync}
+          />
+
+          <ReactionBar onReact={sendReaction} />
+
+          <div className="rounded-[var(--radius)] border border-[hsl(var(--border)/0.6)] bg-[hsl(var(--surface)/0.6)] p-4 backdrop-blur-xl">
+            <SongSearch onAddSong={handleAddSong} userId={user.id} />
+            <div className="scrollbar-karaoke mt-3 max-h-[40vh] overflow-y-auto">
+              <SongQueue
+                queue={queue}
+                currentIndex={playbackState.currentSongIndex}
+                onRemove={handleRemoveSong}
+                onSelect={handleSelectSong}
+                getLyricStatus={getStatusForSong}
+              />
+            </div>
+          </div>
+        </div>
+        <FloatingReactions reactions={reactions} />
+      </div>
+    );
+  }
+
   return (
     <div className="relative isolate h-screen overflow-hidden" onPointerMove={revealChrome}>
       <StageBackground />
