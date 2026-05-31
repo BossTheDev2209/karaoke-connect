@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { YouTubeSearchResult, YouTubeChannel, Song } from '@/types/karaoke';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
+import { toast } from '@/hooks/use-toast';
 
 interface SongSearchProps {
   onAddSong: (song: Song) => void;
@@ -24,11 +25,16 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
   const [activeTab, setActiveTab] = useState<SearchTab>('songs');
   const [selectedChannel, setSelectedChannel] = useState<YouTubeChannel | null>(null);
   const [channelVideos, setChannelVideos] = useState<YouTubeSearchResult[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const handleSearch = async () => {
     if (!query.trim()) return;
 
     setIsLoading(true);
+    setError(null);
+    setHasSearched(true);
+    setIsOpen(true);
     setSelectedChannel(null);
     setChannelVideos([]);
     
@@ -52,9 +58,12 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
         setChannels(data.channels || []);
         setResults([]);
       }
-      setIsOpen(true);
     } catch (err) {
       console.error('Search error:', err);
+      setResults([]);
+      setChannels([]);
+      setError("Couldn't load results. Check your connection and try again.");
+      toast({ title: 'Search failed', description: 'Could not reach the search service.', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
@@ -103,6 +112,8 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
     setQuery('');
     setResults([]);
     setChannels([]);
+    setError(null);
+    setHasSearched(false);
   };
 
   const handleTabChange = (tab: SearchTab) => {
@@ -111,6 +122,8 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
     setChannels([]);
     setSelectedChannel(null);
     setChannelVideos([]);
+    setError(null);
+    setHasSearched(false);
   };
 
   const videosToShow = selectedChannel ? channelVideos : results;
@@ -181,7 +194,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
         </button>
       </div>
 
-      {isOpen && hasResults && (
+      {isOpen && (hasResults || isLoading || error || hasSearched) && (
         <div className="scrollbar-karaoke absolute left-0 right-0 top-full z-50 mt-2 max-h-96 overflow-x-hidden overflow-y-auto rounded-xl border border-border/70 bg-[hsl(var(--surface)/0.94)] pr-1 backdrop-blur-2xl">
           <div className="p-2 flex justify-between items-center border-b border-border">
             {selectedChannel ? (
@@ -227,6 +240,17 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
           )}
 
           <div className="p-2 space-y-1">
+            {isLoading && !selectedChannel && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            {!isLoading && error && (
+              <div className="px-3 py-6 text-center text-sm text-destructive">{error}</div>
+            )}
+            {!isLoading && !error && hasSearched && !hasResults && (
+              <div className="px-3 py-6 text-center text-sm text-muted-foreground">No matches found.</div>
+            )}
             {/* Show channels list */}
             {activeTab === 'artists' && !selectedChannel && channels.map((channel) => (
               <button

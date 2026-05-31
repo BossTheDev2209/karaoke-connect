@@ -6,6 +6,12 @@
       "runtimeExecutable": "bun",
       "runtimeArgs": ["run", "dev"],
       "port": 8080
+    },
+    {
+      "name": "preview",
+      "runtimeExecutable": "bunx",
+      "runtimeArgs": ["vite", "--port", "5199", "--host"],
+      "port": 5199
     }
   ]
 }
