@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { applyPlayableVideoFilters } from "./videoSearchParams.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -85,6 +86,7 @@ async function searchVideos(apiKey: string, query: string) {
   searchUrl.searchParams.set('type', 'video');
   searchUrl.searchParams.set('maxResults', '15');
   searchUrl.searchParams.set('videoCategoryId', '10'); // Music category
+  applyPlayableVideoFilters(searchUrl);
   searchUrl.searchParams.set('key', apiKey);
 
   const searchResponse = await fetch(searchUrl.toString());
@@ -199,6 +201,7 @@ async function fetchChannelVideos(apiKey: string, channelId: string) {
   searchUrl.searchParams.set('type', 'video');
   searchUrl.searchParams.set('order', 'viewCount'); // Most popular first
   searchUrl.searchParams.set('maxResults', '20');
+  applyPlayableVideoFilters(searchUrl);
   searchUrl.searchParams.set('key', apiKey);
 
   const searchResponse = await fetch(searchUrl.toString());
