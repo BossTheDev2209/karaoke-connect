@@ -117,6 +117,9 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   
   const hasCJK = hasCJKLyrics(lyrics);
   const languageLabel = getLanguageLabel(lyrics);
+  const activeLine = lyrics[currentLineIndex];
+  const nextLine = lyrics[currentLineIndex + 1];
+  const nextLineStartsInSec = nextLine ? nextLine.time - currentTime : null;
 
   // Reset selected line when the lyrics list changes (e.g. song change)
   useEffect(() => {
@@ -400,7 +403,29 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
                     isSelected && 'ring-2 ring-primary bg-primary/10'
                   )}
                 >
-                  <div>{line.text}</div>
+                  <div>
+                    {isActive && activeLine?.words?.length ? (
+                      <span>
+                        {activeLine.words.map((word, wordIndex) => (
+                          <span
+                            key={wordIndex}
+                            className={word.time <= currentTime ? 'text-primary' : 'text-muted-foreground'}
+                          >
+                            {word.text}{wordIndex < activeLine.words!.length - 1 ? ' ' : ''}
+                          </span>
+                        ))}
+                      </span>
+                    ) : (
+                      <span>{line.text}</span>
+                    )}
+                  </div>
+                  {isActive && isSynced && nextLineStartsInSec !== null && nextLineStartsInSec <= 3 && nextLineStartsInSec > 0 && (
+                    <div className="mt-1 flex justify-center gap-1.5" aria-hidden="true">
+                      {[3, 2, 1].map((n) => (
+                        <span key={n} className={`h-1.5 w-1.5 rounded-full ${nextLineStartsInSec <= n ? 'bg-primary' : 'bg-muted-foreground/40'}`} />
+                      ))}
+                    </div>
+                  )}
                   {romanization && (
                     <div className={cn(
                       'text-xs mt-0.5 transition-all duration-300',
