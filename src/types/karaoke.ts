@@ -36,10 +36,16 @@ export interface Song {
   addedBy: string;
 }
 
+export interface LyricWord {
+  time: number;
+  text: string;
+}
+
 export interface LyricLine {
   time: number;
   text: string;
   romanization?: string;
+  words?: LyricWord[];
 }
 
 export interface PlaybackState {

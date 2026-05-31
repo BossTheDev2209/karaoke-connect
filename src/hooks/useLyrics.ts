@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { LyricLine } from '@/types/karaoke';
 import { supabase } from '@/integrations/supabase/client';
 import { PreloadedLyrics } from './useLyricsPreload';
+import { parsePlainLyrics, parseSyncedLyrics } from '@/lib/lrc';
 
 interface UseLyricsReturn {
   lyrics: LyricLine[];
@@ -140,38 +141,3 @@ export const useLyrics = (
 
   return { lyrics, currentLineIndex, isLoading, error, offset, setOffset, isSynced, source };
 };
-
-// Parse LRC format: [mm:ss.xx] lyrics text
-function parseSyncedLyrics(lrc: string): LyricLine[] {
-  const lines = lrc.split('\n');
-  const result: LyricLine[] = [];
-
-  for (const line of lines) {
-    const match = line.match(/\[(\d{2}):(\d{2})\.(\d{2})\](.*)/);
-    if (match) {
-      const minutes = parseInt(match[1], 10);
-      const seconds = parseInt(match[2], 10);
-      const centiseconds = parseInt(match[3], 10);
-      const text = match[4].trim();
-
-      if (text) {
-        result.push({
-          time: minutes * 60 + seconds + centiseconds / 100,
-          text,
-        });
-      }
-    }
-  }
-
-  return result;
-}
-
-// Parse plain lyrics into separate lines (no fake timestamps)
-function parsePlainLyrics(plainLyrics: string): LyricLine[] {
-  const lines = plainLyrics
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(line => line.length > 0);
-
-  return lines.map((text) => ({ time: 0, text }));
-}
