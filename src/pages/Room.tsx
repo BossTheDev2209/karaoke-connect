@@ -7,16 +7,19 @@ import { useLyrics } from '@/hooks/useLyrics';
 import { useLyricsPreload } from '@/hooks/useLyricsPreload';
 import { useTheme } from '@/contexts/ThemeContext';
 import { LyricsDisplay } from '@/components/LyricsDisplay';
+import { SingLyrics } from '@/components/SingLyrics';
 import { PlayerControls } from '@/components/PlayerControls';
 import { SongQueue } from '@/components/SongQueue';
 import { SongSearch } from '@/components/SongSearch';
 import { UserAvatars } from '@/components/ui/user-avatars';
 import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
 import { RoomSettings } from '@/components/RoomSettings';
-import { ReactionBar, FloatingReactions, useReactions } from '@/components/Reactions';
-import { Captions, ListMusic, LogOut, Maximize2, Minimize2, Monitor, Smartphone } from 'lucide-react';
+import { FloatingReactions, ReactionBar, ReactionPicker } from '@/components/Reactions';
+import { useReactions } from '@/hooks/useReactions';
+import { Captions, Ellipsis, ListMusic, LogOut, Maximize2, Mic2, Minimize2, Monitor, Plus, Search, Settings, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { expectedPosition, shouldCorrect } from '@/lib/playbackClock';
+import { INITIAL_RIBBON_VISIBILITY, RIBBON_HIDE_DELAY_MS, ribbonTransitionDuration, shouldShowRibbon } from '@/lib/ribbonVisibility';
 import { StageBackground } from '@/components/StageBackground';
 import {
   Sheet,
@@ -24,9 +27,18 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from '@/components/ui/sheet';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+
+type StageMode = 'video' | 'sing';
+type UtilityPanel = 'up-next' | 'search' | 'lyrics' | null;
 
 const Room = () => {
   const { code } = useParams<{ code: string }>();
@@ -170,9 +182,19 @@ const Room = () => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  const [chromeVisible, setChromeVisible] = useState(true);
+  const [stageMode, setStageMode] = useState<StageMode>('video');
+  const [utilityPanel, setUtilityPanel] = useState<UtilityPanel>(null);
+  const [utilitySheetOpen, setUtilitySheetOpen] = useState(false);
+  const [remoteSearchOpen, setRemoteSearchOpen] = useState(false);
+  const [remoteLyricsOpen, setRemoteLyricsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isWideDesktop, setIsWideDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-  const chromeTimerRef = useRef<number | null>(null);
+  const [ribbonIntent, setRibbonIntent] = useState(INITIAL_RIBBON_VISIBILITY);
+  const [ribbonVisible, setRibbonVisible] = useState(false);
+  const ribbonTimerRef = useRef<number | null>(null);
+  const ribbonRef = useRef<HTMLElement>(null);
+  const touchHandleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -183,34 +205,59 @@ const Room = () => {
     return () => mediaQuery.removeEventListener('change', updateMotionPreference);
   }, []);
 
-  const revealChrome = useCallback(() => {
-    setChromeVisible(true);
-    if (chromeTimerRef.current !== null) {
-      window.clearTimeout(chromeTimerRef.current);
-      chromeTimerRef.current = null;
-    }
-    if (!prefersReducedMotion) {
-      chromeTimerRef.current = window.setTimeout(() => setChromeVisible(false), 3000);
-    }
-  }, [prefersReducedMotion]);
-
   useEffect(() => {
-    if (prefersReducedMotion) {
-      setChromeVisible(true);
+    const mediaQuery = window.matchMedia('(min-width: 1024px)');
+    const updateLayout = () => setIsWideDesktop(mediaQuery.matches);
+    mediaQuery.addEventListener('change', updateLayout);
+    updateLayout();
+    return () => mediaQuery.removeEventListener('change', updateLayout);
+  }, []);
+
+  const ribbonRequested = shouldShowRibbon(ribbonIntent);
+  useEffect(() => {
+    if (ribbonTimerRef.current !== null) {
+      window.clearTimeout(ribbonTimerRef.current);
+      ribbonTimerRef.current = null;
+    }
+
+    if (ribbonRequested) {
+      setRibbonVisible(true);
       return;
     }
 
-    revealChrome();
-    window.addEventListener('pointermove', revealChrome);
-    window.addEventListener('pointerdown', revealChrome);
+    ribbonTimerRef.current = window.setTimeout(() => setRibbonVisible(false), RIBBON_HIDE_DELAY_MS);
     return () => {
-      window.removeEventListener('pointermove', revealChrome);
-      window.removeEventListener('pointerdown', revealChrome);
-      if (chromeTimerRef.current !== null) {
-        window.clearTimeout(chromeTimerRef.current);
+      if (ribbonTimerRef.current !== null) {
+        window.clearTimeout(ribbonTimerRef.current);
       }
     };
-  }, [prefersReducedMotion, revealChrome]);
+  }, [ribbonRequested]);
+
+  useEffect(() => {
+    if (!ribbonIntent.touchOpen) return;
+
+    const handleOutsideTap = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (ribbonRef.current?.contains(target) || touchHandleRef.current?.contains(target)) return;
+      setRibbonIntent((current) => ({ ...current, touchOpen: false }));
+    };
+
+    document.addEventListener('pointerdown', handleOutsideTap);
+    return () => document.removeEventListener('pointerdown', handleOutsideTap);
+  }, [ribbonIntent.touchOpen]);
+
+  const setRibbonFlag = (key: keyof typeof ribbonIntent, value: boolean) => {
+    setRibbonIntent((current) => ({ ...current, [key]: value }));
+  };
+
+  const openUtilityPanel = (panel: Exclude<UtilityPanel, null>) => {
+    if (isWideDesktop) {
+      setUtilityPanel((current) => current === panel ? null : panel);
+      return;
+    }
+    setUtilityPanel(panel);
+    setUtilitySheetOpen(true);
+  };
 
   const handlePlayPause = () => {
     if (effectiveIsPlaying) {
@@ -299,141 +346,61 @@ const Room = () => {
 
   if (!user || !code) return null;
 
-  if (role === 'remote') {
-    return (
-      <div className="relative isolate min-h-screen overflow-y-auto">
-        <StageBackground />
-        <div className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-4 px-4 py-5">
-          <header className="flex items-center justify-between">
-            <RoomCodeDisplay code={code} />
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" onClick={() => setRole('player')} title="Play audio on this device" aria-label="Switch to player">
-                <Monitor className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={handleLeave} aria-label="Leave room">
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </div>
-          </header>
-
-          <section className="rounded-[var(--radius)] border border-[hsl(var(--border)/0.6)] bg-[hsl(var(--surface)/0.6)] p-4 backdrop-blur-xl">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.28em] text-primary">Now playing</p>
-            {currentSong ? (
-              <div className="mt-1">
-                <p className="truncate font-medium text-foreground">{currentSong.title}</p>
-                <p className="truncate text-sm text-muted-foreground">{currentSong.artist}</p>
-              </div>
-            ) : (
-              <p className="mt-1 text-sm text-muted-foreground">Add a song below.</p>
-            )}
-            <p className="mt-3 text-xs text-muted-foreground">Audio plays on room's screen. You're remote.</p>
-          </section>
-
-          <PlayerControls
-            isPlaying={effectiveIsPlaying}
-            isMuted={isMuted}
-            volume={volume}
-            currentTime={effectiveTime}
-            duration={duration}
-            canGoPrevious={playbackState.currentSongIndex > 0}
-            canGoNext={playbackState.currentSongIndex < queue.length - 1}
-            onPlayPause={handlePlayPause}
-            onNext={handleNext}
-            onPrevious={handlePrevious}
-            onSeek={handleSeek}
-            onVolumeChange={handleVolumeChange}
-            onMuteToggle={isMuted ? unmute : mute}
-            onSync={requestSync}
-          />
-
-          <ReactionBar onReact={sendReaction} />
-
-          <div className="rounded-[var(--radius)] border border-[hsl(var(--border)/0.6)] bg-[hsl(var(--surface)/0.6)] p-4 backdrop-blur-xl">
-            <SongSearch onAddSong={handleAddSong} userId={user.id} />
-            <div className="scrollbar-karaoke mt-3 max-h-[40vh] overflow-y-auto">
-              <SongQueue
-                queue={queue}
-                currentIndex={playbackState.currentSongIndex}
-                onRemove={handleRemoveSong}
-                onSelect={handleSelectSong}
-                getLyricStatus={getStatusForSong}
-              />
-            </div>
-          </div>
+  const utilityTitle = utilityPanel === 'search' ? 'Search' : utilityPanel === 'lyrics' ? 'Lyrics' : 'Up Next';
+  const renderUtilityContent = () => (
+    <div className="flex h-full flex-col bg-[hsl(var(--surface))]">
+      <div className="border-b border-white/10 px-5 py-4">
+        <p className="text-lg font-semibold tracking-tight">{utilityTitle}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {utilityPanel === 'search' ? 'Find songs for shared queue.' : utilityPanel === 'lyrics' ? 'Read, seek, and tune lyric timing.' : `${queue.length} songs queued.`}
+        </p>
+        <div className="mt-3 flex gap-1">
+          <Button variant="ghost" size="sm" className={cn('rounded-full', utilityPanel === 'up-next' && 'bg-white/10')} onClick={() => openUtilityPanel('up-next')}>
+            <ListMusic className="h-3.5 w-3.5" />
+            Up Next
+          </Button>
+          <Button variant="ghost" size="sm" className={cn('rounded-full', utilityPanel === 'search' && 'bg-white/10')} onClick={() => openUtilityPanel('search')}>
+            <Search className="h-3.5 w-3.5" />
+            Search
+          </Button>
+          <Button variant="ghost" size="sm" className={cn('rounded-full', utilityPanel === 'lyrics' && 'bg-white/10')} onClick={() => openUtilityPanel('lyrics')}>
+            <Captions className="h-3.5 w-3.5" />
+            Lyrics
+          </Button>
         </div>
-        <FloatingReactions reactions={reactions} />
       </div>
-    );
-  }
-
-  return (
-    <div className="relative isolate h-screen overflow-hidden" onPointerMove={revealChrome}>
-      <StageBackground />
-      <FloatingReactions reactions={reactions} />
-
-      <header
-        className={cn(
-          'fixed inset-x-3 top-3 z-40 flex items-center justify-between gap-3 rounded-[var(--radius)] border border-[hsl(var(--border)/0.6)] bg-[hsl(var(--surface)/0.4)] px-3 py-2 backdrop-blur-xl transition-[opacity,transform] duration-200 ease-out sm:inset-x-4',
-          chromeVisible ? 'translate-y-0 opacity-100' : '-translate-y-3 pointer-events-none opacity-0'
-        )}
-      >
-        <RoomCodeDisplay code={code} />
-        <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-          <div className="hidden items-center gap-2 sm:flex">
-            <span
-              className={cn('h-2 w-2 rounded-full', isConnected ? 'bg-[hsl(var(--success))]' : 'bg-destructive')}
-              aria-hidden="true"
-            />
-            <span className="text-sm text-muted-foreground">{users.length} online</span>
-          </div>
-          {users.length > 0 && (
-            <div className="hidden sm:block">
-              <UserAvatars
-                size={28}
-                maxVisible={6}
-                overlap={40}
-                users={avatarUsers}
-              />
-            </div>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setRole(role === 'remote' ? 'player' : 'remote')}
-            title={role === 'remote' ? 'Remote (control only) - tap to play audio here' : 'Player (audio on) - tap to use as remote'}
-            aria-label="Toggle device role"
-          >
-            {role === 'remote' ? <Smartphone className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
-          </Button>
-          <RoomSettings />
-          <Button variant="ghost" size="icon" onClick={handleLeave} aria-label="Leave room">
-            <LogOut className="w-4 h-4" />
-          </Button>
+      {utilityPanel === 'search' && (
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 scrollbar-karaoke">
+          <SongSearch onAddSong={handleAddSong} userId={user.id} resultsPlacement="inline" />
         </div>
-      </header>
-
-      <Sheet>
-        <SheetTrigger asChild>
-          <Button
-            variant="secondary"
-            size="icon"
-            className="fixed left-0 top-1/2 z-40 -translate-y-1/2 rounded-l-none rounded-r-xl border-l-0 bg-[hsl(var(--surface)/0.75)] backdrop-blur-xl"
-            aria-label="Open queue and search"
-            title="Open queue and search"
-          >
-            <ListMusic className="h-5 w-5" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent
-          side="left"
-          className="flex w-[min(92vw,30rem)] flex-col border-[hsl(var(--border)/0.7)] bg-[hsl(var(--surface)/0.82)] p-0 shadow-none backdrop-blur-2xl sm:max-w-md"
-        >
-          <SheetHeader className="border-b border-border/60 px-6 py-5 text-left">
-            <SheetTitle className="font-display text-2xl">Queue</SheetTitle>
-            <SheetDescription>Search songs and shape next set.</SheetDescription>
-          </SheetHeader>
-          <div className="border-b border-border/60 p-4">
-            <SongSearch onAddSong={handleAddSong} userId={user.id} />
+      )}
+      {utilityPanel === 'lyrics' && (
+        <div className="min-h-0 flex-1 p-4">
+          <LyricsDisplay
+            lyrics={lyrics}
+            currentLineIndex={currentLineIndex}
+            currentTime={effectiveTime}
+            isLoading={lyricsLoading}
+            error={lyricsError}
+            isSynced={lyricsSynced}
+            source={lyricsSource}
+            offset={lyricsOffset}
+            onOffsetChange={setLyricsOffset}
+            onSeek={handleSeek}
+            areCaptionsEnabled={areCaptionsEnabled}
+            hasCaptionsAvailable={hasCaptionsAvailable}
+            onEnableCaptions={enableCaptions}
+            onDisableCaptions={disableCaptions}
+          />
+        </div>
+      )}
+      {(utilityPanel === 'up-next' || utilityPanel === null) && (
+        <>
+          <div className="border-b border-white/10 p-4">
+            <Button variant="outline" className="w-full rounded-full" onClick={() => openUtilityPanel('search')}>
+              <Plus className="h-4 w-4" />
+              Add Song
+            </Button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-4 scrollbar-karaoke">
             <SongQueue
@@ -444,122 +411,297 @@ const Room = () => {
               getLyricStatus={getStatusForSong}
             />
           </div>
-        </SheetContent>
-      </Sheet>
+        </>
+      )}
+    </div>
+  );
 
-      <Sheet>
-        <SheetTrigger asChild>
-          <Button
-            variant="secondary"
-            size="icon"
-            className="fixed right-0 top-1/2 z-40 -translate-y-1/2 rounded-l-xl rounded-r-none border-r-0 bg-[hsl(var(--surface)/0.75)] backdrop-blur-xl"
-            aria-label="Open lyric tools"
-            title="Open lyric tools"
-          >
-            <Captions className="h-5 w-5" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent
-          className="flex w-[min(92vw,30rem)] flex-col border-[hsl(var(--border)/0.7)] bg-[hsl(var(--surface)/0.82)] p-0 shadow-none backdrop-blur-2xl sm:max-w-md"
-        >
-          <SheetHeader className="border-b border-border/60 px-6 py-5 text-left">
-            <SheetTitle className="font-display text-2xl">Lyrics</SheetTitle>
-            <SheetDescription>Read, seek, offset, and tune captions.</SheetDescription>
-          </SheetHeader>
-          <div className="min-h-0 flex-1 p-4">
-            <LyricsDisplay 
-              lyrics={lyrics} 
-              currentLineIndex={currentLineIndex} 
-              currentTime={currentTime} 
-              isLoading={lyricsLoading} 
+  if (role === 'remote') {
+    return (
+      <div className="relative isolate min-h-screen overflow-y-auto bg-background">
+        <StageBackground />
+        <div className="mx-auto flex min-h-screen w-full max-w-lg flex-col px-4 py-4">
+          <header className="flex items-center justify-between border-b border-white/10 pb-3">
+            <RoomCodeDisplay code={code} />
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className={cn('h-1.5 w-1.5 rounded-full', isConnected ? 'bg-[hsl(var(--success))]' : 'bg-destructive')} />
+                {users.length}
+              </span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full" aria-label="Open room menu">
+                    <Ellipsis className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52 rounded-xl border-white/10 bg-[hsl(var(--surface))]">
+                  <DropdownMenuItem onSelect={() => setRole('player')} className="rounded-lg">
+                    <Monitor className="mr-2 h-4 w-4" />
+                    Play audio here
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setSettingsOpen(true)} className="rounded-lg">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Room settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={handleLeave} className="rounded-lg text-destructive focus:text-destructive">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Leave room
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </header>
+
+          <section className="flex items-center gap-3 border-b border-white/10 py-4">
+            {currentSong ? (
+              <>
+                <img src={currentSong.thumbnail} alt="" className="h-14 w-20 rounded-md object-cover" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">{currentSong.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">{currentSong.artist}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Audio on stage screen</p>
+                </div>
+              </>
+            ) : (
+              <div className="py-2">
+                <p className="text-sm font-medium text-foreground">Queue waiting.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Add first song below.</p>
+              </div>
+            )}
+          </section>
+
+          <section className="border-b border-white/10 py-4">
+            <PlayerControls
+              isPlaying={effectiveIsPlaying}
+              isMuted={isMuted}
+              volume={volume}
+              currentTime={effectiveTime}
+              duration={duration}
+              canGoPrevious={playbackState.currentSongIndex > 0}
+              canGoNext={playbackState.currentSongIndex < queue.length - 1}
+              onPlayPause={handlePlayPause}
+              onNext={handleNext}
+              onPrevious={handlePrevious}
+              onSeek={handleSeek}
+              onVolumeChange={handleVolumeChange}
+              onMuteToggle={isMuted ? unmute : mute}
+              onSync={requestSync}
+              showVolume={false}
+            />
+          </section>
+
+          <section className="flex items-center gap-2 border-b border-white/10 py-3">
+            <Button variant="outline" className="h-11 flex-1 rounded-full" onClick={() => setRemoteSearchOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Add Song
+            </Button>
+            <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setRemoteLyricsOpen(true)} aria-label="Open lyrics">
+              <Captions className="h-4 w-4" />
+            </Button>
+          </section>
+
+          <section className="border-b border-white/10 py-3">
+            <p className="mb-1 px-1 text-xs font-medium text-muted-foreground">Quick reactions</p>
+            <ReactionBar onReact={sendReaction} />
+          </section>
+
+          <section className="min-h-0 flex-1 py-4">
+            <div className="mb-2 flex items-center justify-between px-1">
+              <p className="text-sm font-semibold">Up Next</p>
+              <span className="font-mono text-xs text-muted-foreground">{queue.length}</span>
+            </div>
+            <SongQueue
+              queue={queue}
+              currentIndex={playbackState.currentSongIndex}
+              onRemove={handleRemoveSong}
+              onSelect={handleSelectSong}
+              getLyricStatus={getStatusForSong}
+            />
+          </section>
+        </div>
+
+        <Sheet open={remoteSearchOpen} onOpenChange={setRemoteSearchOpen}>
+          <SheetContent side="bottom" className="max-h-[84vh] border-white/10 bg-[hsl(var(--surface))] p-0 shadow-2xl">
+            <SheetHeader className="px-4 pt-4 text-left">
+              <SheetTitle>Add Song</SheetTitle>
+              <SheetDescription>Search shared queue.</SheetDescription>
+            </SheetHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 scrollbar-karaoke">
+              <SongSearch onAddSong={handleAddSong} userId={user.id} resultsPlacement="inline" />
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        <Sheet open={remoteLyricsOpen} onOpenChange={setRemoteLyricsOpen}>
+          <SheetContent side="bottom" className="h-[78vh] border-white/10 bg-[hsl(var(--surface))] p-4 shadow-2xl">
+            <SheetHeader className="mb-3 text-left">
+              <SheetTitle>Lyrics</SheetTitle>
+              <SheetDescription>Timed lyric tools.</SheetDescription>
+            </SheetHeader>
+            <LyricsDisplay
+              lyrics={lyrics}
+              currentLineIndex={currentLineIndex}
+              currentTime={effectiveTime}
+              isLoading={lyricsLoading}
               error={lyricsError}
               isSynced={lyricsSynced}
               source={lyricsSource}
               offset={lyricsOffset}
               onOffsetChange={setLyricsOffset}
               onSeek={handleSeek}
-              areCaptionsEnabled={areCaptionsEnabled}
-              hasCaptionsAvailable={hasCaptionsAvailable}
-              onEnableCaptions={enableCaptions}
-              onDisableCaptions={disableCaptions}
             />
+          </SheetContent>
+        </Sheet>
+
+        <RoomSettings open={settingsOpen} onOpenChange={setSettingsOpen} showTrigger={false} />
+        <FloatingReactions reactions={reactions} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative isolate h-screen overflow-hidden bg-background">
+      <StageBackground />
+      <FloatingReactions reactions={reactions} />
+
+      <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-white/10 bg-background/95 px-3 sm:px-5">
+        <RoomCodeDisplay code={code} />
+        <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+          <div className="hidden items-center gap-2 sm:flex">
+            <span className={cn('h-1.5 w-1.5 rounded-full', isConnected ? 'bg-[hsl(var(--success))]' : 'bg-destructive')} aria-hidden="true" />
+            <span className="text-xs text-muted-foreground">{users.length} online</span>
           </div>
+          {users.length > 0 && (
+            <div className="hidden sm:block">
+              <UserAvatars size={26} maxVisible={5} overlap={36} users={avatarUsers} />
+            </div>
+          )}
+          <Button variant="ghost" size="icon" className="rounded-full" onClick={handleVideoFullscreen} aria-label={isVideoFullscreen ? 'Exit fullscreen' : 'Watch fullscreen'}>
+            {isVideoFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full" aria-label="Open room menu">
+                <Ellipsis className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52 rounded-xl border-white/10 bg-[hsl(var(--surface))]">
+              <DropdownMenuItem onSelect={() => setRole('remote')} className="rounded-lg">
+                <Smartphone className="mr-2 h-4 w-4" />
+                Use as remote
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setSettingsOpen(true)} className="rounded-lg">
+                <Settings className="mr-2 h-4 w-4" />
+                Room settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={handleLeave} className="rounded-lg text-destructive focus:text-destructive">
+                <LogOut className="mr-2 h-4 w-4" />
+                Leave room
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </header>
+
+      <div className="flex h-full pt-16">
+        <main className="flex min-w-0 flex-1 items-center justify-center px-3 pb-20 pt-3 sm:px-6 sm:pb-24">
+          <div
+            ref={videoStageRef}
+            className="karaoke-fullscreen-stage relative aspect-video w-full max-w-[min(100vw,calc((100vh-7rem)*16/9))] overflow-hidden rounded-lg bg-black"
+          >
+            <div className="absolute inset-0 overflow-hidden rounded-lg" id="youtube-player-wrapper">
+              {playerVideoId && <div id="youtube-player" className="h-full w-full" />}
+            </div>
+            <div className="absolute inset-0 z-10 rounded-lg" aria-hidden="true" />
+
+            {showCountdown && (
+              <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+                <div className="rounded-2xl bg-black/70 px-6 py-4">
+                  <div className="text-center text-6xl font-semibold tabular-nums text-primary">{remainingSeconds}</div>
+                </div>
+              </div>
+            )}
+
+            {stageMode === 'video' && fullscreenLyric && (
+              <div className="karaoke-fullscreen-lyrics pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center bg-black/65 px-4 pb-7 pt-6">
+                <div className="max-w-5xl text-center text-[clamp(1.5rem,3.5vw,2.75rem)] font-semibold leading-relaxed text-white">
+                  {fullscreenLyric}
+                </div>
+              </div>
+            )}
+
+            {stageMode === 'sing' && currentSong && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/75">
+                <SingLyrics lyrics={lyricsSynced ? lyrics : []} currentLineIndex={currentLineIndex} currentTime={effectiveTime} />
+              </div>
+            )}
+
+            {!currentSong && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-black">
+                <p className="text-sm text-muted-foreground">Open Up Next to add songs.</p>
+              </div>
+            )}
+          </div>
+        </main>
+
+        {isWideDesktop && utilityPanel && (
+          <aside className="hidden h-full w-96 shrink-0 border-l border-white/10 lg:block">
+            {renderUtilityContent()}
+          </aside>
+        )}
+      </div>
+
+      <Sheet open={utilitySheetOpen} onOpenChange={setUtilitySheetOpen}>
+        <SheetContent className="flex w-[min(92vw,30rem)] flex-col border-white/10 bg-[hsl(var(--surface))] p-0 shadow-2xl sm:max-w-md">
+          <SheetTitle className="sr-only">{utilityTitle}</SheetTitle>
+          <SheetDescription className="sr-only">Room queue, search, and lyric tools.</SheetDescription>
+          {renderUtilityContent()}
         </SheetContent>
       </Sheet>
 
-      <main className="flex h-full items-center justify-center px-3 py-20 sm:px-8 sm:py-24">
-        <div
-          ref={videoStageRef}
-          className="karaoke-fullscreen-stage relative aspect-video w-full max-w-[min(100vw,calc((100vh-8rem)*16/9))] overflow-hidden rounded-[var(--radius)] border border-border/60 bg-black"
-        >
-          <div className="absolute inset-0 overflow-hidden rounded-[var(--radius)]" id="youtube-player-wrapper">
-            {playerVideoId && <div id="youtube-player" className="w-full h-full" />}
-          </div>
-          {/* Blocks all YouTube chrome (channel header, pause overlay, share, end cards, branding) by preventing iframe interaction */}
-          <div className="absolute inset-0 z-10 rounded-[var(--radius)]" aria-hidden="true" />
+      <div
+        className="fixed inset-x-0 bottom-0 z-30 hidden h-24 md:block"
+        onPointerEnter={() => setRibbonFlag('zoneHovered', true)}
+        onPointerLeave={() => setRibbonFlag('zoneHovered', false)}
+        aria-hidden="true"
+      />
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleVideoFullscreen}
-            className="absolute right-3 top-3 z-30 rounded-full bg-background/70 text-foreground backdrop-blur hover:bg-background/90"
-            title={isVideoFullscreen ? 'Exit fullscreen' : 'Watch fullscreen'}
-            aria-label={isVideoFullscreen ? 'Exit video fullscreen' : 'Watch video fullscreen'}
-          >
-            {isVideoFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-          </Button>
-
-          {showCountdown && (
-            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-              <div className="rounded-[var(--radius)] border border-border/70 bg-[hsl(var(--surface)/0.75)] px-6 py-4 backdrop-blur-xl">
-                <div className="text-center font-display text-6xl font-bold tabular-nums text-primary">
-                  {remainingSeconds}
-                </div>
-                <div className="mt-1 text-center font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-                  seconds
-                </div>
-              </div>
-            </div>
-          )}
-
-          {fullscreenLyric && (
-            <div className="karaoke-fullscreen-lyrics pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center bg-gradient-to-t from-black/90 via-black/45 to-transparent px-4 pb-8 pt-28">
-              <div className="max-w-5xl text-center font-sans text-[clamp(1.5rem,3.5vw,2.75rem)] font-semibold leading-relaxed text-white">
-                {fullscreenLyric}
-              </div>
-            </div>
-          )}
-
-          {!currentSong && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center rounded-[var(--radius)] bg-card/80">
-              <p className="text-muted-foreground">Open queue to add songs.</p>
-            </div>
-          )}
-          {role === 'remote' && currentSong && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 rounded-[var(--radius)] bg-card/85 px-4 text-center">
-              <Smartphone className="w-8 h-8 text-primary" />
-              <p className="max-w-md text-muted-foreground">Remote mode - audio plays on the room's screen. Tap the screen icon above to play here.</p>
-            </div>
-          )}
-        </div>
-      </main>
+      <button
+        ref={touchHandleRef}
+        type="button"
+        onClick={() => setRibbonFlag('touchOpen', !ribbonIntent.touchOpen)}
+        className="fixed bottom-2 left-1/2 z-50 h-1.5 w-12 -translate-x-1/2 rounded-full bg-white/40 md:hidden"
+        aria-label={ribbonIntent.touchOpen ? 'Hide playback controls' : 'Show playback controls'}
+      />
 
       <section
+        ref={ribbonRef}
+        onPointerEnter={() => setRibbonFlag('ribbonHovered', true)}
+        onPointerLeave={() => setRibbonFlag('ribbonHovered', false)}
+        onFocusCapture={() => setRibbonFlag('focusWithin', true)}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setRibbonFlag('focusWithin', false);
+        }}
         className={cn(
-          'fixed inset-x-3 bottom-3 z-40 mx-auto flex max-w-7xl flex-col gap-3 rounded-[var(--radius)] border border-[hsl(var(--border)/0.6)] bg-[hsl(var(--surface)/0.62)] p-3 backdrop-blur-xl transition-[opacity,transform] duration-200 ease-out sm:inset-x-4 lg:flex-row lg:items-center lg:p-4',
-          chromeVisible ? 'translate-y-0 opacity-100' : 'translate-y-3 pointer-events-none opacity-0'
+          'fixed inset-x-2 bottom-3 z-40 mx-auto flex max-w-7xl flex-col gap-3 rounded-2xl border border-white/10 bg-[hsl(var(--surface)/0.97)] p-3 shadow-2xl transition-[opacity,transform] ease-out sm:inset-x-4 lg:flex-row lg:items-center lg:p-4',
+          ribbonVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0'
         )}
+        style={{ transitionDuration: ribbonTransitionDuration(prefersReducedMotion) }}
       >
         <div className="min-w-0 lg:w-64">
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.28em] text-primary">Now playing</p>
           {currentSong ? (
-            <div className="mt-1 min-w-0">
-              <p className="truncate font-medium text-foreground">{currentSong.title}</p>
-              <p className="truncate text-sm text-muted-foreground">{currentSong.artist}</p>
+            <div className="flex items-center gap-3">
+              <img src={currentSong.thumbnail} alt="" className="h-11 w-16 rounded-md object-cover" />
+              <div className="min-w-0">
+                <p className="truncate font-medium text-foreground">{currentSong.title}</p>
+                <p className="truncate text-xs text-muted-foreground">{currentSong.artist}</p>
+              </div>
             </div>
-          ) : (
-            <p className="mt-1 text-sm text-muted-foreground">Queue waiting.</p>
-          )}
+            ) : (
+              <p className="text-sm text-muted-foreground">Queue waiting.</p>
+            )}
         </div>
         <div className="min-w-0 flex-1">
           <PlayerControls
@@ -579,10 +721,30 @@ const Room = () => {
             onSync={requestSync}
           />
         </div>
-        <div className="shrink-0 overflow-x-auto">
-          <ReactionBar onReact={sendReaction} />
+        <div className="flex shrink-0 items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn('rounded-full', stageMode === 'sing' && 'bg-primary/15 text-primary')}
+            onClick={() => setStageMode(stageMode === 'video' ? 'sing' : 'video')}
+            aria-label={stageMode === 'video' ? 'Open Sing mode' : 'Return to video mode'}
+          >
+            <Mic2 className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className={cn('rounded-full', utilityPanel === 'up-next' && 'bg-white/10')} onClick={() => openUtilityPanel('up-next')} aria-label="Open Up Next">
+            <ListMusic className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className={cn('rounded-full', utilityPanel === 'search' && 'bg-white/10')} onClick={() => openUtilityPanel('search')} aria-label="Open search">
+            <Search className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className={cn('rounded-full', utilityPanel === 'lyrics' && 'bg-white/10')} onClick={() => openUtilityPanel('lyrics')} aria-label="Open lyrics">
+            <Captions className="h-4 w-4" />
+          </Button>
+          <ReactionPicker onReact={sendReaction} />
         </div>
       </section>
+
+      <RoomSettings open={settingsOpen} onOpenChange={setSettingsOpen} showTrigger={false} />
     </div>
   );
 };

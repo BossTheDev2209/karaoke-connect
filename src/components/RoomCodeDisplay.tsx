@@ -31,7 +31,7 @@ export const RoomCodeDisplay: React.FC<RoomCodeDisplayProps> = ({ code }) => {
         variant="ghost"
         size="icon"
         onClick={handleCopy}
-        className="h-9 w-9"
+        className="h-11 w-11"
         aria-label="Copy room code"
       >
         {copied ? (

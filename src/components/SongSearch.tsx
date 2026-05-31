@@ -11,11 +11,12 @@ import { toast } from '@/hooks/use-toast';
 interface SongSearchProps {
   onAddSong: (song: Song) => void;
   userId: string;
+  resultsPlacement?: 'popover' | 'inline';
 }
 
 type SearchTab = 'songs' | 'artists';
 
-export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => {
+export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, resultsPlacement = 'popover' }) => {
   const { karaokeFilterEnabled, setKaraokeFilterEnabled } = useTheme();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<YouTubeSearchResult[]>([]);
@@ -147,7 +148,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
         <Button 
           onClick={handleSearch} 
           disabled={isLoading}
-          className="h-10"
+          className="h-11"
         >
           {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
         </Button>
@@ -158,7 +159,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
         <button
           onClick={() => handleTabChange('songs')}
           className={cn(
-            'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+            'flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
             activeTab === 'songs'
               ? 'border-primary bg-primary text-primary-foreground'
               : 'border-border bg-transparent text-muted-foreground hover:bg-[hsl(var(--surface)/0.7)] hover:text-foreground'
@@ -170,7 +171,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
         <button
           onClick={() => handleTabChange('artists')}
           className={cn(
-            'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+            'flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
             activeTab === 'artists'
               ? 'border-primary bg-primary text-primary-foreground'
               : 'border-border bg-transparent text-muted-foreground hover:bg-[hsl(var(--surface)/0.7)] hover:text-foreground'
@@ -183,7 +184,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
           onClick={() => setKaraokeFilterEnabled(!karaokeFilterEnabled)}
           title="Only show Instrumental/Karaoke versions"
           className={cn(
-            'ml-auto flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+            'ml-auto flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
             karaokeFilterEnabled
               ? 'border-primary/50 bg-primary/10 text-primary'
               : 'border-border bg-transparent text-muted-foreground hover:bg-[hsl(var(--surface)/0.7)] hover:text-foreground'
@@ -195,7 +196,10 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
       </div>
 
       {isOpen && (hasResults || isLoading || error || hasSearched) && (
-        <div className="scrollbar-karaoke absolute left-0 right-0 top-full z-50 mt-2 max-h-96 overflow-x-hidden overflow-y-auto rounded-xl border border-border/70 bg-[hsl(var(--surface)/0.94)] pr-1 backdrop-blur-2xl">
+        <div className={cn(
+          'scrollbar-karaoke z-50 mt-2 max-h-96 overflow-x-hidden overflow-y-auto rounded-xl border border-white/10 bg-[hsl(var(--surface))] pr-1 shadow-2xl',
+          resultsPlacement === 'popover' && 'absolute left-0 right-0 top-full'
+        )}>
           <div className="p-2 flex justify-between items-center border-b border-border">
             {selectedChannel ? (
               <button 
@@ -216,7 +220,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
               variant="ghost"
               size="icon"
               onClick={handleClose}
-              className="h-6 w-6"
+              className="h-11 w-11"
             >
               <X className="w-4 h-4" />
             </Button>

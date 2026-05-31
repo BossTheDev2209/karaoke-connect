@@ -191,8 +191,8 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
       <div className="flex flex-col items-center justify-center h-full gap-3 px-8">
         <div className="w-full max-w-xs">
           <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-primary via-accent to-primary rounded-full transition-all duration-300 ease-out"
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
               style={{ width: `${loadingProgress}%` }} 
             />
           </div>
@@ -242,7 +242,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
               variant="ghost"
               size="icon"
               onClick={() => adjustOffset(-0.1)}
-              className="h-7 w-7 rounded-full"
+              className="h-11 w-11 rounded-full"
               aria-label="Decrease lyric offset"
             >
               <Minus className="h-3.5 w-3.5" />
@@ -254,7 +254,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
               variant="ghost"
               size="icon"
               onClick={() => adjustOffset(0.1)}
-              className="h-7 w-7 rounded-full"
+              className="h-11 w-11 rounded-full"
               aria-label="Increase lyric offset"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -268,7 +268,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
             size="sm"
             onClick={areCaptionsEnabled ? onDisableCaptions : onEnableCaptions}
             className={cn(
-              'h-8 rounded-full px-2.5 text-xs',
+              'rounded-full px-2.5 text-xs',
               areCaptionsEnabled && 'bg-primary/10 text-primary'
             )}
             title={areCaptionsEnabled ? 'Disable YouTube captions' : 'Enable YouTube captions'}
@@ -285,7 +285,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
             size="sm"
             onClick={() => setShowRomanization(!showRomanization)}
             className={cn(
-              'h-8 rounded-full px-2.5 text-xs',
+              'rounded-full px-2.5 text-xs',
               showRomanization ? 'bg-primary/10 text-primary' : 'bg-background/30'
             )}
             title={`Show ${languageLabel || 'Romanization'}`}
@@ -302,7 +302,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 rounded-full bg-background/30 px-2.5 text-xs"
+                className="rounded-full bg-background/30 px-2.5 text-xs"
                 title="View full lyrics"
               >
                 <List className="w-3 h-3 mr-1" />
@@ -319,7 +319,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
                       size="sm"
                       onClick={() => setShowRomanization(!showRomanization)}
                       className={cn(
-                        "h-7 text-xs",
+                        "text-xs",
                         showRomanization && "bg-primary/20"
                       )}
                     >
@@ -349,7 +349,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
         {/* Click-to-seek toggle - only show for synced lyrics */}
         {!hasPlainLyrics && lyrics.length > 1 && onSeek && (
           <label
-            className="group flex h-8 cursor-pointer select-none items-center gap-2 rounded-full border border-border/60 bg-background/30 px-1.5 pr-2 text-[11px] text-foreground/85 transition-colors hover:bg-background/50"
+            className="group flex h-11 cursor-pointer select-none items-center gap-2 rounded-full border border-border/60 bg-background/30 px-1.5 pr-2 text-[11px] text-foreground/85 transition-colors hover:bg-background/50"
             title="When on, clicking a lyric line seeks the video to that time"
           >
             <input

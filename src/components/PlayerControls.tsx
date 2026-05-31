@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { cn } from '@/lib/utils';
 
 interface PlayerControlsProps {
   isPlaying: boolean;
@@ -26,6 +27,8 @@ interface PlayerControlsProps {
   onVolumeChange: (volume: number) => void;
   onMuteToggle: () => void;
   onSync: () => void;
+  className?: string;
+  showVolume?: boolean;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -43,6 +46,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   onVolumeChange,
   onMuteToggle,
   onSync,
+  className,
+  showVolume = true,
 }) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -51,7 +56,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   };
 
   return (
-    <div className="space-y-3">
+    <div className={cn('space-y-3', className)}>
       <div className="space-y-1.5">
         <Slider
           value={[currentTime]}
@@ -114,7 +119,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           </Button>
         </div>
 
-        <div className="hidden items-center gap-2 sm:flex">
+        {showVolume && <div className="hidden items-center gap-2 sm:flex">
           <Button
             variant="ghost"
             size="icon"
@@ -133,7 +138,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
             className="w-20"
             aria-label="Volume"
           />
-        </div>
+        </div>}
       </div>
     </div>
   );

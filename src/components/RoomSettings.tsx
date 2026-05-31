@@ -12,17 +12,25 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { useTheme } from '@/contexts/ThemeContext';
 
-export const RoomSettings: React.FC = () => {
+interface RoomSettingsProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  showTrigger?: boolean;
+}
+
+export const RoomSettings: React.FC<RoomSettingsProps> = ({ open, onOpenChange, showTrigger = true }) => {
   const { karaokeFilterEnabled, setKaraokeFilterEnabled } = useTheme();
 
   return (
-    <Sheet>
-      <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Open room settings">
-          <Settings className="w-4 h-4" />
-        </Button>
-      </SheetTrigger>
-      <SheetContent className="w-[340px] border-[hsl(var(--border)/0.7)] bg-[hsl(var(--surface)/0.82)] shadow-none backdrop-blur-2xl sm:w-[400px]">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      {showTrigger && (
+        <SheetTrigger asChild>
+          <Button variant="ghost" size="icon" aria-label="Open room settings">
+            <Settings className="w-4 h-4" />
+          </Button>
+        </SheetTrigger>
+      )}
+      <SheetContent className="w-[340px] border-white/10 bg-[hsl(var(--surface))] shadow-2xl sm:w-[400px]">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Settings className="w-5 h-5 text-primary" />
@@ -34,7 +42,7 @@ export const RoomSettings: React.FC = () => {
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
-          <div className="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-background/25 p-4">
+          <div className="flex items-center justify-between gap-4 border-t border-white/10 py-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Search className="w-4 h-4 text-primary" />

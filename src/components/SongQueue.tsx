@@ -109,7 +109,7 @@ export const SongQueue: React.FC<SongQueueProps> = ({
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="space-y-2">
+      <div className="divide-y divide-white/10">
         {queue.map((song, index) => {
           const lyricStatus = getLyricStatus?.(song.id) || 'pending';
           
@@ -117,18 +117,18 @@ export const SongQueue: React.FC<SongQueueProps> = ({
             <div
               key={song.id}
               className={cn(
-                'group flex cursor-pointer items-center gap-3 rounded-xl border border-transparent p-2 transition-colors',
+                'group flex cursor-pointer items-center gap-3 px-1 py-3 transition-colors',
                 index === currentIndex
-                  ? 'border-primary/50 bg-primary/10'
-                  : 'hover:bg-[hsl(var(--surface)/0.7)]'
+                  ? 'text-foreground'
+                  : 'hover:bg-white/[0.04]'
               )}
               onClick={() => onSelect(index)}
             >
               <span className={cn(
-                'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
+                'flex h-6 w-6 shrink-0 items-center justify-center font-mono text-xs',
                 index === currentIndex
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground'
+                  ? 'text-primary'
+                  : 'text-muted-foreground'
               )}>
                 {index + 1}
               </span>
@@ -136,7 +136,7 @@ export const SongQueue: React.FC<SongQueueProps> = ({
               <img
                 src={song.thumbnail}
                 alt={song.title}
-                className="w-12 h-9 shrink-0 rounded-lg object-cover"
+                className="h-10 w-14 shrink-0 rounded-md object-cover"
               />
               
               <div className="flex-1 min-w-0">
@@ -159,7 +159,7 @@ export const SongQueue: React.FC<SongQueueProps> = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-destructive/70 transition-opacity hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                  className="h-11 w-11 text-destructive/70 transition-opacity hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                   aria-label={`Remove ${song.title}`}
                   onClick={(e) => {
                     e.stopPropagation();

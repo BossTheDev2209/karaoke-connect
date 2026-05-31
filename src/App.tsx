@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 
 const Index = lazy(() => import("./pages/Index"));
+const RoomEntry = lazy(() => import("./pages/RoomEntry"));
 const Room = lazy(() => import("./pages/Room"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -28,6 +29,8 @@ const App = () => (
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/create" element={<RoomEntry mode="create" />} />
+              <Route path="/join" element={<RoomEntry mode="join" />} />
               <Route path="/room/:code" element={<Room />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

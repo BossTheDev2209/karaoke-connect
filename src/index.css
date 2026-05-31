@@ -2,62 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Font loaded via index.html */
-
 @layer base {
   :root {
-    --background: 30 16% 5%;
-    --foreground: 36 33% 94%;
+    --background: 0 0% 6%;
+    --foreground: 240 7% 96%;
 
-    --surface: 30 22% 8%;
-    --card: 30 22% 8%;
-    --card-foreground: 36 33% 94%;
+    --surface: 240 3% 11%;
+    --card: 240 3% 11%;
+    --card-foreground: 240 7% 96%;
 
-    --popover: 30 22% 8%;
-    --popover-foreground: 36 33% 94%;
+    --popover: 240 3% 11%;
+    --popover-foreground: 240 7% 96%;
 
-    --primary: 40 100% 56%;
-    --primary-foreground: 30 20% 7%;
-    --primary-hover: 40 92% 50%;
+    --primary: 347 100% 61%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 347 100% 67%;
 
-    --secondary: 30 14% 12%;
-    --secondary-foreground: 36 33% 94%;
+    --secondary: 240 3% 17%;
+    --secondary-foreground: 240 7% 96%;
 
-    --muted: 30 14% 12%;
-    --muted-foreground: 36 9% 62%;
+    --muted: 240 3% 17%;
+    --muted-foreground: 240 3% 65%;
 
-    --accent: 30 14% 12%;
-    --accent-foreground: 36 33% 94%;
+    --accent: 240 3% 17%;
+    --accent-foreground: 240 7% 96%;
 
     --destructive: 0 72% 58%;
-    --destructive-foreground: 36 33% 96%;
+    --destructive-foreground: 0 0% 100%;
     --success: 150 55% 48%;
-    --warning: 40 100% 56%;
-    --ambient: 40 100% 56%;
+    --warning: 42 100% 60%;
+    --ambient: 347 100% 61%;
 
-    --border: 33 12% 16%;
-    --input: 33 12% 16%;
-    --ring: 40 100% 56%;
+    --divider: 255 255 255;
+    --border: 0 0% 16%;
+    --input: 240 3% 17%;
+    --ring: 347 100% 61%;
 
-    --radius: 0.875rem;
+    --radius: 0.75rem;
 
-    /* Legacy aliases: one amber spotlight, status colors only where semantic. */
-    --neon-pink: 40 100% 56%;
-    --neon-blue: 40 100% 56%;
-    --neon-purple: 40 100% 56%;
+    /* Legacy aliases stay mapped for older surfaces. */
+    --neon-pink: 347 100% 61%;
+    --neon-blue: 347 100% 61%;
+    --neon-purple: 347 100% 61%;
     --neon-green: 150 55% 48%;
-    --neon-yellow: 40 100% 56%;
-    --neon-orange: 40 100% 56%;
+    --neon-yellow: 42 100% 60%;
+    --neon-orange: 347 100% 61%;
 
     --gradient-neon: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-hover)));
-    --gradient-glow: radial-gradient(ellipse at center, hsl(var(--ambient) / 0.18), transparent 70%);
+    --gradient-glow: none;
 
-    --font-display: 'Space Grotesk', system-ui, sans-serif;
-    --font-sans: 'IBM Plex Sans Thai', system-ui, sans-serif;
-    --font-mono: 'Space Mono', ui-monospace, monospace;
+    --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-    /* Theme transition */
-    --theme-transition: 0.6s ease-in-out;
+    --theme-transition: 160ms ease-out;
   }
 }
 
@@ -74,10 +72,8 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    background-image: radial-gradient(ellipse at top, hsl(var(--ambient) / 0.16), transparent 58%);
-    background-attachment: fixed;
     min-height: 100vh;
-    transition: background-color var(--theme-transition), background-image var(--theme-transition);
+    transition: background-color var(--theme-transition);
     font-size: 16px;
     line-height: 1.5;
   }
@@ -158,21 +154,6 @@
 
   .animate-slide-up-delayed {
     animation: slide-up 0.4s ease-out 0.1s forwards;
-  }
-
-  .animate-ambient-drift {
-    animation: ambient-drift 14s ease-in-out infinite alternate;
-  }
-
-  @keyframes ambient-drift {
-    0% {
-      opacity: 0.72;
-      transform: translate3d(-1.5%, -1%, 0) scale(1);
-    }
-    100% {
-      opacity: 1;
-      transform: translate3d(1.5%, 1%, 0) scale(1.05);
-    }
   }
 
   @keyframes lyric-enter {
@@ -356,9 +337,9 @@
     display: none;
   }
 
-  /* Slim neon scrollbar for popovers and lyric sheets */
+  /* Slim neutral scrollbar for popovers and lyric sheets */
   .scrollbar-karaoke {
-    scrollbar-color: hsl(var(--primary) / 0.75) hsl(var(--card) / 0.28);
+    scrollbar-color: hsl(var(--muted-foreground) / 0.7) transparent;
     scrollbar-width: thin;
   }
 
@@ -375,25 +356,17 @@
   .scrollbar-karaoke::-webkit-scrollbar-track {
     margin: 10px 0;
     border-radius: 999px;
-    background: linear-gradient(
-      180deg,
-      hsl(var(--card) / 0.16),
-      hsl(var(--primary) / 0.08),
-      hsl(var(--card) / 0.16)
-    );
-    border: 1px solid hsl(var(--border) / 0.28);
+    background: transparent;
   }
 
   .scrollbar-karaoke::-webkit-scrollbar-thumb {
     border-radius: 999px;
-    background:
-      linear-gradient(180deg, hsl(var(--neon-pink) / 0.95), hsl(var(--neon-purple) / 0.95), hsl(var(--neon-blue) / 0.9));
-    border: 2px solid hsl(var(--card) / 0.72);
+    background: hsl(var(--muted-foreground) / 0.7);
+    border: 2px solid hsl(var(--card));
   }
 
   .scrollbar-karaoke::-webkit-scrollbar-thumb:hover {
-    background:
-      linear-gradient(180deg, hsl(var(--neon-yellow) / 0.95), hsl(var(--neon-pink) / 0.95), hsl(var(--neon-blue) / 0.95));
+    background: hsl(var(--foreground) / 0.8);
   }
 
   /* Light stick wave animation */

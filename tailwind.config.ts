@@ -15,9 +15,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ['"Space Grotesk"', "system-ui", "sans-serif"],
-        sans: ['"IBM Plex Sans Thai"', "system-ui", "sans-serif"],
-        mono: ['"Space Mono"', "ui-monospace", "monospace"],
+        display: ["-apple-system", "BlinkMacSystemFont", '"Segoe UI"', "sans-serif"],
+        sans: ["-apple-system", "BlinkMacSystemFont", '"Segoe UI"', "sans-serif"],
+        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"],
       },
       colors: {
         border: "hsl(var(--border))",
