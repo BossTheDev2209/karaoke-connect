@@ -6,7 +6,6 @@ const corsHeaders = {
 };
 
 const LRCLIB_API = 'https://lrclib.net/api';
-const GENIUS_API = 'https://api.genius.com';
 
 // Thai character range detection
 function containsThai(text: string): boolean {
@@ -469,88 +468,6 @@ async function searchLRCLIB(trackName: string, artistName?: string): Promise<any
   }
 }
 
-// Search Genius API for lyrics
-async function searchGenius(query: string, apiKey: string): Promise<{ lyrics: string | null; artist: string | null; title: string | null }> {
-  console.log(`Searching Genius: "${query}"`);
-  
-  try {
-    const searchUrl = new URL(`${GENIUS_API}/search`);
-    searchUrl.searchParams.set('q', query);
-
-    const response = await fetch(searchUrl.toString(), {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-      },
-    });
-
-    if (!response.ok) {
-      console.error('Genius search failed:', response.status);
-      return { lyrics: null, artist: null, title: null };
-    }
-
-    const data = await response.json();
-    const hits = data.response?.hits || [];
-    
-    if (hits.length === 0) {
-      console.log('No Genius results found');
-      return { lyrics: null, artist: null, title: null };
-    }
-
-    // Get the first result
-    const firstHit = hits[0].result;
-    const songPath = firstHit.path;
-    const artist = firstHit.primary_artist?.name || null;
-    const title = firstHit.title || null;
-    
-    console.log(`Genius found: "${artist}" - "${title}"`);
-
-    // Fetch the actual lyrics page and scrape
-    const lyricsUrl = `https://genius.com${songPath}`;
-    const lyricsResponse = await fetch(lyricsUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-    });
-
-    if (!lyricsResponse.ok) {
-      console.error('Failed to fetch Genius lyrics page');
-      return { lyrics: null, artist, title };
-    }
-
-    const html = await lyricsResponse.text();
-    
-    // Extract lyrics from Genius HTML
-    // Look for data-lyrics-container="true" divs
-    const lyricsMatch = html.match(/data-lyrics-container="true"[^>]*>([\s\S]*?)<\/div>/g);
-    
-    if (!lyricsMatch) {
-      console.log('Could not parse Genius lyrics from HTML');
-      return { lyrics: null, artist, title };
-    }
-
-    // Clean up the extracted lyrics
-    let lyrics = lyricsMatch
-      .join('\n')
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#x27;/g, "'")
-      .replace(/&nbsp;/g, ' ')
-      .replace(/\[.*?\]/g, '') // Remove section headers like [Verse 1]
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-
-    console.log(`Genius lyrics extracted: ${lyrics.length} chars`);
-    return { lyrics, artist, title };
-  } catch (err) {
-    console.error('Genius fetch error:', err);
-    return { lyrics: null, artist: null, title: null };
-  }
-}
-
 // Generate Thai-specific search strategies
 function generateThaiSearchStrategies(
   artist: string,
@@ -724,42 +641,7 @@ serve(async (req) => {
       );
     }
 
-    // FALLBACK: Try Genius API
-    console.log('LRCLIB found nothing, trying Genius API...');
-    const geniusApiKey = Deno.env.get('GENIUS_API_KEY');
-    
-    if (geniusApiKey) {
-      // Try multiple Genius search queries
-      const geniusQueries = [
-        firstPart, // Just song name
-        `${firstPart} ${primaryArtist}`, // Song + artist
-        songName,
-        `${songName} ${cleanedArtist}`,
-      ].filter((q, i, arr) => q && q.length >= 2 && arr.indexOf(q) === i);
-
-      for (const query of geniusQueries) {
-        const geniusResult = await searchGenius(query, geniusApiKey);
-        
-        if (geniusResult.lyrics) {
-          console.log(`Genius found lyrics for: "${geniusResult.artist}" - "${geniusResult.title}"`);
-          return new Response(
-            JSON.stringify({
-              syncedLyrics: null,
-              plainLyrics: geniusResult.lyrics,
-              trackName: geniusResult.title,
-              artistName: geniusResult.artist,
-              source: 'genius',
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-      }
-      console.log('Genius also found nothing');
-    } else {
-      console.log('GENIUS_API_KEY not configured, skipping Genius fallback');
-    }
-
-    console.log('No lyrics found after all strategies');
+    console.log('No lyrics found (LRCLIB only)');
     return new Response(
       JSON.stringify({ syncedLyrics: null, plainLyrics: null }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
