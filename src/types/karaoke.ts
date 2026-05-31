@@ -49,6 +49,12 @@ export interface PlaybackState {
   lastUpdate: number;
 }
 
+export interface RoomSnapshot {
+  code: string;
+  queue: Song[];
+  playback: PlaybackState;
+}
+
 export interface Room {
   code: string;
   users: User[];
