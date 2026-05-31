@@ -7,6 +7,14 @@ const corsHeaders = {
 
 const LRCLIB_API = 'https://lrclib.net/api';
 
+interface LrclibResult {
+  id: number;
+  trackName: string;
+  artistName: string;
+  syncedLyrics: string | null;
+  plainLyrics: string | null;
+}
+
 // Thai character range detection
 function containsThai(text: string): boolean {
   return /[\u0E00-\u0E7F]/.test(text);
@@ -433,7 +441,7 @@ function similarity(s1: string, s2: string): number {
 }
 
 // Score a result based on how well it matches our query
-function scoreResult(result: any, queryArtist: string, queryTitle: string): number {
+function scoreResult(result: LrclibResult, queryArtist: string, queryTitle: string): number {
   const artistScore = similarity(result.artistName || '', queryArtist);
   const titleScore = similarity(result.trackName || '', queryTitle);
   const hasSynced = result.syncedLyrics ? 0.5 : 0;
@@ -442,7 +450,7 @@ function scoreResult(result: any, queryArtist: string, queryTitle: string): numb
 }
 
 // Search LRCLIB with given parameters
-async function searchLRCLIB(trackName: string, artistName?: string): Promise<any[]> {
+async function searchLRCLIB(trackName: string, artistName?: string): Promise<LrclibResult[]> {
   const searchUrl = new URL(`${LRCLIB_API}/search`);
   searchUrl.searchParams.set('track_name', trackName);
   if (artistName) {
@@ -597,7 +605,7 @@ serve(async (req) => {
       )
     );
 
-    let allResults: any[] = [];
+    let allResults: LrclibResult[] = [];
 
     for (const search of uniqueSearches) {
       if (!search.track || search.track.length < 2) continue;
@@ -605,7 +613,7 @@ serve(async (req) => {
       const results = await searchLRCLIB(search.track, search.artist);
       if (results.length > 0) {
         allResults = [...allResults, ...results];
-        if (results.some((r: any) => r.syncedLyrics)) {
+        if (results.some((r: LrclibResult) => r.syncedLyrics)) {
           console.log(`Found synced lyrics on strategy: track="${search.track}" artist="${search.artist || 'any'}"`);
           break;
         }

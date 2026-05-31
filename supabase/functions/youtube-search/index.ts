@@ -5,6 +5,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface YtThumbnail {
+  url: string;
+}
+
+interface YtSnippet {
+  title: string;
+  channelTitle: string;
+  channelId: string;
+  description?: string;
+  thumbnails: {
+    medium?: YtThumbnail;
+    default?: YtThumbnail;
+  };
+}
+
+interface YtSearchItem {
+  id: { videoId?: string; channelId?: string } | string;
+  snippet: YtSnippet;
+  contentDetails?: { duration: string };
+  statistics?: Record<string, string>;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -76,7 +98,9 @@ async function searchVideos(apiKey: string, query: string) {
     );
   }
 
-  const videoIds = searchData.items?.map((item: any) => item.id.videoId).join(',');
+  const videoIds = searchData.items?.map((item: YtSearchItem) =>
+    typeof item.id === 'string' ? item.id : item.id.videoId
+  ).join(',');
   
   if (!videoIds) {
     return new Response(
@@ -94,13 +118,13 @@ async function searchVideos(apiKey: string, query: string) {
   const detailsResponse = await fetch(detailsUrl.toString());
   const detailsData = await detailsResponse.json();
 
-  const results = detailsData.items?.map((item: any) => ({
+  const results = detailsData.items?.map((item: YtSearchItem) => ({
     videoId: item.id,
     title: item.snippet.title,
     channelTitle: item.snippet.channelTitle,
     channelId: item.snippet.channelId,
     thumbnail: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default?.url,
-    duration: formatDuration(item.contentDetails.duration),
+    duration: formatDuration(item.contentDetails!.duration),
   })) || [];
 
   console.log(`Found ${results.length} video results`);
@@ -130,7 +154,9 @@ async function searchChannels(apiKey: string, query: string) {
     );
   }
 
-  const channelIds = searchData.items?.map((item: any) => item.id.channelId).join(',');
+  const channelIds = searchData.items?.map((item: YtSearchItem) =>
+    typeof item.id === 'string' ? item.id : item.id.channelId
+  ).join(',');
   
   if (!channelIds) {
     return new Response(
@@ -148,13 +174,13 @@ async function searchChannels(apiKey: string, query: string) {
   const detailsResponse = await fetch(detailsUrl.toString());
   const detailsData = await detailsResponse.json();
 
-  const channels = detailsData.items?.map((item: any) => ({
+  const channels = detailsData.items?.map((item: YtSearchItem) => ({
     channelId: item.id,
     title: item.snippet.title,
     description: item.snippet.description?.substring(0, 100) || '',
     thumbnail: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default?.url,
-    subscriberCount: formatSubscriberCount(item.statistics.subscriberCount),
-    videoCount: item.statistics.videoCount,
+    subscriberCount: formatSubscriberCount(item.statistics!.subscriberCount),
+    videoCount: item.statistics!.videoCount,
   })) || [];
 
   console.log(`Found ${channels.length} channel results`);
@@ -186,7 +212,9 @@ async function fetchChannelVideos(apiKey: string, channelId: string) {
     );
   }
 
-  const videoIds = searchData.items?.map((item: any) => item.id.videoId).join(',');
+  const videoIds = searchData.items?.map((item: YtSearchItem) =>
+    typeof item.id === 'string' ? item.id : item.id.videoId
+  ).join(',');
   
   if (!videoIds) {
     return new Response(
@@ -204,13 +232,13 @@ async function fetchChannelVideos(apiKey: string, channelId: string) {
   const detailsResponse = await fetch(detailsUrl.toString());
   const detailsData = await detailsResponse.json();
 
-  const results = detailsData.items?.map((item: any) => ({
+  const results = detailsData.items?.map((item: YtSearchItem) => ({
     videoId: item.id,
     title: item.snippet.title,
     channelTitle: item.snippet.channelTitle,
     channelId: item.snippet.channelId,
     thumbnail: item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default?.url,
-    duration: formatDuration(item.contentDetails.duration),
+    duration: formatDuration(item.contentDetails!.duration),
   })) || [];
 
   console.log(`Found ${results.length} videos from channel`);
