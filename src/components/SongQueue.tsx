@@ -39,7 +39,7 @@ const LyricStatusIcon: React.FC<{ status: LyricStatus }> = ({ status }) => {
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="flex items-center">
-              <Check className="w-3.5 h-3.5 text-neon-green" />
+              <Check className="w-3.5 h-3.5 text-[hsl(var(--success))]" />
             </div>
           </TooltipTrigger>
           <TooltipContent side="left" className="text-xs">
@@ -117,17 +117,17 @@ export const SongQueue: React.FC<SongQueueProps> = ({
             <div
               key={song.id}
               className={cn(
-                'flex items-center gap-3 p-2 rounded-lg transition-all cursor-pointer group',
-                index === currentIndex 
-                  ? 'bg-primary/20 neon-border' 
-                  : 'hover:bg-muted/50'
+                'group flex cursor-pointer items-center gap-3 rounded-xl border border-transparent p-2 transition-colors',
+                index === currentIndex
+                  ? 'border-primary/50 bg-primary/10'
+                  : 'hover:bg-[hsl(var(--surface)/0.7)]'
               )}
               onClick={() => onSelect(index)}
             >
               <span className={cn(
                 'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
-                index === currentIndex 
-                  ? 'bg-neon-purple text-primary-foreground' 
+                index === currentIndex
+                  ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-muted-foreground'
               )}>
                 {index + 1}
@@ -136,13 +136,13 @@ export const SongQueue: React.FC<SongQueueProps> = ({
               <img
                 src={song.thumbnail}
                 alt={song.title}
-                className="w-12 h-9 object-cover rounded shrink-0"
+                className="w-12 h-9 shrink-0 rounded-lg object-cover"
               />
               
               <div className="flex-1 min-w-0">
                 <p className={cn(
                   'text-sm font-medium truncate',
-                  index === currentIndex && 'text-neon-pink'
+                  index === currentIndex && 'text-primary'
                 )}>
                   {song.title}
                 </p>
@@ -159,7 +159,8 @@ export const SongQueue: React.FC<SongQueueProps> = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                  className="h-8 w-8 text-destructive/70 transition-opacity hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                  aria-label={`Remove ${song.title}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     onRemove(song.id);

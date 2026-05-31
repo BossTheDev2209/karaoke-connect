@@ -17,14 +17,15 @@ interface ReactionBarProps {
 export const ReactionBar: React.FC<ReactionBarProps> = ({ onReact }) => {
   return (
     <div className="flex items-center gap-2">
-      <div className="flex gap-1 p-2 rounded-full glass border border-border/50">
+      <div className="flex gap-1 rounded-full border border-border/60 bg-background/25 p-1.5">
         {REACTION_EMOJIS.map((emoji) => (
           <Button
             key={emoji}
             variant="ghost"
             size="sm"
-            className="w-8 h-8 p-0 text-lg hover:scale-125 transition-transform"
+            className="h-9 w-9 rounded-full p-0 text-lg hover:scale-110"
             onClick={() => onReact(emoji)}
+            aria-label={`Send ${emoji} reaction`}
           >
             {emoji}
           </Button>

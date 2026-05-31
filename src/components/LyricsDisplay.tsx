@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { LyricLine } from '@/types/karaoke';
 import { cn } from '@/lib/utils';
-import { Music, Subtitles, List, Languages } from 'lucide-react';
+import { Languages, List, Minus, Music, Plus, Subtitles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -225,9 +225,56 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
   }
 
   return (
-    <div className="h-full flex flex-col relative overflow-hidden">
-      {/* Controls bar */}
-      <div className="absolute top-1 right-1 z-10 flex items-center gap-2">
+    <div className="relative flex h-full flex-col overflow-hidden">
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-border/60 pb-3">
+        {providerLabel && (
+          <span className="mr-auto rounded-full border border-border/60 bg-background/30 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            via {providerLabel}
+          </span>
+        )}
+
+        {onOffsetChange && (
+          <div className="flex items-center gap-0.5 rounded-full border border-border/60 bg-background/30 p-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => adjustOffset(-0.1)}
+              className="h-7 w-7 rounded-full"
+              aria-label="Decrease lyric offset"
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </Button>
+            <span className="min-w-12 text-center font-mono text-[11px] text-muted-foreground">
+              {offset.toFixed(1)}s
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => adjustOffset(0.1)}
+              className="h-7 w-7 rounded-full"
+              aria-label="Increase lyric offset"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+
+        {hasCaptionsAvailable && onEnableCaptions && onDisableCaptions && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={areCaptionsEnabled ? onDisableCaptions : onEnableCaptions}
+            className={cn(
+              'h-8 rounded-full px-2.5 text-xs',
+              areCaptionsEnabled && 'bg-primary/10 text-primary'
+            )}
+            title={areCaptionsEnabled ? 'Disable YouTube captions' : 'Enable YouTube captions'}
+          >
+            <Subtitles className="mr-1 h-3.5 w-3.5" />
+            CC
+          </Button>
+        )}
+
         {/* Romanization toggle for CJK lyrics */}
         {hasCJK && (
           <Button
@@ -235,8 +282,8 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
             size="sm"
             onClick={() => setShowRomanization(!showRomanization)}
             className={cn(
-              "h-6 px-2 text-xs rounded-lg",
-              showRomanization ? "bg-primary/20 text-primary" : "bg-background/80 backdrop-blur"
+              'h-8 rounded-full px-2.5 text-xs',
+              showRomanization ? 'bg-primary/10 text-primary' : 'bg-background/30'
             )}
             title={`Show ${languageLabel || 'Romanization'}`}
           >
@@ -252,7 +299,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 px-2 text-xs bg-background/80 backdrop-blur rounded-lg"
+                className="h-8 rounded-full bg-background/30 px-2.5 text-xs"
                 title="View full lyrics"
               >
                 <List className="w-3 h-3 mr-1" />
@@ -299,7 +346,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
         {/* Click-to-seek toggle - only show for synced lyrics */}
         {!hasPlainLyrics && lyrics.length > 1 && onSeek && (
           <label
-            className="group flex h-6 items-center gap-2 rounded-full bg-background/80 px-1.5 pr-2 text-[11px] text-foreground/85 backdrop-blur cursor-pointer select-none transition-colors hover:bg-background/90"
+            className="group flex h-8 cursor-pointer select-none items-center gap-2 rounded-full border border-border/60 bg-background/30 px-1.5 pr-2 text-[11px] text-foreground/85 transition-colors hover:bg-background/50"
             title="When on, clicking a lyric line seeks the video to that time"
           >
             <input
@@ -310,22 +357,13 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
             />
             <span
               aria-hidden="true"
-              className="relative h-5 w-9 rounded-full bg-slate-300/80 shadow-inner transition-colors duration-200 after:absolute after:left-0.5 after:top-1/2 after:h-4 after:w-4 after:-translate-y-1/2 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200 peer-checked:bg-primary peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background"
+              className="relative h-5 w-9 rounded-full bg-input transition-colors duration-200 after:absolute after:left-0.5 after:top-1/2 after:h-4 after:w-4 after:-translate-y-1/2 after:rounded-full after:bg-foreground after:transition-transform after:duration-200 peer-checked:bg-primary peer-checked:after:translate-x-4 peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background"
             />
             <span>Seek</span>
           </label>
         )}
       </div>
 
-
-      {/* Provider badge */}
-      {providerLabel && (
-        <div className="absolute top-1 left-1 z-10">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground bg-background/80 backdrop-blur rounded px-1.5 py-0.5">
-            via {providerLabel}
-          </span>
-        </div>
-      )}
 
       {hasPlainLyrics ? (
         <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-2 px-4 text-center">
@@ -336,7 +374,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
       ) : (
         <div
           ref={containerRef}
-          className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4"
+          className="scrollbar-hide flex-1 overflow-y-auto px-2 py-4"
         >
           <div className="space-y-1 text-center">
             {lyrics.map((line, index) => {
@@ -356,7 +394,7 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
                     }
                   }}
                   className={cn(
-                    'lyric-line transition-all duration-300 cursor-pointer rounded-md px-2 py-0.5',
+                    'lyric-line cursor-pointer rounded-lg px-2 py-0.5 transition-[background-color,color,opacity,transform] duration-200',
                     isActive && 'active',
                     isPast && 'past',
                     isSelected && 'ring-2 ring-primary bg-primary/10'

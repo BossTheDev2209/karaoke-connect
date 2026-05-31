@@ -128,13 +128,13 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             placeholder={activeTab === 'songs' ? "Search for songs..." : "Search for artists..."}
-            className="pl-10 bg-input border-border"
+            className="rounded-xl border-border bg-background/55 pl-10 text-base md:text-base"
           />
         </div>
         <Button 
           onClick={handleSearch} 
           disabled={isLoading}
-          className="btn-neon"
+          className="h-10"
         >
           {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
         </Button>
@@ -145,10 +145,10 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
         <button
           onClick={() => handleTabChange('songs')}
           className={cn(
-            'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-            activeTab === 'songs' 
-              ? 'bg-primary text-primary-foreground' 
-              : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+            'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+            activeTab === 'songs'
+              ? 'border-primary bg-primary text-primary-foreground'
+              : 'border-border bg-transparent text-muted-foreground hover:bg-[hsl(var(--surface)/0.7)] hover:text-foreground'
           )}
         >
           <Music className="w-3.5 h-3.5" />
@@ -157,10 +157,10 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
         <button
           onClick={() => handleTabChange('artists')}
           className={cn(
-            'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-            activeTab === 'artists' 
-              ? 'bg-primary text-primary-foreground' 
-              : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+            'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+            activeTab === 'artists'
+              ? 'border-primary bg-primary text-primary-foreground'
+              : 'border-border bg-transparent text-muted-foreground hover:bg-[hsl(var(--surface)/0.7)] hover:text-foreground'
           )}
         >
           <User className="w-3.5 h-3.5" />
@@ -170,10 +170,10 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
           onClick={() => setKaraokeFilterEnabled(!karaokeFilterEnabled)}
           title="Only show Instrumental/Karaoke versions"
           className={cn(
-            'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ml-auto',
+            'ml-auto flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
             karaokeFilterEnabled
-              ? 'bg-accent text-accent-foreground'
-              : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+              ? 'border-primary/50 bg-primary/10 text-primary'
+              : 'border-border bg-transparent text-muted-foreground hover:bg-[hsl(var(--surface)/0.7)] hover:text-foreground'
           )}
         >
           <Mic2 className="w-3.5 h-3.5" />
@@ -182,7 +182,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
       </div>
 
       {isOpen && hasResults && (
-        <div className="absolute top-full left-0 right-0 mt-2 z-50 glass rounded-xl max-h-96 overflow-y-auto overflow-x-hidden scrollbar-karaoke pr-1">
+        <div className="scrollbar-karaoke absolute left-0 right-0 top-full z-50 mt-2 max-h-96 overflow-x-hidden overflow-y-auto rounded-xl border border-border/70 bg-[hsl(var(--surface)/0.94)] pr-1 backdrop-blur-2xl">
           <div className="p-2 flex justify-between items-center border-b border-border">
             {selectedChannel ? (
               <button 
@@ -286,7 +286,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId }) => 
                   <span className="text-xs text-muted-foreground font-mono">
                     {result.duration}
                   </span>
-                  <Plus className="w-5 h-5 text-neon-green opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <Plus className="w-5 h-5 text-[hsl(var(--success))] opacity-0 transition-opacity group-hover:opacity-100" />
                 </div>
               </button>
             ))}

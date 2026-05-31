@@ -22,19 +22,20 @@ export const RoomCodeDisplay: React.FC<RoomCodeDisplayProps> = ({ code }) => {
   };
 
   return (
-    <div className="flex items-center gap-2 glass rounded-xl px-4 py-2">
-      <span className="text-xs text-muted-foreground uppercase tracking-wider">Room</span>
-      <span className="font-mono text-xl font-bold text-neon-purple tracking-widest">
+    <div className="flex items-center gap-2">
+      <span className="hidden text-xs uppercase tracking-wider text-muted-foreground sm:inline">Room</span>
+      <span className="font-mono text-lg font-bold tracking-widest text-primary sm:text-xl">
         {code}
       </span>
       <Button
         variant="ghost"
         size="icon"
         onClick={handleCopy}
-        className="h-8 w-8"
+        className="h-9 w-9"
+        aria-label="Copy room code"
       >
         {copied ? (
-          <Check className="w-4 h-4 text-neon-green" />
+          <Check className="w-4 h-4 text-[hsl(var(--success))]" />
         ) : (
           <Copy className="w-4 h-4" />
         )}

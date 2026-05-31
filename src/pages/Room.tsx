@@ -14,9 +14,19 @@ import { UserAvatars } from '@/components/ui/user-avatars';
 import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
 import { RoomSettings } from '@/components/RoomSettings';
 import { ReactionBar, FloatingReactions, useReactions } from '@/components/Reactions';
-import { LogOut, Maximize2, Minimize2, Monitor, Smartphone } from 'lucide-react';
+import { Captions, ListMusic, LogOut, Maximize2, Minimize2, Monitor, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { expectedPosition, shouldCorrect } from '@/lib/playbackClock';
+import { StageBackground } from '@/components/StageBackground';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 
 const Room = () => {
   const { code } = useParams<{ code: string }>();
@@ -160,6 +170,48 @@ const Room = () => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  const [chromeVisible, setChromeVisible] = useState(true);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const chromeTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const updateMotionPreference = () => setPrefersReducedMotion(mediaQuery.matches);
+
+    updateMotionPreference();
+    mediaQuery.addEventListener('change', updateMotionPreference);
+    return () => mediaQuery.removeEventListener('change', updateMotionPreference);
+  }, []);
+
+  const revealChrome = useCallback(() => {
+    setChromeVisible(true);
+    if (chromeTimerRef.current !== null) {
+      window.clearTimeout(chromeTimerRef.current);
+      chromeTimerRef.current = null;
+    }
+    if (!prefersReducedMotion) {
+      chromeTimerRef.current = window.setTimeout(() => setChromeVisible(false), 3000);
+    }
+  }, [prefersReducedMotion]);
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      setChromeVisible(true);
+      return;
+    }
+
+    revealChrome();
+    window.addEventListener('pointermove', revealChrome);
+    window.addEventListener('pointerdown', revealChrome);
+    return () => {
+      window.removeEventListener('pointermove', revealChrome);
+      window.removeEventListener('pointerdown', revealChrome);
+      if (chromeTimerRef.current !== null) {
+        window.clearTimeout(chromeTimerRef.current);
+      }
+    };
+  }, [prefersReducedMotion, revealChrome]);
+
   const handlePlayPause = () => {
     if (effectiveIsPlaying) {
       pause();
@@ -248,20 +300,34 @@ const Room = () => {
   if (!user || !code) return null;
 
   return (
-    <div className="min-h-screen flex flex-col p-4 gap-4">
+    <div className="relative isolate h-screen overflow-hidden" onPointerMove={revealChrome}>
+      <StageBackground />
       <FloatingReactions reactions={reactions} />
-      <header className="flex items-center justify-between">
+
+      <header
+        className={cn(
+          'fixed inset-x-3 top-3 z-40 flex items-center justify-between gap-3 rounded-[var(--radius)] border border-[hsl(var(--border)/0.6)] bg-[hsl(var(--surface)/0.4)] px-3 py-2 backdrop-blur-xl transition-[opacity,transform] duration-200 ease-out sm:inset-x-4',
+          chromeVisible ? 'translate-y-0 opacity-100' : '-translate-y-3 pointer-events-none opacity-0'
+        )}
+      >
         <RoomCodeDisplay code={code} />
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-neon-green' : 'bg-destructive'}`} />
-          <span className="text-sm text-muted-foreground">{users.length} online</span>
-          {users.length > 0 && (
-            <UserAvatars
-              size={28}
-              maxVisible={6}
-              overlap={40}
-              users={avatarUsers}
+        <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+          <div className="hidden items-center gap-2 sm:flex">
+            <span
+              className={cn('h-2 w-2 rounded-full', isConnected ? 'bg-[hsl(var(--success))]' : 'bg-destructive')}
+              aria-hidden="true"
             />
+            <span className="text-sm text-muted-foreground">{users.length} online</span>
+          </div>
+          {users.length > 0 && (
+            <div className="hidden sm:block">
+              <UserAvatars
+                size={28}
+                maxVisible={6}
+                overlap={40}
+                users={avatarUsers}
+              />
+            </div>
           )}
           <Button
             variant="ghost"
@@ -273,87 +339,67 @@ const Room = () => {
             {role === 'remote' ? <Smartphone className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
           </Button>
           <RoomSettings />
-          <Button variant="ghost" size="icon" onClick={handleLeave}>
+          <Button variant="ghost" size="icon" onClick={handleLeave} aria-label="Leave room">
             <LogOut className="w-4 h-4" />
           </Button>
         </div>
       </header>
 
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-3 card-karaoke overflow-hidden flex flex-col min-h-0">
-          <h3 className="font-semibold mb-3 text-primary">Queue</h3>
-          <div className="mb-3">
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button
+            variant="secondary"
+            size="icon"
+            className="fixed left-0 top-1/2 z-40 -translate-y-1/2 rounded-l-none rounded-r-xl border-l-0 bg-[hsl(var(--surface)/0.75)] backdrop-blur-xl"
+            aria-label="Open queue and search"
+            title="Open queue and search"
+          >
+            <ListMusic className="h-5 w-5" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent
+          side="left"
+          className="flex w-[min(92vw,30rem)] flex-col border-[hsl(var(--border)/0.7)] bg-[hsl(var(--surface)/0.82)] p-0 shadow-none backdrop-blur-2xl sm:max-w-md"
+        >
+          <SheetHeader className="border-b border-border/60 px-6 py-5 text-left">
+            <SheetTitle className="font-display text-2xl">Queue</SheetTitle>
+            <SheetDescription>Search songs and shape next set.</SheetDescription>
+          </SheetHeader>
+          <div className="border-b border-border/60 p-4">
             <SongSearch onAddSong={handleAddSong} userId={user.id} />
           </div>
-          <div className="relative flex-1 min-h-0">
-            <div className="absolute inset-0 overflow-y-auto pr-1">
-              <SongQueue 
-                queue={queue} 
-                currentIndex={playbackState.currentSongIndex} 
-                onRemove={handleRemoveSong} 
-                onSelect={handleSelectSong}
-                getLyricStatus={getStatusForSong}
-              />
-            </div>
-            <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-card to-transparent" />
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 scrollbar-karaoke">
+            <SongQueue
+              queue={queue}
+              currentIndex={playbackState.currentSongIndex}
+              onRemove={handleRemoveSong}
+              onSelect={handleSelectSong}
+              getLyricStatus={getStatusForSong}
+            />
           </div>
-        </div>
+        </SheetContent>
+      </Sheet>
 
-        <div className="lg:col-span-6 flex flex-col gap-4">
-          <div className="card-karaoke aspect-video relative flex-1">
-            <div ref={videoStageRef} className="karaoke-fullscreen-stage absolute inset-6 overflow-hidden rounded-lg bg-black">
-              <div className="absolute inset-0 rounded-lg overflow-hidden" id="youtube-player-wrapper">
-                {playerVideoId && <div id="youtube-player" className="w-full h-full" />}
-              </div>
-              {/* Blocks all YouTube chrome (channel header, pause overlay, share, end cards, branding) by preventing iframe interaction */}
-              <div className="absolute inset-0 rounded-lg z-10" aria-hidden="true" />
-
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleVideoFullscreen}
-                className="absolute right-3 top-3 z-30 h-9 w-9 rounded-full bg-background/70 text-foreground backdrop-blur hover:bg-background/90"
-                title={isVideoFullscreen ? 'Exit fullscreen' : 'Watch fullscreen'}
-                aria-label={isVideoFullscreen ? 'Exit video fullscreen' : 'Watch video fullscreen'}
-              >
-                {isVideoFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-              </Button>
-
-              {showCountdown && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                  <div className="rounded-2xl bg-card/70 backdrop-blur border border-border shadow-lg px-6 py-4">
-                    <div className="text-6xl font-black text-primary tabular-nums text-center">
-                      {remainingSeconds}
-                    </div>
-                    <div className="mt-1 text-[10px] uppercase tracking-[0.3em] text-muted-foreground text-center">
-                      seconds
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isVideoFullscreen && fullscreenLyric && (
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-4 pb-5 pt-20 karaoke-fullscreen-lyrics">
-                  <div className="max-w-5xl text-center text-2xl font-semibold leading-relaxed text-white md:text-4xl">
-                    {fullscreenLyric}
-                  </div>
-                </div>
-              )}
-
-              {!currentSong && (
-                <div className="absolute inset-0 z-20 flex items-center justify-center bg-card/80 rounded-lg">
-                  <p className="text-muted-foreground">Add songs to start!</p>
-                </div>
-              )}
-              {role === 'remote' && currentSong && (
-                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-card/85 rounded-lg text-center px-4">
-                  <Smartphone className="w-8 h-8 text-primary" />
-                  <p className="text-muted-foreground">Remote mode - audio plays on the room's screen. Tap the screen icon above to play here.</p>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="card-karaoke h-[160px] shrink-0">
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button
+            variant="secondary"
+            size="icon"
+            className="fixed right-0 top-1/2 z-40 -translate-y-1/2 rounded-l-xl rounded-r-none border-r-0 bg-[hsl(var(--surface)/0.75)] backdrop-blur-xl"
+            aria-label="Open lyric tools"
+            title="Open lyric tools"
+          >
+            <Captions className="h-5 w-5" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent
+          className="flex w-[min(92vw,30rem)] flex-col border-[hsl(var(--border)/0.7)] bg-[hsl(var(--surface)/0.82)] p-0 shadow-none backdrop-blur-2xl sm:max-w-md"
+        >
+          <SheetHeader className="border-b border-border/60 px-6 py-5 text-left">
+            <SheetTitle className="font-display text-2xl">Lyrics</SheetTitle>
+            <SheetDescription>Read, seek, offset, and tune captions.</SheetDescription>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 p-4">
             <LyricsDisplay 
               lyrics={lyrics} 
               currentLineIndex={currentLineIndex} 
@@ -371,16 +417,84 @@ const Room = () => {
               onDisableCaptions={disableCaptions}
             />
           </div>
-        </div>
+        </SheetContent>
+      </Sheet>
 
-        <div className="lg:col-span-3 card-karaoke flex flex-col">
-          <h3 className="font-semibold mb-4 text-primary">Now Playing</h3>
-          {currentSong && (
-            <div className="mb-4">
-              <p className="font-medium truncate">{currentSong.title}</p>
-              <p className="text-sm text-muted-foreground truncate">{currentSong.artist}</p>
+      <main className="flex h-full items-center justify-center px-3 py-20 sm:px-8 sm:py-24">
+        <div
+          ref={videoStageRef}
+          className="karaoke-fullscreen-stage relative aspect-video w-full max-w-[min(100vw,calc((100vh-8rem)*16/9))] overflow-hidden rounded-[var(--radius)] border border-border/60 bg-black"
+        >
+          <div className="absolute inset-0 overflow-hidden rounded-[var(--radius)]" id="youtube-player-wrapper">
+            {playerVideoId && <div id="youtube-player" className="w-full h-full" />}
+          </div>
+          {/* Blocks all YouTube chrome (channel header, pause overlay, share, end cards, branding) by preventing iframe interaction */}
+          <div className="absolute inset-0 z-10 rounded-[var(--radius)]" aria-hidden="true" />
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleVideoFullscreen}
+            className="absolute right-3 top-3 z-30 rounded-full bg-background/70 text-foreground backdrop-blur hover:bg-background/90"
+            title={isVideoFullscreen ? 'Exit fullscreen' : 'Watch fullscreen'}
+            aria-label={isVideoFullscreen ? 'Exit video fullscreen' : 'Watch video fullscreen'}
+          >
+            {isVideoFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </Button>
+
+          {showCountdown && (
+            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+              <div className="rounded-[var(--radius)] border border-border/70 bg-[hsl(var(--surface)/0.75)] px-6 py-4 backdrop-blur-xl">
+                <div className="text-center font-display text-6xl font-bold tabular-nums text-primary">
+                  {remainingSeconds}
+                </div>
+                <div className="mt-1 text-center font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+                  seconds
+                </div>
+              </div>
             </div>
           )}
+
+          {fullscreenLyric && (
+            <div className="karaoke-fullscreen-lyrics pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center bg-gradient-to-t from-black/90 via-black/45 to-transparent px-4 pb-8 pt-28">
+              <div className="max-w-5xl text-center font-sans text-[clamp(1.5rem,3.5vw,2.75rem)] font-semibold leading-relaxed text-white">
+                {fullscreenLyric}
+              </div>
+            </div>
+          )}
+
+          {!currentSong && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center rounded-[var(--radius)] bg-card/80">
+              <p className="text-muted-foreground">Open queue to add songs.</p>
+            </div>
+          )}
+          {role === 'remote' && currentSong && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 rounded-[var(--radius)] bg-card/85 px-4 text-center">
+              <Smartphone className="w-8 h-8 text-primary" />
+              <p className="max-w-md text-muted-foreground">Remote mode - audio plays on the room's screen. Tap the screen icon above to play here.</p>
+            </div>
+          )}
+        </div>
+      </main>
+
+      <section
+        className={cn(
+          'fixed inset-x-3 bottom-3 z-40 mx-auto flex max-w-7xl flex-col gap-3 rounded-[var(--radius)] border border-[hsl(var(--border)/0.6)] bg-[hsl(var(--surface)/0.62)] p-3 backdrop-blur-xl transition-[opacity,transform] duration-200 ease-out sm:inset-x-4 lg:flex-row lg:items-center lg:p-4',
+          chromeVisible ? 'translate-y-0 opacity-100' : 'translate-y-3 pointer-events-none opacity-0'
+        )}
+      >
+        <div className="min-w-0 lg:w-64">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.28em] text-primary">Now playing</p>
+          {currentSong ? (
+            <div className="mt-1 min-w-0">
+              <p className="truncate font-medium text-foreground">{currentSong.title}</p>
+              <p className="truncate text-sm text-muted-foreground">{currentSong.artist}</p>
+            </div>
+          ) : (
+            <p className="mt-1 text-sm text-muted-foreground">Queue waiting.</p>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
           <PlayerControls
             isPlaying={effectiveIsPlaying}
             isMuted={isMuted}
@@ -397,12 +511,11 @@ const Room = () => {
             onMuteToggle={isMuted ? unmute : mute}
             onSync={requestSync}
           />
-
-          <div className="mt-auto pt-4 flex flex-col gap-4">
-            <ReactionBar onReact={sendReaction} />
-          </div>
         </div>
-      </div>
+        <div className="shrink-0 overflow-x-auto">
+          <ReactionBar onReact={sendReaction} />
+        </div>
+      </section>
     </div>
   );
 };

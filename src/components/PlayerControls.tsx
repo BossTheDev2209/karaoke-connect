@@ -51,8 +51,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-2">
+    <div className="space-y-3">
+      <div className="space-y-1.5">
         <Slider
           value={[currentTime]}
           max={duration || 100}
@@ -60,70 +60,80 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           onValueChange={([value]) => onSeek(value)}
           className="cursor-pointer"
         />
-        <div className="flex justify-between text-xs text-muted-foreground font-mono">
+        <div className="flex justify-between font-mono text-[11px] text-muted-foreground">
           <span>{formatTime(currentTime)}</span>
           <span>{formatTime(duration)}</span>
         </div>
       </div>
 
-      <div className="flex items-center justify-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onSync}
-          className="rounded-full"
-          title="Sync with room"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </Button>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onSync}
+            className="rounded-full"
+            title="Sync with room"
+            aria-label="Sync with room"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </Button>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onPrevious}
-          disabled={!canGoPrevious}
-          className="rounded-full"
-        >
-          <SkipBack className="w-5 h-5" />
-        </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onPrevious}
+            disabled={!canGoPrevious}
+            className="rounded-full"
+            aria-label="Previous song"
+          >
+            <SkipBack className="w-5 h-5" />
+          </Button>
 
-        <Button
-          onClick={onPlayPause}
-          className="btn-neon w-12 h-12 rounded-full flex items-center justify-center"
-        >
-          {isPlaying ? (
-            <Pause className="w-5 h-5" />
-          ) : (
-            <Play className="w-5 h-5 ml-0.5" />
-          )}
-        </Button>
+          <Button
+            onClick={onPlayPause}
+            className="h-12 w-12 rounded-full p-0"
+            aria-label={isPlaying ? 'Pause' : 'Play'}
+          >
+            {isPlaying ? (
+              <Pause className="w-5 h-5" />
+            ) : (
+              <Play className="ml-0.5 w-5 h-5" />
+            )}
+          </Button>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onNext}
-          disabled={!canGoNext}
-          className="rounded-full"
-        >
-          <SkipForward className="w-5 h-5" />
-        </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onNext}
+            disabled={!canGoNext}
+            className="rounded-full"
+            aria-label="Next song"
+          >
+            <SkipForward className="w-5 h-5" />
+          </Button>
+        </div>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onMuteToggle}
-          className="rounded-full"
-        >
-          {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-        </Button>
+        <div className="hidden items-center gap-2 sm:flex">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onMuteToggle}
+            className="rounded-full"
+            aria-label={isMuted ? 'Unmute' : 'Mute'}
+          >
+            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </Button>
 
-        <Slider
-          value={[isMuted ? 0 : volume]}
-          max={100}
-          step={1}
-          onValueChange={([value]) => onVolumeChange(value)}
-          className="w-20"
-        />
+          <Slider
+            value={[isMuted ? 0 : volume]}
+            max={100}
+            step={1}
+            onValueChange={([value]) => onVolumeChange(value)}
+            className="w-20"
+            aria-label="Volume"
+          />
+        </div>
       </div>
     </div>
   );
