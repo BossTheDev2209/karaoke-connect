@@ -4,6 +4,7 @@ import { User, Song, PlaybackState, RealtimePayload, RoomRole } from '@/types/ka
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { detectDefaultRole, readDeviceEnv } from '@/lib/deviceRole';
 import { electClock } from '@/lib/playbackClock';
+import { fromSnapshotRow } from '@/lib/roomSnapshot';
 
 interface UseRoomReturn {
   users: User[];
@@ -66,6 +67,16 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
         if (status === 'SUBSCRIBED') {
           await channel.track({ ...user, role });
           setIsConnected(true);
+          const { data } = await supabase
+            .from('room_state')
+            .select('code, queue, playback')
+            .eq('code', roomCode)
+            .maybeSingle();
+          const snap = fromSnapshotRow(data);
+          if (snap) {
+            setQueue(snap.queue);
+            setPlaybackState(snap.playback);
+          }
         }
       });
 
@@ -112,6 +123,24 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
   }, [user]);
 
   const isClock = !!user && electClock(users) === user.id;
+  const saveTimer = useRef<number | null>(null);
+  useEffect(() => {
+    if (!isClock || !roomCode) return;
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => {
+      void supabase.from('room_state').upsert({
+        code: roomCode,
+        queue,
+        playback: playbackState,
+        updated_at: new Date().toISOString(),
+      }).then(({ error }) => {
+        if (error) console.error('Failed to persist room snapshot:', error);
+      });
+    }, 1500);
+    return () => {
+      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+    };
+  }, [isClock, roomCode, queue, playbackState]);
 
   return {
     users,
