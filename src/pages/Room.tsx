@@ -26,6 +26,7 @@ import { removeSongFromQueue } from '@/lib/queuePlayback';
 import { StageBackground } from '@/components/StageBackground';
 import { connectionStatus } from '@/lib/connectionStatus';
 import { remoteJoinUrl, roleFromSearch } from '@/lib/remoteJoin';
+import { hotkeyAction } from '@/lib/playerHotkeys';
 import {
   Sheet,
   SheetContent,
@@ -300,7 +301,7 @@ const Room = () => {
     setRibbonIntent((current) => ({ ...current, [key]: value }));
   };
 
-  const handlePlayPause = () => {
+  const handlePlayPause = useCallback(() => {
     if (effectiveIsPlaying) {
       pause();
       updatePlayback({ isPlaying: false, currentTime: effectiveTime });
@@ -308,28 +309,28 @@ const Room = () => {
       play();
       updatePlayback({ isPlaying: true, currentTime: effectiveTime });
     }
-  };
+  }, [effectiveIsPlaying, effectiveTime, pause, play, updatePlayback]);
 
-  const handleSeek = (time: number) => {
+  const handleSeek = useCallback((time: number) => {
     seekTo(time);
     if (isClock || role === 'remote') {
       updatePlayback({ currentTime: time });
     }
-  };
+  }, [isClock, role, seekTo, updatePlayback]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (playbackState.currentSongIndex < queue.length - 1) {
       const nextIndex = playbackState.currentSongIndex + 1;
       updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
     }
-  };
+  }, [playbackState.currentSongIndex, queue.length, updatePlayback]);
 
-  const handlePrevious = () => {
+  const handlePrevious = useCallback(() => {
     if (playbackState.currentSongIndex > 0) {
       const prevIndex = playbackState.currentSongIndex - 1;
       updatePlayback({ currentSongIndex: prevIndex, currentTime: 0, isPlaying: true });
     }
-  };
+  }, [playbackState.currentSongIndex, updatePlayback]);
 
   const handleAddSong = (song: Song) => {
     updateQueue([...queue, song]);
@@ -365,6 +366,22 @@ const Room = () => {
 
     await stage.requestFullscreen();
   };
+
+  useEffect(() => {
+    if (role === 'remote') return;
+    const onKey = (e: KeyboardEvent) => {
+      const action = hotkeyAction(e);
+      if (!action) return;
+      e.preventDefault();
+      if (action === 'playpause') handlePlayPause();
+      else if (action === 'seekback') handleSeek(Math.max(0, effectiveTime - 5));
+      else if (action === 'seekfwd') handleSeek(effectiveTime + 5);
+      else if (action === 'prev') handlePrevious();
+      else if (action === 'next') handleNext();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [role, handlePlayPause, handleSeek, effectiveTime, handlePrevious, handleNext]);
 
   if (!user || !code) return null;
 
