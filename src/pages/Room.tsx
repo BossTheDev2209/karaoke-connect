@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { User, Song } from '@/types/karaoke';
+import { User, Song, PlaybackState } from '@/types/karaoke';
 import { useRoom } from '@/hooks/useRoom';
 import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
 import { useLyrics } from '@/hooks/useLyrics';
@@ -47,6 +47,13 @@ const Room = () => {
   const [volume, setVolume] = useState(80);
   const [isVideoFullscreen, setIsVideoFullscreen] = useState(false);
   const videoStageRef = useRef<HTMLDivElement>(null);
+  const livePlaybackRef = useRef<() => PlaybackState>(() => ({
+    isPlaying: false,
+    currentTime: 0,
+    currentSongIndex: 0,
+    lastUpdate: Date.now(),
+  }));
+  const getClockPlayback = useCallback(() => livePlaybackRef.current(), []);
   const { setVideoId } = useTheme();
 
   useEffect(() => {
@@ -70,7 +77,7 @@ const Room = () => {
     role,
     setRole,
     isClock,
-  } = useRoom(code || '', user);
+  } = useRoom(code || '', user, getClockPlayback);
 
   const currentSong = queue[playbackState.currentSongIndex];
 
@@ -127,6 +134,11 @@ const Room = () => {
   const playerVideoId = role === 'remote' ? null : (currentSong?.videoId || null);
   const { player, isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable } = useYouTubePlayer('youtube-player', playerVideoId, handleStateChange, handleVideoEnded, handleUnplayable);
   const currentTimeRef = useRef(currentTime);
+  livePlaybackRef.current = () => ({
+    ...playbackState,
+    currentTime: currentTimeRef.current,
+    lastUpdate: Date.now(),
+  });
 
   useEffect(() => {
     currentTimeRef.current = currentTime;
@@ -165,15 +177,6 @@ const Room = () => {
     }, 1000);
     return () => clearInterval(id);
   }, [isClock, role, isReady, playbackState, player, seekTo]);
-
-  // Clock: broadcast true position every 3s so followers re-anchor.
-  useEffect(() => {
-    if (!isClock || !isReady || !isPlaying) return;
-    const id = window.setInterval(() => {
-      updatePlayback({ currentTime: player?.getCurrentTime?.() ?? currentTimeRef.current, isPlaying: true });
-    }, 3000);
-    return () => clearInterval(id);
-  }, [isClock, isReady, isPlaying, player, updatePlayback]);
 
   const remainingSeconds = duration > 0 ? Math.ceil(duration - currentTime) : null;
   const showCountdown = isPlaying && remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 5;

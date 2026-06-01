@@ -5,6 +5,7 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 import { detectDefaultRole, readDeviceEnv } from '@/lib/deviceRole';
 import { electClock } from '@/lib/playbackClock';
 import { fromSnapshotRow } from '@/lib/roomSnapshot';
+import type { Json } from '@/integrations/supabase/types';
 
 interface UseRoomReturn {
   users: User[];
@@ -28,13 +29,23 @@ const DEFAULT_PLAYBACK: PlaybackState = {
   lastUpdate: Date.now(),
 };
 
-export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
+export const useRoom = (
+  roomCode: string,
+  user: User | null,
+  getClockPlayback?: () => PlaybackState,
+): UseRoomReturn => {
   const [users, setUsers] = useState<User[]>([]);
   const [queue, setQueue] = useState<Song[]>([]);
   const [playbackState, setPlaybackState] = useState<PlaybackState>(DEFAULT_PLAYBACK);
   const [isConnected, setIsConnected] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const [role, setRoleState] = useState<RoomRole>(() => detectDefaultRole(readDeviceEnv()));
+  const isClockRef = useRef(false);
+  const getClockPlaybackRef = useRef(getClockPlayback);
+
+  useEffect(() => {
+    getClockPlaybackRef.current = getClockPlayback;
+  }, [getClockPlayback]);
 
   useEffect(() => {
     if (!roomCode || !user) return;
@@ -61,6 +72,19 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
           case 'queue_update':
             setQueue(data.payload as Song[]);
             break;
+          case 'sync_request': {
+            if (isClockRef.current) {
+              const live = getClockPlaybackRef.current?.();
+              if (live) {
+                channelRef.current?.send({
+                  type: 'broadcast',
+                  event: 'room_event',
+                  payload: { type: 'playback_update', payload: { ...live, lastUpdate: Date.now() } },
+                });
+              }
+            }
+            break;
+          }
         }
       })
       .subscribe(async (status) => {
@@ -77,6 +101,11 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
             setQueue(snap.queue);
             setPlaybackState(snap.playback);
           }
+          channel.send({
+            type: 'broadcast',
+            event: 'room_event',
+            payload: { type: 'sync_request', payload: null },
+          });
         }
       });
 
@@ -123,6 +152,22 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
   }, [user]);
 
   const isClock = !!user && electClock(users) === user.id;
+  useEffect(() => {
+    isClockRef.current = isClock;
+    if (!isClock) return;
+    const id = window.setInterval(() => {
+      const live = getClockPlaybackRef.current?.();
+      if (live) {
+        channelRef.current?.send({
+          type: 'broadcast',
+          event: 'room_event',
+          payload: { type: 'playback_update', payload: { ...live, lastUpdate: Date.now() } },
+        });
+      }
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [isClock]);
+
   const saveTimer = useRef<number | null>(null);
   useEffect(() => {
     if (!isClock || !roomCode) return;
@@ -130,8 +175,8 @@ export const useRoom = (roomCode: string, user: User | null): UseRoomReturn => {
     saveTimer.current = window.setTimeout(() => {
       void supabase.from('room_state').upsert({
         code: roomCode,
-        queue,
-        playback: playbackState,
+        queue: queue as unknown as Json,
+        playback: playbackState as unknown as Json,
         updated_at: new Date().toISOString(),
       }).then(({ error }) => {
         if (error) console.error('Failed to persist room snapshot:', error);
