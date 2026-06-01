@@ -569,12 +569,12 @@ const Room = () => {
         </div>
 
         <Sheet open={remoteSearchOpen} onOpenChange={setRemoteSearchOpen}>
-          <SheetContent side="bottom" className="flex h-[84vh] flex-col border-white/10 bg-[hsl(var(--surface))] p-0 shadow-2xl">
-            <SheetHeader className="shrink-0 px-4 pt-4 text-left">
+          <SheetContent side="bottom" className="flex max-h-[88vh] flex-col gap-0 rounded-t-2xl border-white/10 bg-[hsl(var(--surface))] p-0 shadow-2xl">
+            <SheetHeader className="shrink-0 px-4 pb-1 pt-4 text-left">
               <SheetTitle>Add Song</SheetTitle>
               <SheetDescription>Search and add to the shared queue.</SheetDescription>
             </SheetHeader>
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 scrollbar-karaoke">
+            <div className="overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2 scrollbar-karaoke">
               <SongSearch onAddSong={handleAddSong} userId={user.id} resultsPlacement="inline" />
             </div>
           </SheetContent>
