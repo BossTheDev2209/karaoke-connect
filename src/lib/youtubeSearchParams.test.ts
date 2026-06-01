@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { applyPlayableVideoFilters } from '../../supabase/functions/youtube-search/videoSearchParams';
+import {
+  applyPlayableVideoFilters,
+  filterEmbeddableVideoDetails,
+} from '../../supabase/functions/youtube-search/videoSearchParams';
 
 describe('applyPlayableVideoFilters', () => {
   it('restricts search results to videos playable in embedded external players', () => {
@@ -7,5 +10,19 @@ describe('applyPlayableVideoFilters', () => {
 
     expect(url.searchParams.get('videoEmbeddable')).toBe('true');
     expect(url.searchParams.get('videoSyndicated')).toBe('true');
+  });
+});
+
+describe('filterEmbeddableVideoDetails', () => {
+  it('keeps only videos explicitly marked embeddable by videos.list', () => {
+    const items = [
+      { id: 'playable', status: { embeddable: true } },
+      { id: 'blocked', status: { embeddable: false } },
+      { id: 'unknown' },
+    ];
+
+    expect(filterEmbeddableVideoDetails(items)).toEqual([
+      { id: 'playable', status: { embeddable: true } },
+    ]);
   });
 });

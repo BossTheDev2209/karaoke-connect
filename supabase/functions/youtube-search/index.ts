@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { applyPlayableVideoFilters } from "./videoSearchParams.ts";
+import { applyPlayableVideoFilters, filterEmbeddableVideoDetails } from "./videoSearchParams.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,6 +26,7 @@ interface YtSearchItem {
   snippet: YtSnippet;
   contentDetails?: { duration: string };
   statistics?: Record<string, string>;
+  status?: { embeddable?: boolean };
 }
 
 serve(async (req) => {
@@ -113,14 +114,16 @@ async function searchVideos(apiKey: string, query: string) {
 
   // Get video details including duration
   const detailsUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
-  detailsUrl.searchParams.set('part', 'contentDetails,snippet');
+  detailsUrl.searchParams.set('part', 'contentDetails,snippet,status');
   detailsUrl.searchParams.set('id', videoIds);
   detailsUrl.searchParams.set('key', apiKey);
 
   const detailsResponse = await fetch(detailsUrl.toString());
   const detailsData = await detailsResponse.json();
 
-  const results = detailsData.items?.map((item: YtSearchItem) => ({
+  const detailsItems = (detailsData.items || []) as YtSearchItem[];
+  const embeddableItems = filterEmbeddableVideoDetails(detailsItems);
+  const results = embeddableItems.map((item: YtSearchItem) => ({
     videoId: item.id,
     title: item.snippet.title,
     channelTitle: item.snippet.channelTitle,
@@ -129,6 +132,7 @@ async function searchVideos(apiKey: string, query: string) {
     duration: formatDuration(item.contentDetails!.duration),
   })) || [];
 
+  console.log(`Dropped ${detailsItems.length - embeddableItems.length} non-embeddable video results`);
   console.log(`Found ${results.length} video results`);
 
   return new Response(
@@ -228,14 +232,16 @@ async function fetchChannelVideos(apiKey: string, channelId: string) {
 
   // Get video details
   const detailsUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
-  detailsUrl.searchParams.set('part', 'contentDetails,snippet');
+  detailsUrl.searchParams.set('part', 'contentDetails,snippet,status');
   detailsUrl.searchParams.set('id', videoIds);
   detailsUrl.searchParams.set('key', apiKey);
 
   const detailsResponse = await fetch(detailsUrl.toString());
   const detailsData = await detailsResponse.json();
 
-  const results = detailsData.items?.map((item: YtSearchItem) => ({
+  const detailsItems = (detailsData.items || []) as YtSearchItem[];
+  const embeddableItems = filterEmbeddableVideoDetails(detailsItems);
+  const results = embeddableItems.map((item: YtSearchItem) => ({
     videoId: item.id,
     title: item.snippet.title,
     channelTitle: item.snippet.channelTitle,
@@ -244,6 +250,7 @@ async function fetchChannelVideos(apiKey: string, channelId: string) {
     duration: formatDuration(item.contentDetails!.duration),
   })) || [];
 
+  console.log(`Dropped ${detailsItems.length - embeddableItems.length} non-embeddable channel videos`);
   console.log(`Found ${results.length} videos from channel`);
 
   return new Response(
