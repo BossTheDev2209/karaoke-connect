@@ -65,21 +65,37 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
   return (
     <div className={cn(compact ? 'space-y-1.5' : 'space-y-3', className)}>
-      <div className={compact ? 'space-y-1' : 'space-y-1.5'}>
-        <Slider
-          value={[shownTime]}
-          max={duration || 100}
-          step={1}
-          onValueChange={([value]) => onSeek(value)}
-          disabled={disabled}
-          seek
-          className="cursor-pointer"
-        />
-        <div className="flex justify-between font-mono text-[11px] text-muted-foreground">
-          <span>{formatTime(shownTime)}</span>
-          <span>{formatTime(duration)}</span>
+      {compact ? (
+        <div className="flex items-center gap-2.5">
+          <span className="w-9 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted-foreground">{formatTime(shownTime)}</span>
+          <Slider
+            value={[shownTime]}
+            max={duration || 100}
+            step={1}
+            onValueChange={([value]) => onSeek(value)}
+            disabled={disabled}
+            seek
+            className="flex-1 cursor-pointer"
+          />
+          <span className="w-9 shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">{formatTime(duration)}</span>
         </div>
-      </div>
+      ) : (
+        <div className="space-y-1.5">
+          <Slider
+            value={[shownTime]}
+            max={duration || 100}
+            step={1}
+            onValueChange={([value]) => onSeek(value)}
+            disabled={disabled}
+            seek
+            className="cursor-pointer"
+          />
+          <div className="flex justify-between font-mono text-[11px] text-muted-foreground">
+            <span>{formatTime(shownTime)}</span>
+            <span>{formatTime(duration)}</span>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         {/* left: secondary action */}
@@ -156,6 +172,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 max={100}
                 step={1}
                 onValueChange={([value]) => onVolumeChange(value)}
+                seek
                 className={compact ? 'w-16' : 'w-20'}
                 aria-label="Volume"
               />
