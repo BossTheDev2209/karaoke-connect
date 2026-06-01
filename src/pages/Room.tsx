@@ -17,7 +17,7 @@ import { RoomSettings } from '@/components/RoomSettings';
 import { FloatingReactions, ReactionBar, ReactionPicker } from '@/components/Reactions';
 import { useReactions } from '@/hooks/useReactions';
 import { toast } from '@/hooks/use-toast';
-import { Captions, ChevronUp, Ellipsis, ListMusic, LogOut, Maximize2, Mic2, Minimize2, Monitor, PanelRight, Pause, Play, Plus, Settings, Smartphone, Subtitles } from 'lucide-react';
+import { Captions, ChevronUp, Ellipsis, ListMusic, LogOut, Maximize2, Mic2, Minimize2, Monitor, PanelRight, Pause, Play, Plus, Settings, SkipBack, SkipForward, Smartphone, Subtitles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { expectedPosition, shouldCorrect } from '@/lib/playbackClock';
 import { INITIAL_RIBBON_VISIBILITY, RIBBON_HIDE_DELAY_MS, ribbonTransitionDuration, shouldShowRibbon } from '@/lib/ribbonVisibility';
@@ -705,11 +705,31 @@ const Room = () => {
             variant="ghost"
             size="icon"
             className="h-9 w-9 shrink-0 rounded-full"
+            onClick={handlePrevious}
+            disabled={playbackState.currentSongIndex <= 0}
+            aria-label="Previous song"
+          >
+            <SkipBack className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0 rounded-full"
             onClick={handlePlayPause}
             disabled={!currentSong}
             aria-label={effectiveIsPlaying ? 'Pause' : 'Play'}
           >
             {effectiveIsPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0 rounded-full"
+            onClick={handleNext}
+            disabled={playbackState.currentSongIndex >= queue.length - 1}
+            aria-label="Next song"
+          >
+            <SkipForward className="h-4 w-4" />
           </Button>
           <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         </div>
