@@ -476,9 +476,9 @@ const Room = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52 rounded-xl border-white/10 bg-[hsl(var(--surface))]">
-                  <DropdownMenuItem onSelect={() => setRole('player')} className="rounded-lg">
-                    <Monitor className="mr-2 h-4 w-4" />
-                    Play audio here
+                  <DropdownMenuItem onSelect={() => setRole('player')} className="flex-col items-start rounded-lg">
+                    <span className="flex items-center"><Monitor className="mr-2 h-4 w-4" />Play audio here</span>
+                    <span className="ml-6 text-xs text-muted-foreground">Switch this phone to play the video and sound.</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setSettingsOpen(true)} className="rounded-lg">
                     <Settings className="mr-2 h-4 w-4" />
@@ -501,7 +501,9 @@ const Room = () => {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-foreground">{currentSong.title}</p>
                   <p className="truncate text-xs text-muted-foreground">{currentSong.artist}</p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">Audio on stage screen</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {effectiveIsPlaying ? 'Playing on the stage screen' : 'Paused on the stage screen'}
+                  </p>
                 </div>
               </>
             ) : (
