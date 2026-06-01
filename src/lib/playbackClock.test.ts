@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { expectedPosition, shouldCorrect, electClock } from "./playbackClock";
+import { canBroadcastClockState, expectedPosition, shouldCorrect, electClock } from "./playbackClock";
 import type { PlaybackState, User } from "@/types/karaoke";
 
 const baseState: PlaybackState = {
@@ -53,14 +53,15 @@ describe("electClock", () => {
     expect(electClock(users)).toBe("alpha");
   });
 
-  it("keeps the oldest player as clock when a later player has a lower id", () => {
-    const users = [user("zzzz", "player", 100), user("aaaa", "player", 200)];
-    expect(electClock(users)).toBe("zzzz");
+  it("ignores cross-device joinedAt clock skew", () => {
+    const users = [user("aaaa", "player", 500_000), user("zzzz", "player", -500_000)];
+    expect(electClock(users)).toBe("aaaa");
   });
 
-  it("uses id as the tie-breaker when players joined together", () => {
-    const users = [user("zzzz", "player", 100), user("aaaa", "player", 100)];
-    expect(electClock(users)).toBe("aaaa");
+  it("keeps an established clock when a fresh lower-id player joins", () => {
+    const established = { ...user("zzzz"), hasAuthoritativeState: true };
+    const fresh = { ...user("aaaa"), hasAuthoritativeState: false };
+    expect(electClock([established, fresh])).toBe("zzzz");
   });
 
   it("ignores remotes when electing", () => {
@@ -71,5 +72,16 @@ describe("electClock", () => {
   it("treats missing role as player (backwards compatible)", () => {
     const legacy: User = { id: "x", nickname: "x", avatarId: "", isSpeaking: false };
     expect(electClock([legacy])).toBe("x");
+  });
+});
+
+describe("canBroadcastClockState", () => {
+  it("blocks a fresh elected clock from broadcasting default state", () => {
+    expect(canBroadcastClockState({ isClock: true, hasAuthoritativeState: false })).toBe(false);
+  });
+
+  it("allows only an authoritative elected clock", () => {
+    expect(canBroadcastClockState({ isClock: true, hasAuthoritativeState: true })).toBe(true);
+    expect(canBroadcastClockState({ isClock: false, hasAuthoritativeState: true })).toBe(false);
   });
 });

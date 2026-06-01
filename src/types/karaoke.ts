@@ -12,6 +12,7 @@ export interface User {
   audioLevel?: number;
   role?: RoomRole;
   joinedAt?: number;
+  hasAuthoritativeState?: boolean;
   team?: 'left' | 'right';
   score?: number;
   discordId?: string;
@@ -110,4 +111,5 @@ export type RealtimePayload = {
     | 'mode_update'
     | 'team_update';
   payload: unknown;
+  senderId?: string;
 };
