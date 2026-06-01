@@ -23,6 +23,7 @@ import { expectedPosition, shouldCorrect } from '@/lib/playbackClock';
 import { INITIAL_RIBBON_VISIBILITY, RIBBON_HIDE_DELAY_MS, ribbonTransitionDuration, shouldShowRibbon } from '@/lib/ribbonVisibility';
 import { removeSongFromQueue } from '@/lib/queuePlayback';
 import { StageBackground } from '@/components/StageBackground';
+import { connectionStatus } from '@/lib/connectionStatus';
 import {
   Sheet,
   SheetContent,
@@ -81,6 +82,7 @@ const Room = () => {
   } = useRoom(code || '', user, getClockPlayback);
 
   const currentSong = queue[playbackState.currentSongIndex];
+  const status = connectionStatus(isConnected);
   const removeSong = useCallback((songId: string) => {
     const next = removeSongFromQueue(queue, playbackState.currentSongIndex, songId);
     if (!next) return;
@@ -404,13 +406,22 @@ const Room = () => {
     return (
       <div className="relative isolate min-h-screen overflow-y-auto bg-background">
         <StageBackground />
+        {!isConnected && (
+          <div
+            role="status"
+            className="fixed inset-x-0 top-16 z-50 flex items-center justify-center gap-2 bg-destructive/90 py-1.5 text-xs font-medium text-destructive-foreground"
+          >
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" aria-hidden="true" />
+            Reconnecting to the room…
+          </div>
+        )}
         <div className="mx-auto flex min-h-screen w-full max-w-lg flex-col px-4 py-4">
           <header className="flex items-center justify-between border-b border-white/10 pb-3">
             <RoomCodeDisplay code={code} />
             <div className="flex items-center gap-2">
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className={cn('h-1.5 w-1.5 rounded-full', isConnected ? 'bg-[hsl(var(--success))]' : 'bg-destructive')} />
-                {users.length}
+                <span className={cn('h-1.5 w-1.5 rounded-full', status.tone === 'ok' ? 'bg-[hsl(var(--success))]' : 'bg-destructive')} aria-hidden="true" />
+                {status.label} · {users.length}
               </span>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -547,15 +558,27 @@ const Room = () => {
   return (
     <div className="relative isolate h-screen overflow-hidden bg-background">
       <StageBackground />
+      {!isConnected && (
+        <div
+          role="status"
+          className="fixed inset-x-0 top-16 z-50 flex items-center justify-center gap-2 bg-destructive/90 py-1.5 text-xs font-medium text-destructive-foreground"
+        >
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" aria-hidden="true" />
+          Reconnecting to the room…
+        </div>
+      )}
       <FloatingReactions reactions={reactions} />
 
       <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-white/10 bg-background/95 px-3 sm:px-5">
         <RoomCodeDisplay code={code} />
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-          <div className="hidden items-center gap-2 sm:flex">
-            <span className={cn('h-1.5 w-1.5 rounded-full', isConnected ? 'bg-[hsl(var(--success))]' : 'bg-destructive')} aria-hidden="true" />
-            <span className="text-xs text-muted-foreground">{users.length} online</span>
-          </div>
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span
+              className={cn('h-1.5 w-1.5 rounded-full', status.tone === 'ok' ? 'bg-[hsl(var(--success))]' : 'bg-destructive')}
+              aria-hidden="true"
+            />
+            {status.label} · {users.length}
+          </span>
           {users.length > 0 && (
             <div className="hidden sm:block">
               <UserAvatars size={26} maxVisible={5} overlap={36} users={avatarUsers} />
