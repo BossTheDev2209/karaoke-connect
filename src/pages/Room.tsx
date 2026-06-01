@@ -344,6 +344,11 @@ const Room = () => {
     setPlayerVolume(v);
   };
 
+  const handleResync = useCallback(() => {
+    requestSync();
+    toast({ title: 'Syncing to the room…', description: 'Catching up to the current position.' });
+  }, [requestSync]);
+
   const handleLeave = () => {
     sessionStorage.removeItem('karaoke_user');
     navigate('/');
@@ -505,7 +510,7 @@ const Room = () => {
               onSeek={handleSeek}
               onVolumeChange={handleVolumeChange}
               onMuteToggle={isMuted ? unmute : mute}
-              onSync={requestSync}
+              onSync={handleResync}
               showVolume={false}
             />
           </section>
@@ -840,7 +845,7 @@ const Room = () => {
             onSeek={handleSeek}
             onVolumeChange={handleVolumeChange}
             onMuteToggle={isMuted ? unmute : mute}
-            onSync={requestSync}
+            onSync={handleResync}
           />
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
