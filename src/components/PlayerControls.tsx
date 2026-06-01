@@ -72,6 +72,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           step={1}
           onValueChange={([value]) => onSeek(value)}
           disabled={disabled}
+          seek
           className="cursor-pointer"
         />
         <div className="flex justify-between font-mono text-[11px] text-muted-foreground">
