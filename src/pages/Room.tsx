@@ -52,7 +52,11 @@ const Room = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
-  const [volume, setVolume] = useState(80);
+  const [volume, setVolume] = useState(() => {
+    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('karaoke_volume') : null;
+    const n = stored === null ? NaN : Number(stored);
+    return Number.isFinite(n) && n >= 0 && n <= 100 ? n : 45;
+  });
   const [isVideoFullscreen, setIsVideoFullscreen] = useState(false);
   const videoStageRef = useRef<HTMLDivElement>(null);
   const livePlaybackRef = useRef<() => PlaybackState>(() => ({
@@ -346,7 +350,14 @@ const Room = () => {
   const handleVolumeChange = (v: number) => {
     setVolume(v);
     setPlayerVolume(v);
+    try { localStorage.setItem('karaoke_volume', String(v)); } catch { /* private mode */ }
   };
+
+  // Push the saved volume to the player as soon as it is ready, so it never
+  // blasts at YouTube's default 100 on open.
+  useEffect(() => {
+    if (isReady) setPlayerVolume(volume);
+  }, [isReady, volume, setPlayerVolume]);
 
   const handleResync = useCallback(() => {
     requestSync();
@@ -859,15 +870,15 @@ const Room = () => {
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setRibbonFlag('focusWithin', false);
         }}
         className={cn(
-          'fixed inset-x-2 bottom-3 z-40 mx-auto flex max-w-7xl flex-col gap-3 rounded-2xl border border-white/10 bg-[hsl(var(--surface)/0.97)] p-3 shadow-2xl transition-[opacity,transform] ease-out sm:inset-x-4 lg:left-4 lg:right-[25rem] lg:mx-0 lg:max-w-none lg:flex-row lg:items-center lg:p-4',
+          'fixed inset-x-2 bottom-3 z-40 mx-auto flex max-w-7xl flex-col gap-3 rounded-2xl border border-white/10 bg-[hsl(var(--surface)/0.97)] p-3 shadow-2xl transition-[opacity,transform] ease-out sm:inset-x-4 lg:left-4 lg:right-[25rem] lg:mx-0 lg:max-w-none lg:flex-row lg:items-center lg:gap-5 lg:px-4 lg:py-2',
           ribbonVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0'
         )}
         style={{ transitionDuration: ribbonTransitionDuration(prefersReducedMotion) }}
       >
-        <div className="min-w-0 lg:w-64">
+        <div className="min-w-0 lg:w-52">
           {currentSong ? (
             <div className="flex items-center gap-3">
-              <img src={currentSong.thumbnail} alt="" className="h-11 w-16 rounded-md object-cover" />
+              <img src={currentSong.thumbnail} alt="" className="h-10 w-16 rounded-md object-cover" />
               <div className="min-w-0">
                 <p className="truncate font-medium text-foreground">{currentSong.title}</p>
                 <p className="truncate text-xs text-muted-foreground">{currentSong.artist}</p>
@@ -894,9 +905,10 @@ const Room = () => {
             onMuteToggle={isMuted ? unmute : mute}
             onSync={handleResync}
             disabled={!currentSong}
+            compact
           />
         </div>
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div className="flex shrink-0 items-center gap-1">
           <Button
             variant="ghost"
             size="icon"
