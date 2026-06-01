@@ -62,6 +62,58 @@ describe('pickBest', () => {
   });
 });
 
+// Real cases from the Spotify Thailand Top 200 benchmark. pickBest must score
+// against the parsed clean guesses (not the noisy raw YouTube title) and must
+// not accept a title-only match for a common ASCII title with zero artist
+// agreement (the Yorch -> Jamiroquai false positive).
+describe('pickBest with parsed guesses (benchmark)', () => {
+  it('REJECTS a wrong same-title track when the title is common ASCII and artist does not agree', () => {
+    // Yorch - Blow Your Mind is NOT on LRCLIB; only Jamiroquai shares the title.
+    const guesses = parseArtistTitle('Yorch - Blow Your Mind (Official MV)', 'Yorch - Topic');
+    const cands = [
+      { id: 1, artistName: 'Jamiroquai', trackName: 'Blow Your Mind', syncedLyrics: '[00:01.0]x', plainLyrics: 'x' },
+    ];
+    expect(pickBest(cands, guesses)).toBeNull();
+  });
+
+  it('KEEPS a title-only match when the title is distinctive non-Latin (romanized-artist rescue)', () => {
+    // FREEHAND (Latin channel) vs LRCLIB artist ฟรีแฮน (Thai) -> artist sim 0,
+    // but the Thai title is distinctive enough to trust.
+    const guesses = parseArtistTitle(
+      'FREEHAND - เมื่อถูกค้นพบ (Finally She Found.) (Official MV)',
+      'FREEHAND - Topic',
+    );
+    const cands = [
+      { id: 2, artistName: 'ฟรีแฮน', trackName: 'เมื่อถูกค้นพบ (Finally She Found.)', syncedLyrics: '[00:01.0]x' },
+    ];
+    expect(pickBest(cands, guesses)?.artistName).toBe('ฟรีแฮน');
+  });
+
+  it('recovers a feat./variant-suffixed track (scored against the clean guess, not raw metadata)', () => {
+    const guesses = parseArtistTitle('aespa - Switchblade (Official MV)', 'aespa - Topic');
+    const cands = [
+      { id: 3, artistName: 'aespa & Ty Dolla $ign', trackName: 'Switchblade (feat. Ty Dolla $ign)', syncedLyrics: '[00:01.0]x' },
+    ];
+    expect(pickBest(cands, guesses)?.trackName).toContain('Switchblade');
+  });
+
+  it('recovers a Thai feat.-suffixed track with matching artist', () => {
+    const guesses = parseArtistTitle('ป๊อบ ปองกูล - สลักจิต (Official MV)', 'ป๊อบ ปองกูล - Topic');
+    const cands = [
+      { id: 4, artistName: 'ป๊อบ ปองกูล', trackName: 'สลักจิต (feat. Da Endorphine)', plainLyrics: 'x' },
+    ];
+    expect(pickBest(cands, guesses)?.artistName).toBe('ป๊อบ ปองกูล');
+  });
+
+  it('still rejects when even the best guess has a weak title match', () => {
+    const guesses = parseArtistTitle('Some Artist - Totally Different Song', 'Some Artist');
+    const cands = [
+      { id: 5, artistName: 'Some Artist', trackName: 'Unrelated Track', syncedLyrics: '[00:01.0]x' },
+    ];
+    expect(pickBest(cands, guesses)).toBeNull();
+  });
+});
+
 describe('similarity', () => {
   it('is 1 for identical and 0 for empty', () => {
     expect(similarity('Yellow', 'yellow')).toBe(1);

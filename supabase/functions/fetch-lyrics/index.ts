@@ -115,10 +115,10 @@ serve(async (req) => {
       addCandidates(await searchLRCLIBFulltext(query));
     }
 
-    // Score every candidate against the cleaned (artist, title); require a real
-    // resemblance or return nothing rather than a confident wrong guess.
-    const primary = { artist: cleanText(artist), title: cleanText(title) };
-    const best = pickBest(all, primary);
+    // Score every candidate against the parsed clean guesses (NOT the raw noisy
+    // YouTube metadata) so feat./variant suffixes don't dilute the match; require
+    // a real resemblance or return nothing rather than a confident wrong guess.
+    const best = pickBest(all, guesses);
 
     if (!best) {
       console.log(`No confident lyric match across ${all.length} candidates; returning empty.`);
