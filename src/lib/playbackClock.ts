@@ -18,18 +18,25 @@ export function shouldCorrect(
   return Math.abs(localTime - expected) > threshold;
 }
 
+export function canBroadcastClockState({
+  isClock,
+  hasAuthoritativeState,
+}: {
+  isClock: boolean;
+  hasAuthoritativeState: boolean;
+}): boolean {
+  return isClock && hasAuthoritativeState;
+}
+
 /**
- * Deterministically elects the clock: the oldest player (not remote).
- * Every client computes the same answer from presence with no coordination, and
- * the clock re-elects automatically when the current one leaves the room.
+ * Deterministically elects the clock without comparing device wall clocks.
+ * Established and legacy players beat fresh clients, so a joiner cannot become
+ * clock until it has received or originated authoritative playback state.
  */
 export function electClock(users: User[]): string | null {
   const players = users.filter((u) => (u.role ?? "player") === "player");
   if (players.length === 0) return null;
-  return players.reduce((oldest, user) => {
-    const oldestJoinedAt = oldest.joinedAt ?? Number.MAX_SAFE_INTEGER;
-    const userJoinedAt = user.joinedAt ?? Number.MAX_SAFE_INTEGER;
-    if (userJoinedAt !== oldestJoinedAt) return userJoinedAt < oldestJoinedAt ? user : oldest;
-    return user.id < oldest.id ? user : oldest;
-  }).id;
+  const established = players.filter((u) => u.hasAuthoritativeState !== false);
+  const candidates = established.length > 0 ? established : players;
+  return candidates.reduce((clock, user) => user.id < clock.id ? user : clock).id;
 }

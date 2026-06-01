@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { User, Song, PlaybackState, RealtimePayload, RoomRole } from '@/types/karaoke';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { detectDefaultRole, readDeviceEnv } from '@/lib/deviceRole';
-import { electClock } from '@/lib/playbackClock';
+import { canBroadcastClockState, electClock } from '@/lib/playbackClock';
 import { fromSnapshotRow } from '@/lib/roomSnapshot';
 import { dedupePresence } from '@/lib/presence';
 import type { Json } from '@/integrations/supabase/types';
@@ -30,6 +30,8 @@ const DEFAULT_PLAYBACK: PlaybackState = {
   lastUpdate: Date.now(),
 };
 
+const PRESENCE_SETTLE_MS = 1000;
+
 export const useRoom = (
   roomCode: string,
   user: User | null,
@@ -42,8 +44,9 @@ export const useRoom = (
   const channelRef = useRef<RealtimeChannel | null>(null);
   const [role, setRoleState] = useState<RoomRole>(() => detectDefaultRole(readDeviceEnv()));
   const roleRef = useRef(role);
-  const joinedAtRef = useRef(Date.now());
   const isClockRef = useRef(false);
+  const hasAuthoritativeStateRef = useRef(false);
+  const usersRef = useRef(users);
   const getClockPlaybackRef = useRef(getClockPlayback);
 
   useEffect(() => {
@@ -53,6 +56,22 @@ export const useRoom = (
   useEffect(() => {
     roleRef.current = role;
   }, [role]);
+
+  useEffect(() => {
+    usersRef.current = users;
+  }, [users]);
+
+  const markAuthoritativeState = useCallback(() => {
+    if (hasAuthoritativeStateRef.current) return;
+    hasAuthoritativeStateRef.current = true;
+    if (channelRef.current && user) {
+      void channelRef.current.track({
+        ...user,
+        role: roleRef.current,
+        hasAuthoritativeState: true,
+      });
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!roomCode || !user) return;
@@ -73,19 +92,30 @@ export const useRoom = (
         const data = payload as RealtimePayload;
         switch (data.type) {
           case 'playback_update':
+            if (data.senderId !== user.id) markAuthoritativeState();
             setPlaybackState(data.payload as PlaybackState);
             break;
           case 'queue_update':
             setQueue(data.payload as Song[]);
             break;
           case 'sync_request': {
-            if (isClockRef.current) {
+            if (
+              data.senderId !== user.id
+              && canBroadcastClockState({
+                isClock: isClockRef.current,
+                hasAuthoritativeState: hasAuthoritativeStateRef.current,
+              })
+            ) {
               const live = getClockPlaybackRef.current?.();
               if (live) {
                 channelRef.current?.send({
                   type: 'broadcast',
                   event: 'room_event',
-                  payload: { type: 'playback_update', payload: { ...live, lastUpdate: Date.now() } },
+                  payload: {
+                    type: 'playback_update',
+                    payload: { ...live, lastUpdate: Date.now() },
+                    senderId: user.id,
+                  },
                 });
               }
             }
@@ -95,7 +125,11 @@ export const useRoom = (
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          await channel.track({ ...user, role: roleRef.current, joinedAt: joinedAtRef.current });
+          await channel.track({
+            ...user,
+            role: roleRef.current,
+            hasAuthoritativeState: hasAuthoritativeStateRef.current,
+          });
           setIsConnected(true);
           const { data } = await supabase
             .from('room_state')
@@ -110,7 +144,7 @@ export const useRoom = (
           channel.send({
             type: 'broadcast',
             event: 'room_event',
-            payload: { type: 'sync_request', payload: null },
+            payload: { type: 'sync_request', payload: null, senderId: user.id },
           });
         }
       });
@@ -121,17 +155,18 @@ export const useRoom = (
       channel.unsubscribe();
       channelRef.current = null;
     };
-  }, [roomCode, user]);
+  }, [markAuthoritativeState, roomCode, user]);
 
   const updatePlayback = useCallback((state: Partial<PlaybackState>) => {
+    markAuthoritativeState();
     const newState = { ...playbackState, ...state, lastUpdate: Date.now() };
     setPlaybackState(newState);
     channelRef.current?.send({
       type: 'broadcast',
       event: 'room_event',
-      payload: { type: 'playback_update', payload: newState },
+      payload: { type: 'playback_update', payload: newState, senderId: user?.id },
     });
-  }, [playbackState]);
+  }, [markAuthoritativeState, playbackState, user]);
 
   const updateQueue = useCallback((newQueue: Song[]) => {
     setQueue(newQueue);
@@ -146,39 +181,68 @@ export const useRoom = (
     channelRef.current?.send({
       type: 'broadcast',
       event: 'room_event',
-      payload: { type: 'sync_request', payload: null },
+      payload: { type: 'sync_request', payload: null, senderId: user?.id },
     });
-  }, []);
+  }, [user]);
 
   const setRole = useCallback((next: RoomRole) => {
     setRoleState(next);
     if (channelRef.current && user) {
-      channelRef.current.track({ ...user, role: next, joinedAt: joinedAtRef.current });
+      channelRef.current.track({
+        ...user,
+        role: next,
+        hasAuthoritativeState: hasAuthoritativeStateRef.current,
+      });
     }
   }, [user]);
 
   const isClock = !!user && electClock(users) === user.id;
   useEffect(() => {
+    if (!user || hasAuthoritativeStateRef.current) return;
+    const players = users.filter((candidate) => (candidate.role ?? 'player') === 'player');
+    if (players.length !== 1 || players[0].id !== user.id) return;
+    const id = window.setTimeout(() => {
+      const settledPlayers = usersRef.current.filter((candidate) => (candidate.role ?? 'player') === 'player');
+      if (settledPlayers.length === 1 && settledPlayers[0].id === user.id) {
+        markAuthoritativeState();
+      }
+    }, PRESENCE_SETTLE_MS);
+    return () => window.clearTimeout(id);
+  }, [markAuthoritativeState, user, users]);
+
+  useEffect(() => {
     isClockRef.current = isClock;
     if (!isClock) return;
     const id = window.setInterval(() => {
+      if (!canBroadcastClockState({
+        isClock: isClockRef.current,
+        hasAuthoritativeState: hasAuthoritativeStateRef.current,
+      })) return;
       const live = getClockPlaybackRef.current?.();
       if (live) {
         channelRef.current?.send({
           type: 'broadcast',
           event: 'room_event',
-          payload: { type: 'playback_update', payload: { ...live, lastUpdate: Date.now() } },
+          payload: {
+            type: 'playback_update',
+            payload: { ...live, lastUpdate: Date.now() },
+            senderId: user?.id,
+          },
         });
       }
     }, 5000);
     return () => window.clearInterval(id);
-  }, [isClock]);
+  }, [isClock, user]);
 
   const saveTimer = useRef<number | null>(null);
   useEffect(() => {
     if (!isClock || !roomCode) return;
     if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
+      if (!canBroadcastClockState({
+        isClock: isClockRef.current,
+        hasAuthoritativeState: hasAuthoritativeStateRef.current,
+      })) return;
       void supabase.from('room_state').upsert({
         code: roomCode,
         queue: queue as unknown as Json,
