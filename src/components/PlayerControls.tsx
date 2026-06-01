@@ -29,6 +29,8 @@ interface PlayerControlsProps {
   onSync: () => void;
   className?: string;
   showVolume?: boolean;
+  /** No song to control (empty queue): dim + disable transport, freeze the scrubber. */
+  disabled?: boolean;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -48,6 +50,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   onSync,
   className,
   showVolume = true,
+  disabled = false,
 }) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -55,18 +58,21 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const shownTime = disabled ? 0 : currentTime;
+
   return (
     <div className={cn('space-y-3', className)}>
       <div className="space-y-1.5">
         <Slider
-          value={[currentTime]}
+          value={[shownTime]}
           max={duration || 100}
           step={1}
           onValueChange={([value]) => onSeek(value)}
+          disabled={disabled}
           className="cursor-pointer"
         />
         <div className="flex justify-between font-mono text-[11px] text-muted-foreground">
-          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(shownTime)}</span>
           <span>{formatTime(duration)}</span>
         </div>
       </div>
@@ -101,6 +107,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
           <Button
             onClick={onPlayPause}
+            disabled={disabled}
             className="flex h-14 w-14 items-center justify-center rounded-full p-0 shadow-lg shadow-primary/30 transition-transform duration-150 ease-out hover:scale-105 active:scale-90 motion-reduce:transition-none motion-reduce:hover:scale-100"
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >

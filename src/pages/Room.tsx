@@ -303,6 +303,7 @@ const Room = () => {
   };
 
   const handlePlayPause = useCallback(() => {
+    if (!currentSong) return; // nothing to play with an empty queue
     if (effectiveIsPlaying) {
       pause();
       updatePlayback({ isPlaying: false, currentTime: effectiveTime });
@@ -310,14 +311,15 @@ const Room = () => {
       play();
       updatePlayback({ isPlaying: true, currentTime: effectiveTime });
     }
-  }, [effectiveIsPlaying, effectiveTime, pause, play, updatePlayback]);
+  }, [currentSong, effectiveIsPlaying, effectiveTime, pause, play, updatePlayback]);
 
   const handleSeek = useCallback((time: number) => {
+    if (!currentSong) return;
     seekTo(time);
     if (isClock || role === 'remote') {
       updatePlayback({ currentTime: time });
     }
-  }, [isClock, role, seekTo, updatePlayback]);
+  }, [currentSong, isClock, role, seekTo, updatePlayback]);
 
   const handleNext = useCallback(() => {
     if (playbackState.currentSongIndex < queue.length - 1) {
@@ -532,6 +534,7 @@ const Room = () => {
               onMuteToggle={isMuted ? unmute : mute}
               onSync={handleResync}
               showVolume={false}
+              disabled={!currentSong}
             />
           </section>
 
@@ -566,10 +569,10 @@ const Room = () => {
         </div>
 
         <Sheet open={remoteSearchOpen} onOpenChange={setRemoteSearchOpen}>
-          <SheetContent side="bottom" className="max-h-[84vh] border-white/10 bg-[hsl(var(--surface))] p-0 shadow-2xl">
-            <SheetHeader className="px-4 pt-4 text-left">
+          <SheetContent side="bottom" className="flex h-[84vh] flex-col border-white/10 bg-[hsl(var(--surface))] p-0 shadow-2xl">
+            <SheetHeader className="shrink-0 px-4 pt-4 text-left">
               <SheetTitle>Add Song</SheetTitle>
-              <SheetDescription>Search shared queue.</SheetDescription>
+              <SheetDescription>Search and add to the shared queue.</SheetDescription>
             </SheetHeader>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 scrollbar-karaoke">
               <SongSearch onAddSong={handleAddSong} userId={user.id} resultsPlacement="inline" />
@@ -890,6 +893,7 @@ const Room = () => {
             onVolumeChange={handleVolumeChange}
             onMuteToggle={isMuted ? unmute : mute}
             onSync={handleResync}
+            disabled={!currentSong}
           />
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
