@@ -731,6 +731,15 @@ const Room = () => {
         </SheetContent>
       </Sheet>
 
+      <Button
+        variant="secondary"
+        className="fixed right-4 top-20 z-30 hidden rounded-full shadow-lg md:inline-flex lg:hidden"
+        onClick={() => setUtilitySheetOpen(true)}
+      >
+        <Plus className="h-4 w-4" />
+        Add song
+      </Button>
+
       {/* Persistent control peek: always-visible at rest so the controls are
           discoverable on a mouse-idle / TV screen; hovering or focusing it
           expands the full ribbon below. Fades out once the ribbon is showing. */}
