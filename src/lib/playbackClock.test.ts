@@ -64,6 +64,14 @@ describe("electClock", () => {
     expect(electClock([established, fresh])).toBe("zzzz");
   });
 
+  it("re-elects the remaining player when the established clock leaves", () => {
+    const remaining = { ...user("aaaa"), hasAuthoritativeState: false };
+    const established = { ...user("zzzz"), hasAuthoritativeState: true };
+
+    expect(electClock([remaining, established])).toBe("zzzz");
+    expect(electClock([remaining])).toBe("aaaa");
+  });
+
   it("ignores remotes when electing", () => {
     const users = [user("aaa", "remote"), user("bbb", "player")];
     expect(electClock(users)).toBe("bbb");

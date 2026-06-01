@@ -124,13 +124,14 @@ const Room = () => {
   // Skip past it so the party never stalls on a dead video.
   const handleUnplayable = useCallback((code: number) => {
     if (![2, 100, 101, 150].includes(code)) return;
+    if (!isClock) return;
     toast({
       title: "Can't play that one here",
       description: `${currentSong?.title ?? 'That video'} blocks embedding. Skipping.`,
       variant: 'destructive',
     });
     if (currentSong) removeSong(currentSong.id);
-  }, [currentSong, removeSong]);
+  }, [currentSong, isClock, removeSong]);
 
   const playerVideoId = role === 'remote' ? null : (currentSong?.videoId || null);
   const { player, isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable } = useYouTubePlayer('youtube-player', playerVideoId, handleStateChange, handleVideoEnded, handleUnplayable);

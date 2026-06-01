@@ -76,6 +76,9 @@ export const useRoom = (
   useEffect(() => {
     if (!roomCode || !user) return;
 
+    isClockRef.current = false;
+    hasAuthoritativeStateRef.current = false;
+
     const channel = supabase.channel(`room:${roomCode}`, {
       config: {
         presence: { key: user.id },
@@ -196,7 +199,11 @@ export const useRoom = (
     }
   }, [user]);
 
-  const isClock = !!user && electClock(users) === user.id;
+  const isElectedClock = !!user && electClock(users) === user.id;
+  const isClock = canBroadcastClockState({
+    isClock: isElectedClock,
+    hasAuthoritativeState: hasAuthoritativeStateRef.current,
+  });
   useEffect(() => {
     if (!user || hasAuthoritativeStateRef.current) return;
     const players = users.filter((candidate) => (candidate.role ?? 'player') === 'player');
@@ -211,8 +218,8 @@ export const useRoom = (
   }, [markAuthoritativeState, user, users]);
 
   useEffect(() => {
-    isClockRef.current = isClock;
-    if (!isClock) return;
+    isClockRef.current = isElectedClock;
+    if (!isElectedClock) return;
     const id = window.setInterval(() => {
       if (!canBroadcastClockState({
         isClock: isClockRef.current,
@@ -232,11 +239,11 @@ export const useRoom = (
       }
     }, 5000);
     return () => window.clearInterval(id);
-  }, [isClock, user]);
+  }, [isElectedClock, user]);
 
   const saveTimer = useRef<number | null>(null);
   useEffect(() => {
-    if (!isClock || !roomCode) return;
+    if (!isElectedClock || !roomCode) return;
     if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
       if (!canBroadcastClockState({
@@ -255,7 +262,7 @@ export const useRoom = (
     return () => {
       if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
     };
-  }, [isClock, roomCode, queue, playbackState]);
+  }, [isElectedClock, roomCode, queue, playbackState]);
 
   return {
     users,
