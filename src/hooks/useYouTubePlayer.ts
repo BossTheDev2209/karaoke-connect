@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { ensurePlayerMount } from '@/lib/playerMount';
 
 interface YouTubePlayer {
   playVideo: () => void;
@@ -90,6 +91,14 @@ export const useYouTubePlayer = (
   const onEndedRef = useRef(onEnded);
   const onStateChangeRef = useRef(onStateChange);
   const onUnplayableRef = useRef(onUnplayable);
+  const ensureContainer = useCallback(
+    () => ensurePlayerMount<HTMLElement>(
+      document,
+      document.getElementById(`${containerId}-wrapper`),
+      containerId,
+    ),
+    [containerId],
+  );
 
   // Keep refs updated
   useEffect(() => {
@@ -145,9 +154,9 @@ export const useYouTubePlayer = (
         playerRef.current = null;
       }
 
-      // Ensure no orphaned iframes keep playing
+      // Mount is hook-owned because YouTube replaces it with an iframe.
       const el = document.getElementById(containerId);
-      if (el) el.innerHTML = '';
+      el?.remove();
 
       isPlayerReady.current = false;
       isInitializing.current = false;
@@ -173,6 +182,7 @@ export const useYouTubePlayer = (
 
     const initPlayer = () => {
       if (playerRef.current || isInitializing.current) return;
+      if (!ensureContainer()) return;
       isInitializing.current = true;
 
       currentVideoIdRef.current = videoId;
@@ -245,7 +255,7 @@ export const useYouTubePlayer = (
         initPlayer();
       };
     }
-  }, [containerId, destroyPlayer, videoId]);
+  }, [checkCaptionsAvailable, containerId, destroyPlayer, ensureContainer, videoId]);
 
   // Cleanup on unmount only (avoid destroying the player on every videoId change)
   useEffect(() => {

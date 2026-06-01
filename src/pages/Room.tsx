@@ -21,6 +21,7 @@ import { Captions, CaptionsOff, Ellipsis, ListMusic, LogOut, Maximize2, Mic2, Mi
 import { Button } from '@/components/ui/button';
 import { expectedPosition, shouldCorrect } from '@/lib/playbackClock';
 import { INITIAL_RIBBON_VISIBILITY, RIBBON_HIDE_DELAY_MS, ribbonTransitionDuration, shouldShowRibbon } from '@/lib/ribbonVisibility';
+import { removeSongFromQueue } from '@/lib/queuePlayback';
 import { StageBackground } from '@/components/StageBackground';
 import {
   Sheet,
@@ -80,6 +81,12 @@ const Room = () => {
   } = useRoom(code || '', user, getClockPlayback);
 
   const currentSong = queue[playbackState.currentSongIndex];
+  const removeSong = useCallback((songId: string) => {
+    const next = removeSongFromQueue(queue, playbackState.currentSongIndex, songId);
+    if (!next) return;
+    updateQueue(next.queue);
+    updatePlayback(next.playback);
+  }, [queue, playbackState.currentSongIndex, updatePlayback, updateQueue]);
 
   useEffect(() => {
     setVideoId(currentSong?.videoId || null);
@@ -122,14 +129,8 @@ const Room = () => {
       description: `${currentSong?.title ?? 'That video'} blocks embedding. Skipping.`,
       variant: 'destructive',
     });
-    if (!isClock) return;
-    const nextIndex = playbackState.currentSongIndex + 1;
-    if (nextIndex < queue.length) {
-      updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
-    } else {
-      updatePlayback({ isPlaying: false });
-    }
-  }, [isClock, currentSong, queue.length, playbackState.currentSongIndex, updatePlayback]);
+    if (currentSong) removeSong(currentSong.id);
+  }, [currentSong, removeSong]);
 
   const playerVideoId = role === 'remote' ? null : (currentSong?.videoId || null);
   const { player, isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable } = useYouTubePlayer('youtube-player', playerVideoId, handleStateChange, handleVideoEnded, handleUnplayable);
@@ -307,30 +308,6 @@ const Room = () => {
     updateQueue([...queue, song]);
   };
 
-  const handleRemoveSong = (songId: string) => {
-    const removedIndex = queue.findIndex(s => s.id === songId);
-    if (removedIndex === -1) return;
-    const newQueue = queue.filter(s => s.id !== songId);
-    updateQueue(newQueue);
-
-    const currentIndex = playbackState.currentSongIndex;
-
-    if (newQueue.length === 0) {
-      // Nothing left — stop and reset
-      updatePlayback({ currentSongIndex: 0, currentTime: 0, isPlaying: false });
-      return;
-    }
-
-    if (removedIndex < currentIndex) {
-      // Shift index down so we keep playing the same song
-      updatePlayback({ currentSongIndex: currentIndex - 1 });
-    } else if (removedIndex === currentIndex) {
-      // Removed the currently playing song — advance to the song now at this index
-      const nextIndex = Math.min(currentIndex, newQueue.length - 1);
-      updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
-    }
-  };
-
   const handleSelectSong = (index: number) => {
     updatePlayback({ currentSongIndex: index, currentTime: 0, isPlaying: true });
   };
@@ -413,7 +390,7 @@ const Room = () => {
           <SongQueue
             queue={queue}
             currentIndex={playbackState.currentSongIndex}
-            onRemove={handleRemoveSong}
+            onRemove={removeSong}
             onSelect={handleSelectSong}
             getLyricStatus={getStatusForSong}
           />
@@ -520,7 +497,7 @@ const Room = () => {
             <SongQueue
               queue={queue}
               currentIndex={playbackState.currentSongIndex}
-              onRemove={handleRemoveSong}
+              onRemove={removeSong}
               onSelect={handleSelectSong}
               getLyricStatus={getStatusForSong}
             />
@@ -618,7 +595,6 @@ const Room = () => {
             className="karaoke-fullscreen-stage relative aspect-video w-full max-w-[min(100vw,calc((100vh-7rem)*16/9))] overflow-hidden rounded-lg bg-black"
           >
             <div className="absolute inset-0 overflow-hidden rounded-lg" id="youtube-player-wrapper">
-              {playerVideoId && <div id="youtube-player" className="h-full w-full" />}
             </div>
             <div className="absolute inset-0 z-10 rounded-lg" aria-hidden="true" />
 
