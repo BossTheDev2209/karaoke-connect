@@ -196,9 +196,7 @@ export const useYouTubePlayer = (
           disablekb: 1,
           fs: 0,
           loop: 0,
-          modestbranding: 1,
           rel: 0,
-          showinfo: 0,
           iv_load_policy: 3,
           playsinline: 1,
           cc_load_policy: 0, // Don't load captions by default

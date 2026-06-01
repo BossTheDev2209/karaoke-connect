@@ -472,7 +472,6 @@
   }
 }
 
-/* Block all interaction with YouTube iframe and crop its chrome (title bar / bottom gradient that briefly reappear on programmatic seek) */
 #youtube-player-wrapper {
   position: absolute;
   overflow: hidden;
@@ -480,12 +479,10 @@
 
 #youtube-player-wrapper > #youtube-player,
 #youtube-player-wrapper > iframe#youtube-player {
-  pointer-events: none !important;
   position: absolute !important;
-  top: -60px !important;
-  left: -10% !important;
-  width: 120% !important;
-  height: calc(100% + 120px) !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .karaoke-fullscreen-stage:fullscreen {

@@ -596,7 +596,6 @@ const Room = () => {
           >
             <div className="absolute inset-0 overflow-hidden rounded-lg" id="youtube-player-wrapper">
             </div>
-            <div className="absolute inset-0 z-10 rounded-lg" aria-hidden="true" />
 
             {showCountdown && (
               <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
