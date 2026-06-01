@@ -18,7 +18,7 @@ import { RoomSettings } from '@/components/RoomSettings';
 import { FloatingReactions, ReactionBar, ReactionPicker } from '@/components/Reactions';
 import { useReactions } from '@/hooks/useReactions';
 import { toast } from '@/hooks/use-toast';
-import { Captions, ChevronUp, Ellipsis, ListMusic, LogOut, Maximize2, Mic2, Minimize2, Monitor, PanelRight, Pause, Play, Plus, Settings, SkipBack, SkipForward, Smartphone, Subtitles } from 'lucide-react';
+import { Captions, ChevronUp, Ellipsis, ListMusic, Loader2, LogOut, Maximize2, Mic2, Minimize2, Monitor, PanelRight, Pause, Play, Plus, Settings, SkipBack, SkipForward, Smartphone, Subtitles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { expectedPosition, shouldCorrect } from '@/lib/playbackClock';
 import { INITIAL_RIBBON_VISIBILITY, RIBBON_HIDE_DELAY_MS, peekPointerEnterPatch, ribbonTransitionDuration, shouldShowRibbon } from '@/lib/ribbonVisibility';
@@ -645,6 +645,12 @@ const Room = () => {
             <div className="absolute inset-0 overflow-hidden rounded-lg" id="youtube-player-wrapper">
             </div>
 
+            {currentSong && !isReady && (
+              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground motion-reduce:animate-none" />
+              </div>
+            )}
+
             {showCountdown && (
               <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
                 <div className="rounded-2xl bg-black/70 px-6 py-4">
@@ -655,6 +661,12 @@ const Room = () => {
                     {remainingSeconds}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {stageMode === 'video' && showStageLyrics && currentSong && lyricsLoading && !fullscreenLyric && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center bg-black/50 px-4 pb-6 pt-5">
+                <span className="text-sm text-white/70">Finding lyrics…</span>
               </div>
             )}
 
