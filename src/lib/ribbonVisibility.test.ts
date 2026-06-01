@@ -22,7 +22,7 @@ describe('ribbon visibility', () => {
     expect(ribbonTransitionDuration(false)).toBe('160ms');
   });
 
-  it('waits briefly before hiding after pointer exit', () => {
-    expect(RIBBON_HIDE_DELAY_MS).toBe(600);
+  it('hides near-instantly after pointer exit (small grace to avoid handoff flicker)', () => {
+    expect(RIBBON_HIDE_DELAY_MS).toBe(120);
   });
 });

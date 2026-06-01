@@ -71,39 +71,43 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        {/* left: secondary action */}
+        <div className="flex items-center justify-start">
           <Button
             variant="ghost"
             size="icon"
             onClick={onSync}
-            className="rounded-full"
+            className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground"
             title="Sync with room"
             aria-label="Sync with room"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="h-4 w-4" />
           </Button>
+        </div>
 
+        {/* center: primary transport, always optically centered */}
+        <div className="flex items-center justify-center gap-2 sm:gap-3">
           <Button
             variant="ghost"
             size="icon"
             onClick={onPrevious}
             disabled={!canGoPrevious}
-            className="rounded-full"
+            className="h-11 w-11 rounded-full"
             aria-label="Previous song"
           >
-            <SkipBack className="w-5 h-5" />
+            <SkipBack className="h-5 w-5" />
           </Button>
 
           <Button
             onClick={onPlayPause}
-            className="h-12 w-12 rounded-full p-0"
+            className="flex h-14 w-14 items-center justify-center rounded-full p-0 shadow-lg shadow-primary/30 transition-transform duration-150 ease-out hover:scale-105 active:scale-90 motion-reduce:transition-none motion-reduce:hover:scale-100"
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? (
-              <Pause className="w-5 h-5" />
+              <Pause className="h-6 w-6" />
             ) : (
-              <Play className="ml-0.5 w-5 h-5" />
+              <Play className="ml-0.5 h-6 w-6" />
             )}
           </Button>
 
@@ -112,33 +116,38 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
             size="icon"
             onClick={onNext}
             disabled={!canGoNext}
-            className="rounded-full"
+            className="h-11 w-11 rounded-full"
             aria-label="Next song"
           >
-            <SkipForward className="w-5 h-5" />
+            <SkipForward className="h-5 w-5" />
           </Button>
         </div>
 
-        {showVolume && <div className="hidden items-center gap-2 sm:flex">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onMuteToggle}
-            className="rounded-full"
-            aria-label={isMuted ? 'Unmute' : 'Mute'}
-          >
-            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-          </Button>
+        {/* right: volume */}
+        <div className="flex items-center justify-end gap-2">
+          {showVolume && (
+            <div className="hidden items-center gap-2 sm:flex">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onMuteToggle}
+                className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground"
+                aria-label={isMuted ? 'Unmute' : 'Mute'}
+              >
+                {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              </Button>
 
-          <Slider
-            value={[isMuted ? 0 : volume]}
-            max={100}
-            step={1}
-            onValueChange={([value]) => onVolumeChange(value)}
-            className="w-20"
-            aria-label="Volume"
-          />
-        </div>}
+              <Slider
+                value={[isMuted ? 0 : volume]}
+                max={100}
+                step={1}
+                onValueChange={([value]) => onVolumeChange(value)}
+                className="w-20"
+                aria-label="Volume"
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -4,28 +4,29 @@
 
 @layer base {
   :root {
-    --background: 0 0% 6%;
-    --foreground: 240 7% 96%;
+    /* Warm near-black: every neutral is tinted toward the rose accent (hue 345, very low sat). */
+    --background: 345 14% 5%;
+    --foreground: 345 8% 96%;
 
-    --surface: 240 3% 11%;
-    --card: 240 3% 11%;
-    --card-foreground: 240 7% 96%;
+    --surface: 345 9% 10%;
+    --card: 345 9% 10%;
+    --card-foreground: 345 8% 96%;
 
-    --popover: 240 3% 11%;
-    --popover-foreground: 240 7% 96%;
+    --popover: 345 9% 10%;
+    --popover-foreground: 345 8% 96%;
 
-    --primary: 347 100% 61%;
+    --primary: 347 92% 60%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 347 100% 67%;
+    --primary-hover: 347 96% 67%;
 
-    --secondary: 240 3% 17%;
-    --secondary-foreground: 240 7% 96%;
+    --secondary: 345 7% 16%;
+    --secondary-foreground: 345 8% 96%;
 
-    --muted: 240 3% 17%;
-    --muted-foreground: 240 3% 65%;
+    --muted: 345 7% 16%;
+    --muted-foreground: 345 6% 66%;
 
-    --accent: 240 3% 17%;
-    --accent-foreground: 240 7% 96%;
+    --accent: 345 8% 18%;
+    --accent-foreground: 345 8% 96%;
 
     --destructive: 0 72% 58%;
     --destructive-foreground: 0 0% 100%;
@@ -34,9 +35,9 @@
     --ambient: 347 100% 61%;
 
     --divider: 255 255 255;
-    --border: 0 0% 16%;
-    --input: 240 3% 17%;
-    --ring: 347 100% 61%;
+    --border: 345 8% 17%;
+    --input: 345 7% 16%;
+    --ring: 347 92% 60%;
 
     --radius: 0.75rem;
 

@@ -1,8 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { LyricLine } from '@/types/karaoke';
 import { cn } from '@/lib/utils';
-import { Languages, List, Minus, Music, Plus, Subtitles } from 'lucide-react';
+import { Languages, List, Music, Subtitles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
 import {
   Dialog,
   DialogContent,
@@ -180,11 +181,6 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
     }
   }, [currentLineIndex]);
 
-  const adjustOffset = (delta: number) => {
-    if (onOffsetChange) {
-      onOffsetChange(offset + delta);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -237,28 +233,38 @@ export const LyricsDisplay: React.FC<LyricsDisplayProps> = ({
         )}
 
         {onOffsetChange && (
-          <div className="flex items-center gap-0.5 rounded-full border border-border/60 bg-background/30 p-0.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => adjustOffset(-0.1)}
-              className="h-11 w-11 rounded-full"
-              aria-label="Decrease lyric offset"
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </Button>
-            <span className="min-w-12 text-center font-mono text-[11px] text-muted-foreground">
-              {offset.toFixed(1)}s
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => adjustOffset(0.1)}
-              className="h-11 w-11 rounded-full"
-              aria-label="Increase lyric offset"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
+          <div className="order-last w-full pt-3">
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-xs font-medium text-foreground">Lyric timing</span>
+              {offset !== 0 && (
+                <button
+                  type="button"
+                  onClick={() => onOffsetChange(0)}
+                  className="text-[11px] font-medium text-primary transition-opacity hover:opacity-70"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+            <p className="mb-2 text-center text-[11px] text-muted-foreground" aria-live="polite">
+              {offset === 0
+                ? 'On time'
+                : offset < 0
+                  ? `Lyrics ${Math.abs(offset).toFixed(1)}s earlier`
+                  : `Lyrics ${offset.toFixed(1)}s later`}
+            </p>
+            <Slider
+              value={[offset]}
+              min={-5}
+              max={5}
+              step={0.1}
+              onValueChange={([value]) => onOffsetChange(value)}
+              aria-label="Lyric timing: drag left for earlier, right for later"
+            />
+            <div className="mt-1.5 flex justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
+              <span>Earlier</span>
+              <span>Later</span>
+            </div>
           </div>
         )}
 

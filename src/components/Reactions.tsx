@@ -42,7 +42,10 @@ export const ReactionBar: React.FC<ReactionBarProps> = ({ onReact, compact = fal
           key={emoji}
           variant="ghost"
           size="icon"
-          className={cn('h-11 w-11 rounded-full p-0 text-lg hover:bg-white/10', compact && 'hover:bg-white/[0.06]')}
+          className={cn(
+            'h-11 w-11 rounded-full p-0 text-lg transition-transform duration-150 ease-out hover:scale-110 hover:bg-white/10 active:scale-125 motion-reduce:transition-none motion-reduce:hover:scale-100',
+            compact && 'hover:bg-white/[0.06]'
+          )}
           onClick={() => onReact(emoji)}
           aria-label={`Send ${emoji} reaction`}
         >
@@ -73,7 +76,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onReact }) => {
   return (
     <Popover onOpenChange={(open) => !open && setEditing(false)}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full text-primary" aria-label="Open reactions">
+        <Button variant="ghost" size="icon" className="rounded-full text-primary hover:bg-transparent hover:text-primary" aria-label="Open reactions">
           <Sparkles className="h-4 w-4" />
         </Button>
       </PopoverTrigger>

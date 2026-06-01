@@ -49,6 +49,7 @@ declare global {
           events?: {
             onReady?: () => void;
             onStateChange?: (event: { data: number }) => void;
+            onError?: (event: { data: number }) => void;
           };
         }
       ) => YouTubePlayer;
@@ -68,7 +69,8 @@ export const useYouTubePlayer = (
   containerId: string,
   videoId: string | null,
   onStateChange?: (isPlaying: boolean) => void,
-  onEnded?: () => void
+  onEnded?: () => void,
+  onUnplayable?: (code: number) => void
 ): UseYouTubePlayerReturn => {
   const playerRef = useRef<YouTubePlayer | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -87,6 +89,7 @@ export const useYouTubePlayer = (
 
   const onEndedRef = useRef(onEnded);
   const onStateChangeRef = useRef(onStateChange);
+  const onUnplayableRef = useRef(onUnplayable);
 
   // Keep refs updated
   useEffect(() => {
@@ -96,6 +99,10 @@ export const useYouTubePlayer = (
   useEffect(() => {
     onStateChangeRef.current = onStateChange;
   }, [onStateChange]);
+
+  useEffect(() => {
+    onUnplayableRef.current = onUnplayable;
+  }, [onUnplayable]);
 
   // Load YouTube IFrame API
   useEffect(() => {
@@ -217,6 +224,11 @@ export const useYouTubePlayer = (
               endedHandledRef.current = true;
               onEndedRef.current?.();
             }
+          },
+          onError: (event) => {
+            // 2 invalid id, 5 HTML5 error, 100 not found/private,
+            // 101 / 150 embedding disabled by owner. All mean "can't play here".
+            onUnplayableRef.current?.(event.data);
           },
         },
       });

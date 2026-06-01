@@ -16,7 +16,8 @@ import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
 import { RoomSettings } from '@/components/RoomSettings';
 import { FloatingReactions, ReactionBar, ReactionPicker } from '@/components/Reactions';
 import { useReactions } from '@/hooks/useReactions';
-import { Captions, Ellipsis, ListMusic, LogOut, Maximize2, Mic2, Minimize2, Monitor, Plus, Search, Settings, Smartphone } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+import { Captions, CaptionsOff, Ellipsis, ListMusic, LogOut, Maximize2, Mic2, Minimize2, Monitor, PanelRight, Plus, Settings, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { expectedPosition, shouldCorrect } from '@/lib/playbackClock';
 import { INITIAL_RIBBON_VISIBILITY, RIBBON_HIDE_DELAY_MS, ribbonTransitionDuration, shouldShowRibbon } from '@/lib/ribbonVisibility';
@@ -38,7 +39,6 @@ import {
 import { cn } from '@/lib/utils';
 
 type StageMode = 'video' | 'sing';
-type UtilityPanel = 'up-next' | 'search' | 'lyrics' | null;
 
 const Room = () => {
   const { code } = useParams<{ code: string }>();
@@ -106,8 +106,26 @@ const Room = () => {
     }
   }, [isClock, queue.length, playbackState.currentSongIndex, updatePlayback]);
 
+  // YouTube refused to play this embed (101/150 owner-blocked, 100 missing, 2 bad id).
+  // Skip past it so the party never stalls on a dead video.
+  const handleUnplayable = useCallback((code: number) => {
+    if (![2, 100, 101, 150].includes(code)) return;
+    toast({
+      title: "Can't play that one here",
+      description: `${currentSong?.title ?? 'That video'} blocks embedding. Skipping.`,
+      variant: 'destructive',
+    });
+    if (!isClock) return;
+    const nextIndex = playbackState.currentSongIndex + 1;
+    if (nextIndex < queue.length) {
+      updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
+    } else {
+      updatePlayback({ isPlaying: false });
+    }
+  }, [isClock, currentSong, queue.length, playbackState.currentSongIndex, updatePlayback]);
+
   const playerVideoId = role === 'remote' ? null : (currentSong?.videoId || null);
-  const { player, isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable } = useYouTubePlayer('youtube-player', playerVideoId, handleStateChange, handleVideoEnded);
+  const { player, isReady, currentTime, duration, isPlaying, play, pause, seekTo, setVolume: setPlayerVolume, mute, unmute, isMuted, enableCaptions, disableCaptions, areCaptionsEnabled, hasCaptionsAvailable } = useYouTubePlayer('youtube-player', playerVideoId, handleStateChange, handleVideoEnded, handleUnplayable);
   const currentTimeRef = useRef(currentTime);
 
   useEffect(() => {
@@ -183,8 +201,9 @@ const Room = () => {
   }, []);
 
   const [stageMode, setStageMode] = useState<StageMode>('video');
-  const [utilityPanel, setUtilityPanel] = useState<UtilityPanel>(null);
   const [utilitySheetOpen, setUtilitySheetOpen] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<'queue' | 'lyrics'>('queue');
+  const [showStageLyrics, setShowStageLyrics] = useState(true);
   const [remoteSearchOpen, setRemoteSearchOpen] = useState(false);
   const [remoteLyricsOpen, setRemoteLyricsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -248,15 +267,6 @@ const Room = () => {
 
   const setRibbonFlag = (key: keyof typeof ribbonIntent, value: boolean) => {
     setRibbonIntent((current) => ({ ...current, [key]: value }));
-  };
-
-  const openUtilityPanel = (panel: Exclude<UtilityPanel, null>) => {
-    if (isWideDesktop) {
-      setUtilityPanel((current) => current === panel ? null : panel);
-      return;
-    }
-    setUtilityPanel(panel);
-    setUtilitySheetOpen(true);
   };
 
   const handlePlayPause = () => {
@@ -346,35 +356,37 @@ const Room = () => {
 
   if (!user || !code) return null;
 
-  const utilityTitle = utilityPanel === 'search' ? 'Search' : utilityPanel === 'lyrics' ? 'Lyrics' : 'Up Next';
   const renderUtilityContent = () => (
     <div className="flex h-full flex-col bg-[hsl(var(--surface))]">
-      <div className="border-b border-white/10 px-5 py-4">
-        <p className="text-lg font-semibold tracking-tight">{utilityTitle}</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {utilityPanel === 'search' ? 'Find songs for shared queue.' : utilityPanel === 'lyrics' ? 'Read, seek, and tune lyric timing.' : `${queue.length} songs queued.`}
-        </p>
-        <div className="mt-3 flex gap-1">
-          <Button variant="ghost" size="sm" className={cn('rounded-full', utilityPanel === 'up-next' && 'bg-white/10')} onClick={() => openUtilityPanel('up-next')}>
-            <ListMusic className="h-3.5 w-3.5" />
-            Up Next
-          </Button>
-          <Button variant="ghost" size="sm" className={cn('rounded-full', utilityPanel === 'search' && 'bg-white/10')} onClick={() => openUtilityPanel('search')}>
-            <Search className="h-3.5 w-3.5" />
-            Search
-          </Button>
-          <Button variant="ghost" size="sm" className={cn('rounded-full', utilityPanel === 'lyrics' && 'bg-white/10')} onClick={() => openUtilityPanel('lyrics')}>
-            <Captions className="h-3.5 w-3.5" />
-            Lyrics
-          </Button>
-        </div>
+      {/* Search is always pinned to the top of the panel */}
+      <div className="border-b border-white/10 p-4">
+        <SongSearch onAddSong={handleAddSong} userId={user.id} resultsPlacement="inline" />
       </div>
-      {utilityPanel === 'search' && (
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 scrollbar-karaoke">
-          <SongSearch onAddSong={handleAddSong} userId={user.id} resultsPlacement="inline" />
-        </div>
-      )}
-      {utilityPanel === 'lyrics' && (
+
+      {/* Queue / Lyrics tabs */}
+      <div className="flex items-center gap-1 px-3 pt-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn('flex-1 rounded-full', sidebarTab === 'queue' ? 'bg-white/10 text-foreground' : 'text-muted-foreground')}
+          onClick={() => setSidebarTab('queue')}
+        >
+          <ListMusic className="h-3.5 w-3.5" />
+          Up Next
+          <span className="ml-1 font-mono text-[11px] opacity-70">{queue.length}</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn('flex-1 rounded-full', sidebarTab === 'lyrics' ? 'bg-white/10 text-foreground' : 'text-muted-foreground')}
+          onClick={() => setSidebarTab('lyrics')}
+        >
+          <Captions className="h-3.5 w-3.5" />
+          Lyrics
+        </Button>
+      </div>
+
+      {sidebarTab === 'lyrics' ? (
         <div className="min-h-0 flex-1 p-4">
           <LyricsDisplay
             lyrics={lyrics}
@@ -393,25 +405,16 @@ const Room = () => {
             onDisableCaptions={disableCaptions}
           />
         </div>
-      )}
-      {(utilityPanel === 'up-next' || utilityPanel === null) && (
-        <>
-          <div className="border-b border-white/10 p-4">
-            <Button variant="outline" className="w-full rounded-full" onClick={() => openUtilityPanel('search')}>
-              <Plus className="h-4 w-4" />
-              Add Song
-            </Button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 scrollbar-karaoke">
-            <SongQueue
-              queue={queue}
-              currentIndex={playbackState.currentSongIndex}
-              onRemove={handleRemoveSong}
-              onSelect={handleSelectSong}
-              getLyricStatus={getStatusForSong}
-            />
-          </div>
-        </>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 scrollbar-karaoke">
+          <SongQueue
+            queue={queue}
+            currentIndex={playbackState.currentSongIndex}
+            onRemove={handleRemoveSong}
+            onSelect={handleSelectSong}
+            getLyricStatus={getStatusForSong}
+          />
+        </div>
       )}
     </div>
   );
@@ -619,12 +622,17 @@ const Room = () => {
             {showCountdown && (
               <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
                 <div className="rounded-2xl bg-black/70 px-6 py-4">
-                  <div className="text-center text-6xl font-semibold tabular-nums text-primary">{remainingSeconds}</div>
+                  <div
+                    key={remainingSeconds}
+                    className="animate-in zoom-in-50 fade-in text-center text-6xl font-semibold tabular-nums text-primary duration-300 ease-out motion-reduce:animate-none"
+                  >
+                    {remainingSeconds}
+                  </div>
                 </div>
               </div>
             )}
 
-            {stageMode === 'video' && fullscreenLyric && (
+            {stageMode === 'video' && showStageLyrics && fullscreenLyric && (
               <div className="karaoke-fullscreen-lyrics pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center bg-black/65 px-4 pb-7 pt-6">
                 <div className="max-w-5xl text-center text-[clamp(1.5rem,3.5vw,2.75rem)] font-semibold leading-relaxed text-white">
                   {fullscreenLyric}
@@ -646,23 +654,21 @@ const Room = () => {
           </div>
         </main>
 
-        {isWideDesktop && utilityPanel && (
-          <aside className="hidden h-full w-96 shrink-0 border-l border-white/10 lg:block">
-            {renderUtilityContent()}
-          </aside>
-        )}
+        <aside className="hidden h-full w-96 shrink-0 border-l border-white/10 lg:block">
+          {renderUtilityContent()}
+        </aside>
       </div>
 
       <Sheet open={utilitySheetOpen} onOpenChange={setUtilitySheetOpen}>
         <SheetContent className="flex w-[min(92vw,30rem)] flex-col border-white/10 bg-[hsl(var(--surface))] p-0 shadow-2xl sm:max-w-md">
-          <SheetTitle className="sr-only">{utilityTitle}</SheetTitle>
+          <SheetTitle className="sr-only">Search, queue and lyrics</SheetTitle>
           <SheetDescription className="sr-only">Room queue, search, and lyric tools.</SheetDescription>
           {renderUtilityContent()}
         </SheetContent>
       </Sheet>
 
       <div
-        className="fixed inset-x-0 bottom-0 z-30 hidden h-24 md:block"
+        className="fixed inset-x-0 bottom-0 z-30 hidden h-24 md:block lg:right-[24rem]"
         onPointerEnter={() => setRibbonFlag('zoneHovered', true)}
         onPointerLeave={() => setRibbonFlag('zoneHovered', false)}
         aria-hidden="true"
@@ -685,7 +691,7 @@ const Room = () => {
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setRibbonFlag('focusWithin', false);
         }}
         className={cn(
-          'fixed inset-x-2 bottom-3 z-40 mx-auto flex max-w-7xl flex-col gap-3 rounded-2xl border border-white/10 bg-[hsl(var(--surface)/0.97)] p-3 shadow-2xl transition-[opacity,transform] ease-out sm:inset-x-4 lg:flex-row lg:items-center lg:p-4',
+          'fixed inset-x-2 bottom-3 z-40 mx-auto flex max-w-7xl flex-col gap-3 rounded-2xl border border-white/10 bg-[hsl(var(--surface)/0.97)] p-3 shadow-2xl transition-[opacity,transform] ease-out sm:inset-x-4 lg:left-4 lg:right-[25rem] lg:mx-0 lg:max-w-none lg:flex-row lg:items-center lg:p-4',
           ribbonVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0'
         )}
         style={{ transitionDuration: ribbonTransitionDuration(prefersReducedMotion) }}
@@ -725,20 +731,25 @@ const Room = () => {
           <Button
             variant="ghost"
             size="icon"
-            className={cn('rounded-full', stageMode === 'sing' && 'bg-primary/15 text-primary')}
+            className={cn('rounded-full hover:bg-transparent', stageMode === 'sing' ? 'text-primary hover:text-primary' : 'text-foreground hover:text-foreground')}
             onClick={() => setStageMode(stageMode === 'video' ? 'sing' : 'video')}
             aria-label={stageMode === 'video' ? 'Open Sing mode' : 'Return to video mode'}
           >
             <Mic2 className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className={cn('rounded-full', utilityPanel === 'up-next' && 'bg-white/10')} onClick={() => openUtilityPanel('up-next')} aria-label="Open Up Next">
-            <ListMusic className="h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn('rounded-full hover:bg-transparent', showStageLyrics ? 'text-primary hover:text-primary' : 'text-muted-foreground hover:text-muted-foreground')}
+            onClick={() => setShowStageLyrics((v) => !v)}
+            aria-label={showStageLyrics ? 'Hide on-screen lyrics' : 'Show on-screen lyrics'}
+            aria-pressed={showStageLyrics}
+            title={showStageLyrics ? 'Hide on-screen lyrics' : 'Show on-screen lyrics'}
+          >
+            {showStageLyrics ? <Captions className="h-4 w-4" /> : <CaptionsOff className="h-4 w-4" />}
           </Button>
-          <Button variant="ghost" size="icon" className={cn('rounded-full', utilityPanel === 'search' && 'bg-white/10')} onClick={() => openUtilityPanel('search')} aria-label="Open search">
-            <Search className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className={cn('rounded-full', utilityPanel === 'lyrics' && 'bg-white/10')} onClick={() => openUtilityPanel('lyrics')} aria-label="Open lyrics">
-            <Captions className="h-4 w-4" />
+          <Button variant="ghost" size="icon" className="rounded-full text-foreground hover:bg-transparent hover:text-foreground lg:hidden" onClick={() => setUtilitySheetOpen(true)} aria-label="Open search, queue and lyrics">
+            <PanelRight className="h-4 w-4" />
           </Button>
           <ReactionPicker onReact={sendReaction} />
         </div>
