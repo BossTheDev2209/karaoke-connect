@@ -5,6 +5,7 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 import { detectDefaultRole, readDeviceEnv } from '@/lib/deviceRole';
 import { electClock } from '@/lib/playbackClock';
 import { fromSnapshotRow } from '@/lib/roomSnapshot';
+import { dedupePresence } from '@/lib/presence';
 import type { Json } from '@/integrations/supabase/types';
 
 interface UseRoomReturn {
@@ -66,8 +67,7 @@ export const useRoom = (
     channel
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState<User>();
-        const presentUsers = Object.values(state).flat() as User[];
-        setUsers(presentUsers);
+        setUsers(dedupePresence(state as Record<string, User[]>));
       })
       .on('broadcast', { event: 'room_event' }, ({ payload }) => {
         const data = payload as RealtimePayload;
