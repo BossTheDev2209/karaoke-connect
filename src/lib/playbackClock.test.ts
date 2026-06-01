@@ -9,12 +9,13 @@ const baseState: PlaybackState = {
   lastUpdate: 1_000_000,
 };
 
-const user = (id: string, role: User["role"] = "player"): User => ({
+const user = (id: string, role: User["role"] = "player", joinedAt?: number): User => ({
   id,
   nickname: id,
   avatarId: "",
   isSpeaking: false,
   role,
+  joinedAt,
 });
 
 describe("expectedPosition", () => {
@@ -47,9 +48,19 @@ describe("electClock", () => {
     expect(electClock([user("a", "remote"), user("b", "remote")])).toBeNull();
   });
 
-  it("picks the lowest player id deterministically", () => {
+  it("uses id as a deterministic fallback for legacy presences", () => {
     const users = [user("zeta"), user("alpha"), user("mid")];
     expect(electClock(users)).toBe("alpha");
+  });
+
+  it("keeps the oldest player as clock when a later player has a lower id", () => {
+    const users = [user("zzzz", "player", 100), user("aaaa", "player", 200)];
+    expect(electClock(users)).toBe("zzzz");
+  });
+
+  it("uses id as the tie-breaker when players joined together", () => {
+    const users = [user("zzzz", "player", 100), user("aaaa", "player", 100)];
+    expect(electClock(users)).toBe("aaaa");
   });
 
   it("ignores remotes when electing", () => {

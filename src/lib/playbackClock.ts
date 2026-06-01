@@ -19,12 +19,17 @@ export function shouldCorrect(
 }
 
 /**
- * Deterministically elects the clock: the player (not remote) with the lowest id.
+ * Deterministically elects the clock: the oldest player (not remote).
  * Every client computes the same answer from presence with no coordination, and
  * the clock re-elects automatically when the current one leaves the room.
  */
 export function electClock(users: User[]): string | null {
   const players = users.filter((u) => (u.role ?? "player") === "player");
   if (players.length === 0) return null;
-  return players.reduce((min, u) => (u.id < min.id ? u : min)).id;
+  return players.reduce((oldest, user) => {
+    const oldestJoinedAt = oldest.joinedAt ?? Number.MAX_SAFE_INTEGER;
+    const userJoinedAt = user.joinedAt ?? Number.MAX_SAFE_INTEGER;
+    if (userJoinedAt !== oldestJoinedAt) return userJoinedAt < oldestJoinedAt ? user : oldest;
+    return user.id < oldest.id ? user : oldest;
+  }).id;
 }

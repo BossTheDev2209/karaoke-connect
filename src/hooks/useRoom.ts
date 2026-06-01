@@ -40,12 +40,18 @@ export const useRoom = (
   const [isConnected, setIsConnected] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const [role, setRoleState] = useState<RoomRole>(() => detectDefaultRole(readDeviceEnv()));
+  const roleRef = useRef(role);
+  const joinedAtRef = useRef(Date.now());
   const isClockRef = useRef(false);
   const getClockPlaybackRef = useRef(getClockPlayback);
 
   useEffect(() => {
     getClockPlaybackRef.current = getClockPlayback;
   }, [getClockPlayback]);
+
+  useEffect(() => {
+    roleRef.current = role;
+  }, [role]);
 
   useEffect(() => {
     if (!roomCode || !user) return;
@@ -89,7 +95,7 @@ export const useRoom = (
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          await channel.track({ ...user, role });
+          await channel.track({ ...user, role: roleRef.current, joinedAt: joinedAtRef.current });
           setIsConnected(true);
           const { data } = await supabase
             .from('room_state')
@@ -115,7 +121,7 @@ export const useRoom = (
       channel.unsubscribe();
       channelRef.current = null;
     };
-  }, [roomCode, user, role]);
+  }, [roomCode, user]);
 
   const updatePlayback = useCallback((state: Partial<PlaybackState>) => {
     const newState = { ...playbackState, ...state, lastUpdate: Date.now() };
@@ -147,7 +153,7 @@ export const useRoom = (
   const setRole = useCallback((next: RoomRole) => {
     setRoleState(next);
     if (channelRef.current && user) {
-      channelRef.current.track({ ...user, role: next });
+      channelRef.current.track({ ...user, role: next, joinedAt: joinedAtRef.current });
     }
   }, [user]);
 

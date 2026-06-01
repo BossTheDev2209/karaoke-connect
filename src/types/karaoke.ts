@@ -11,6 +11,7 @@ export interface User {
   isSpeaking: boolean;
   audioLevel?: number;
   role?: RoomRole;
+  joinedAt?: number;
   team?: 'left' | 'right';
   score?: number;
   discordId?: string;
