@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   INITIAL_RIBBON_VISIBILITY,
+  peekPointerEnterPatch,
   RIBBON_HIDE_DELAY_MS,
   ribbonTransitionDuration,
   shouldShowRibbon,
@@ -15,6 +16,10 @@ describe('ribbon visibility', () => {
     for (const key of ['zoneHovered', 'ribbonHovered', 'focusWithin', 'touchOpen'] as const) {
       expect(shouldShowRibbon({ ...INITIAL_RIBBON_VISIBILITY, [key]: true })).toBe(true);
     }
+  });
+
+  it('keeps the full ribbon closed while the resting peek itself is hovered', () => {
+    expect(shouldShowRibbon({ ...INITIAL_RIBBON_VISIBILITY, ...peekPointerEnterPatch() })).toBe(false);
   });
 
   it('uses instant reduced-motion transition', () => {

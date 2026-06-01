@@ -20,7 +20,7 @@ import { toast } from '@/hooks/use-toast';
 import { Captions, ChevronUp, Ellipsis, ListMusic, LogOut, Maximize2, Mic2, Minimize2, Monitor, PanelRight, Pause, Play, Plus, Settings, SkipBack, SkipForward, Smartphone, Subtitles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { expectedPosition, shouldCorrect } from '@/lib/playbackClock';
-import { INITIAL_RIBBON_VISIBILITY, RIBBON_HIDE_DELAY_MS, ribbonTransitionDuration, shouldShowRibbon } from '@/lib/ribbonVisibility';
+import { INITIAL_RIBBON_VISIBILITY, RIBBON_HIDE_DELAY_MS, peekPointerEnterPatch, ribbonTransitionDuration, shouldShowRibbon } from '@/lib/ribbonVisibility';
 import { removeSongFromQueue } from '@/lib/queuePlayback';
 import { StageBackground } from '@/components/StageBackground';
 import { connectionStatus } from '@/lib/connectionStatus';
@@ -683,8 +683,7 @@ const Room = () => {
           expands the full ribbon below. Fades out once the ribbon is showing. */}
       <div
         className="fixed inset-x-0 bottom-0 z-30 hidden h-24 md:block lg:right-[24rem]"
-        onPointerEnter={() => setRibbonFlag('zoneHovered', true)}
-        onPointerLeave={() => setRibbonFlag('zoneHovered', false)}
+        onPointerEnter={() => setRibbonIntent((current) => ({ ...current, ...peekPointerEnterPatch() }))}
       >
         <div
           className={cn(
@@ -731,7 +730,15 @@ const Room = () => {
           >
             <SkipForward className="h-4 w-4" />
           </Button>
-          <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0 rounded-full text-muted-foreground"
+            onClick={() => setRibbonFlag('touchOpen', true)}
+            aria-label="Show full playback controls"
+          >
+            <ChevronUp className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
