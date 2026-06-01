@@ -18,7 +18,7 @@ import { RoomSettings } from '@/components/RoomSettings';
 import { FloatingReactions, ReactionBar, ReactionPicker } from '@/components/Reactions';
 import { useReactions } from '@/hooks/useReactions';
 import { toast } from '@/hooks/use-toast';
-import { Captions, ChevronUp, Ellipsis, ListMusic, Loader2, LogOut, Maximize2, Mic2, Minimize2, Monitor, PanelRight, Pause, Play, Plus, Settings, SkipBack, SkipForward, Smartphone, Subtitles } from 'lucide-react';
+import { Captions, ChevronUp, Ellipsis, ListMusic, Loader2, LogOut, Maximize2, Mic2, Minimize2, Monitor, PanelRight, Pause, Play, Plus, QrCode, Settings, SkipBack, SkipForward, Smartphone, Subtitles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { expectedPosition, shouldCorrect } from '@/lib/playbackClock';
 import { INITIAL_RIBBON_VISIBILITY, RIBBON_HIDE_DELAY_MS, peekPointerEnterPatch, ribbonTransitionDuration, shouldShowRibbon } from '@/lib/ribbonVisibility';
@@ -42,6 +42,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
 type StageMode = 'video' | 'sing';
@@ -618,7 +619,22 @@ const Room = () => {
       <FloatingReactions reactions={reactions} />
 
       <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-white/10 bg-background/95 px-3 sm:px-5">
-        <RoomCodeDisplay code={code} />
+        <div className="flex items-center gap-1.5">
+          <RoomCodeDisplay code={code} />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full" aria-label="Show QR code to join as remote">
+                <QrCode className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-auto rounded-xl border-white/10 bg-[hsl(var(--surface))] p-3">
+              <div className="rounded-lg bg-white p-2">
+                <QRCodeSVG value={remoteUrl} size={144} title="Scan to join as remote" />
+              </div>
+              <p className="mt-2 max-w-[160px] text-center text-xs text-muted-foreground">Scan with your phone to join as a remote</p>
+            </PopoverContent>
+          </Popover>
+        </div>
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span
@@ -718,24 +734,15 @@ const Room = () => {
             )}
 
             {!currentSong && (
-              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 bg-black px-6 text-center">
-                <div className="flex items-center gap-5">
-                  <div>
-                    <p className="text-sm uppercase tracking-wide text-muted-foreground">Room code</p>
-                    <p className="mt-1 font-mono text-5xl font-bold tracking-[0.3em] text-foreground">{code}</p>
-                    <p className="mt-3 max-w-sm text-sm text-muted-foreground">
-                      Friends scan QR or enter code, then add songs from their phone.
-                    </p>
-                  </div>
-                  <div className="hidden rounded-xl bg-white p-2 sm:block">
-                    <QRCodeSVG value={remoteUrl} size={116} title="Scan to join as remote" />
-                  </div>
-                </div>
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black px-6 text-center">
                 <div>
-                  <p className="text-xs text-muted-foreground">
-                    {isWideDesktop ? 'Or search for a song in the panel to start.' : 'Or tap the panel button to add a song.'}
+                  <p className="text-sm uppercase tracking-wide text-muted-foreground">Room code</p>
+                  <p className="mt-1 font-mono text-5xl font-bold tracking-[0.3em] text-foreground">{code}</p>
+                  <p className="mt-3 max-w-sm text-sm text-muted-foreground">
+                    {isWideDesktop
+                      ? 'Search for a song in the panel to start, or share the code so friends can join.'
+                      : 'Tap the panel button to add a song, or share the code so friends can join.'}
                   </p>
-                  <p className="mt-1 hidden text-xs text-muted-foreground sm:block">Scan QR to join as remote.</p>
                 </div>
                 <Button variant="ghost" size="sm" className="rounded-full text-muted-foreground" onClick={() => setRole('remote')}>
                   <Smartphone className="h-4 w-4" />
