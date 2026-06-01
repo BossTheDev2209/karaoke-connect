@@ -687,7 +687,7 @@ const Room = () => {
       >
         <div
           className={cn(
-            'absolute inset-x-2 bottom-3 mx-auto flex max-w-7xl items-center gap-3 rounded-2xl border border-white/10 bg-[hsl(var(--surface)/0.9)] px-3 py-2 shadow-xl transition-opacity ease-out sm:inset-x-4 lg:left-4 lg:right-[25rem] lg:mx-0 lg:max-w-none',
+            'absolute inset-x-2 bottom-3 mx-auto flex max-w-7xl items-center gap-3 rounded-2xl border border-white/10 bg-[hsl(var(--surface)/0.9)] px-3 py-2 shadow-xl transition-opacity ease-out sm:inset-x-4 lg:left-4 lg:right-4 lg:mx-0 lg:max-w-none',
             ribbonVisible ? 'pointer-events-none opacity-0' : 'opacity-100'
           )}
           style={{ transitionDuration: ribbonTransitionDuration(prefersReducedMotion) }}
