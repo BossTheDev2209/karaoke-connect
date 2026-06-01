@@ -18,8 +18,9 @@ import { RoomSettings } from '@/components/RoomSettings';
 import { FloatingReactions, ReactionBar, ReactionPicker } from '@/components/Reactions';
 import { useReactions } from '@/hooks/useReactions';
 import { toast } from '@/hooks/use-toast';
-import { Captions, ChevronUp, Ellipsis, ListMusic, Loader2, LogOut, Maximize2, Mic2, Minimize2, Monitor, PanelRight, Pause, Play, Plus, QrCode, Settings, SkipBack, SkipForward, Smartphone, Subtitles } from 'lucide-react';
+import { Captions, ChevronUp, Ellipsis, ListMusic, Loader2, LogOut, Maximize2, Mic2, Minimize2, Monitor, PanelRight, Pause, Play, Plus, QrCode, RefreshCw, Settings, SkipBack, SkipForward, Smartphone, Subtitles, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
 import { expectedPosition, shouldCorrect } from '@/lib/playbackClock';
 import { INITIAL_RIBBON_VISIBILITY, RIBBON_HIDE_DELAY_MS, peekPointerEnterPatch, ribbonTransitionDuration, shouldShowRibbon } from '@/lib/ribbonVisibility';
 import { removeSongFromQueue } from '@/lib/queuePlayback';
@@ -46,6 +47,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 
 type StageMode = 'video' | 'sing';
+
+const formatTime = (seconds: number) => {
+  const total = Math.max(0, Math.floor(seconds || 0));
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
 
 const Room = () => {
   const { code } = useParams<{ code: string }>();
@@ -870,71 +878,90 @@ const Room = () => {
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setRibbonFlag('focusWithin', false);
         }}
         className={cn(
-          'fixed inset-x-2 bottom-3 z-40 mx-auto flex max-w-7xl flex-col gap-3 rounded-2xl border border-white/10 bg-[hsl(var(--surface)/0.97)] p-3 shadow-2xl transition-[opacity,transform] ease-out sm:inset-x-4 lg:left-4 lg:right-[25rem] lg:mx-0 lg:max-w-none lg:flex-row lg:items-center lg:gap-5 lg:px-4 lg:py-2',
+          'fixed inset-x-2 bottom-3 z-40 mx-auto flex max-w-7xl flex-col gap-1 rounded-2xl border border-white/10 bg-[hsl(var(--surface)/0.97)] px-4 py-2 shadow-2xl transition-[opacity,transform] ease-out sm:inset-x-4 lg:left-4 lg:right-[25rem] lg:mx-0 lg:max-w-none',
           ribbonVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0'
         )}
         style={{ transitionDuration: ribbonTransitionDuration(prefersReducedMotion) }}
       >
-        <div className="min-w-0 lg:w-52">
+        {/* Row 1: now playing, centered */}
+        <div className="flex min-w-0 items-center justify-center gap-2">
           {currentSong ? (
-            <div className="flex items-center gap-3">
-              <img src={currentSong.thumbnail} alt="" className="h-10 w-16 rounded-md object-cover" />
-              <div className="min-w-0">
-                <p className="truncate font-medium text-foreground">{currentSong.title}</p>
-                <p className="truncate text-xs text-muted-foreground">{currentSong.artist}</p>
-              </div>
+            <>
+              <img src={currentSong.thumbnail} alt="" className="h-6 w-9 shrink-0 rounded object-cover" />
+              <p className="truncate text-sm font-medium text-foreground">{currentSong.title}</p>
+              <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">&middot; {currentSong.artist}</span>
+            </>
+          ) : (
+            <p className="text-sm font-medium text-muted-foreground">Queue waiting.</p>
+          )}
+        </div>
+
+        {/* Row 2: sync (left) · transport (center) · volume + tools (right) */}
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2 lg:grid-cols-[1fr_auto_1fr]">
+          <div className="flex items-center justify-start">
+            <Button variant="ghost" size="icon" onClick={handleResync} className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" aria-label="Sync with room" title="Sync with room">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-center gap-2">
+            <Button variant="ghost" size="icon" onClick={handlePrevious} disabled={playbackState.currentSongIndex <= 0} className="h-9 w-9 rounded-full" aria-label="Previous song">
+              <SkipBack className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={handlePlayPause}
+              disabled={!currentSong}
+              className="flex h-11 w-11 items-center justify-center rounded-full p-0 shadow-lg shadow-primary/30 transition-transform duration-150 ease-out hover:scale-105 active:scale-90 motion-reduce:transition-none motion-reduce:hover:scale-100"
+              aria-label={effectiveIsPlaying ? 'Pause' : 'Play'}
+            >
+              {effectiveIsPlaying ? <Pause className="h-5 w-5" /> : <Play className="ml-0.5 h-5 w-5" />}
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleNext} disabled={playbackState.currentSongIndex >= queue.length - 1} className="h-9 w-9 rounded-full" aria-label="Next song">
+              <SkipForward className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-end gap-1">
+            <div className="mr-1 hidden items-center gap-1.5 md:flex">
+              <Button variant="ghost" size="icon" onClick={isMuted ? unmute : mute} className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" aria-label={isMuted ? 'Unmute' : 'Mute'}>
+                {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              </Button>
+              <Slider value={[isMuted ? 0 : volume]} max={100} step={1} onValueChange={([v]) => handleVolumeChange(v)} seek className="w-16" aria-label="Volume" />
             </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Queue waiting.</p>
-            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn('rounded-full hover:bg-transparent', stageMode === 'sing' ? 'text-primary hover:text-primary' : 'text-foreground hover:text-foreground')}
+              onClick={() => setStageMode(stageMode === 'video' ? 'sing' : 'video')}
+              aria-label={stageMode === 'video' ? 'Big lyrics (full-screen sing mode)' : 'Back to video'}
+              aria-pressed={stageMode === 'sing'}
+              title={stageMode === 'video' ? 'Big lyrics (full-screen sing mode)' : 'Back to video'}
+            >
+              <Mic2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn('rounded-full hover:bg-transparent', showStageLyrics ? 'text-primary hover:text-primary' : 'text-muted-foreground hover:text-muted-foreground')}
+              onClick={() => setShowStageLyrics((v) => !v)}
+              aria-label={showStageLyrics ? 'Hide subtitles on video' : 'Show subtitles on video'}
+              aria-pressed={showStageLyrics}
+              title={showStageLyrics ? 'Subtitles on video (on)' : 'Subtitles on video (off)'}
+            >
+              <Subtitles className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="rounded-full text-foreground hover:bg-transparent hover:text-foreground lg:hidden" onClick={() => setUtilitySheetOpen(true)} aria-label="Open search, queue and lyrics">
+              <PanelRight className="h-4 w-4" />
+            </Button>
+            <ReactionPicker onReact={sendReaction} />
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
-          <PlayerControls
-            isPlaying={effectiveIsPlaying}
-            isMuted={isMuted}
-            volume={volume}
-            currentTime={effectiveTime}
-            duration={duration}
-            canGoPrevious={playbackState.currentSongIndex > 0}
-            canGoNext={playbackState.currentSongIndex < queue.length - 1}
-            onPlayPause={handlePlayPause}
-            onNext={handleNext}
-            onPrevious={handlePrevious}
-            onSeek={handleSeek}
-            onVolumeChange={handleVolumeChange}
-            onMuteToggle={isMuted ? unmute : mute}
-            onSync={handleResync}
-            disabled={!currentSong}
-            compact
-          />
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn('rounded-full hover:bg-transparent', stageMode === 'sing' ? 'text-primary hover:text-primary' : 'text-foreground hover:text-foreground')}
-            onClick={() => setStageMode(stageMode === 'video' ? 'sing' : 'video')}
-            aria-label={stageMode === 'video' ? 'Big lyrics (full-screen sing mode)' : 'Back to video'}
-            aria-pressed={stageMode === 'sing'}
-            title={stageMode === 'video' ? 'Big lyrics (full-screen sing mode)' : 'Back to video'}
-          >
-            <Mic2 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn('rounded-full hover:bg-transparent', showStageLyrics ? 'text-primary hover:text-primary' : 'text-muted-foreground hover:text-muted-foreground')}
-            onClick={() => setShowStageLyrics((v) => !v)}
-            aria-label={showStageLyrics ? 'Hide subtitles on video' : 'Show subtitles on video'}
-            aria-pressed={showStageLyrics}
-            title={showStageLyrics ? 'Subtitles on video (on)' : 'Subtitles on video (off)'}
-          >
-            <Subtitles className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="rounded-full text-foreground hover:bg-transparent hover:text-foreground lg:hidden" onClick={() => setUtilitySheetOpen(true)} aria-label="Open search, queue and lyrics">
-            <PanelRight className="h-4 w-4" />
-          </Button>
-          <ReactionPicker onReact={sendReaction} />
+
+        {/* Row 3: seek rail, full width with inline times */}
+        <div className="flex items-center gap-2.5">
+          <span className="w-9 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted-foreground">{formatTime(currentSong ? effectiveTime : 0)}</span>
+          <Slider value={[currentSong ? effectiveTime : 0]} max={duration || 100} step={1} onValueChange={([v]) => handleSeek(v)} disabled={!currentSong} seek className="flex-1 cursor-pointer" />
+          <span className="w-9 shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">{formatTime(duration)}</span>
         </div>
       </section>
 
