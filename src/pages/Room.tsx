@@ -17,7 +17,7 @@ import { RoomSettings } from '@/components/RoomSettings';
 import { FloatingReactions, ReactionBar, ReactionPicker } from '@/components/Reactions';
 import { useReactions } from '@/hooks/useReactions';
 import { toast } from '@/hooks/use-toast';
-import { Captions, CaptionsOff, Ellipsis, ListMusic, LogOut, Maximize2, Mic2, Minimize2, Monitor, PanelRight, Plus, Settings, Smartphone } from 'lucide-react';
+import { Captions, ChevronUp, Ellipsis, ListMusic, LogOut, Maximize2, Mic2, Minimize2, Monitor, PanelRight, Pause, Play, Plus, Settings, Smartphone, Subtitles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { expectedPosition, shouldCorrect } from '@/lib/playbackClock';
 import { INITIAL_RIBBON_VISIBILITY, RIBBON_HIDE_DELAY_MS, ribbonTransitionDuration, shouldShowRibbon } from '@/lib/ribbonVisibility';
@@ -625,8 +625,17 @@ const Room = () => {
             )}
 
             {!currentSong && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center bg-black">
-                <p className="text-sm text-muted-foreground">Open Up Next to add songs.</p>
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black px-6 text-center">
+                <div>
+                  <p className="text-base font-medium text-foreground">No song playing yet</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {isWideDesktop ? 'Search for a song in the panel to start.' : 'Tap the panel button to add a song.'}
+                  </p>
+                </div>
+                <Button variant="outline" className="rounded-full" onClick={() => setRole('remote')}>
+                  <Smartphone className="h-4 w-4" />
+                  Use this phone as a remote
+                </Button>
               </div>
             )}
           </div>
@@ -645,12 +654,42 @@ const Room = () => {
         </SheetContent>
       </Sheet>
 
+      {/* Persistent control peek: always-visible at rest so the controls are
+          discoverable on a mouse-idle / TV screen; hovering or focusing it
+          expands the full ribbon below. Fades out once the ribbon is showing. */}
       <div
         className="fixed inset-x-0 bottom-0 z-30 hidden h-24 md:block lg:right-[24rem]"
         onPointerEnter={() => setRibbonFlag('zoneHovered', true)}
         onPointerLeave={() => setRibbonFlag('zoneHovered', false)}
-        aria-hidden="true"
-      />
+      >
+        <div
+          className={cn(
+            'absolute inset-x-2 bottom-3 mx-auto flex max-w-7xl items-center gap-3 rounded-2xl border border-white/10 bg-[hsl(var(--surface)/0.9)] px-3 py-2 shadow-xl transition-opacity ease-out sm:inset-x-4 lg:left-4 lg:right-[25rem] lg:mx-0 lg:max-w-none',
+            ribbonVisible ? 'pointer-events-none opacity-0' : 'opacity-100'
+          )}
+          style={{ transitionDuration: ribbonTransitionDuration(prefersReducedMotion) }}
+        >
+          {currentSong ? (
+            <>
+              <img src={currentSong.thumbnail} alt="" className="h-8 w-12 shrink-0 rounded object-cover" />
+              <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{currentSong.title}</p>
+            </>
+          ) : (
+            <p className="min-w-0 flex-1 text-sm text-muted-foreground">Queue waiting.</p>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0 rounded-full"
+            onClick={handlePlayPause}
+            disabled={!currentSong}
+            aria-label={effectiveIsPlaying ? 'Pause' : 'Play'}
+          >
+            {effectiveIsPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </Button>
+          <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        </div>
+      </div>
 
       <button
         ref={touchHandleRef}
@@ -711,7 +750,9 @@ const Room = () => {
             size="icon"
             className={cn('rounded-full hover:bg-transparent', stageMode === 'sing' ? 'text-primary hover:text-primary' : 'text-foreground hover:text-foreground')}
             onClick={() => setStageMode(stageMode === 'video' ? 'sing' : 'video')}
-            aria-label={stageMode === 'video' ? 'Open Sing mode' : 'Return to video mode'}
+            aria-label={stageMode === 'video' ? 'Big lyrics (full-screen sing mode)' : 'Back to video'}
+            aria-pressed={stageMode === 'sing'}
+            title={stageMode === 'video' ? 'Big lyrics (full-screen sing mode)' : 'Back to video'}
           >
             <Mic2 className="h-4 w-4" />
           </Button>
@@ -720,11 +761,11 @@ const Room = () => {
             size="icon"
             className={cn('rounded-full hover:bg-transparent', showStageLyrics ? 'text-primary hover:text-primary' : 'text-muted-foreground hover:text-muted-foreground')}
             onClick={() => setShowStageLyrics((v) => !v)}
-            aria-label={showStageLyrics ? 'Hide on-screen lyrics' : 'Show on-screen lyrics'}
+            aria-label={showStageLyrics ? 'Hide subtitles on video' : 'Show subtitles on video'}
             aria-pressed={showStageLyrics}
-            title={showStageLyrics ? 'Hide on-screen lyrics' : 'Show on-screen lyrics'}
+            title={showStageLyrics ? 'Subtitles on video (on)' : 'Subtitles on video (off)'}
           >
-            {showStageLyrics ? <Captions className="h-4 w-4" /> : <CaptionsOff className="h-4 w-4" />}
+            <Subtitles className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="icon" className="rounded-full text-foreground hover:bg-transparent hover:text-foreground lg:hidden" onClick={() => setUtilitySheetOpen(true)} aria-label="Open search, queue and lyrics">
             <PanelRight className="h-4 w-4" />
