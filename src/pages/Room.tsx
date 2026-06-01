@@ -31,6 +31,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { ToastAction } from '@/components/ui/toast';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -86,9 +87,27 @@ const Room = () => {
   const removeSong = useCallback((songId: string) => {
     const next = removeSongFromQueue(queue, playbackState.currentSongIndex, songId);
     if (!next) return;
+    const removed = queue.find((song) => song.id === songId);
+    const prevQueue = queue;
+    const prevPlayback = playbackState;
     updateQueue(next.queue);
     updatePlayback(next.playback);
-  }, [queue, playbackState.currentSongIndex, updatePlayback, updateQueue]);
+    toast({
+      title: 'Removed from queue',
+      description: removed?.title ?? 'Song removed',
+      action: (
+        <ToastAction
+          altText="Undo remove"
+          onClick={() => {
+            updateQueue(prevQueue);
+            updatePlayback(prevPlayback);
+          }}
+        >
+          Undo
+        </ToastAction>
+      ),
+    });
+  }, [queue, playbackState, updatePlayback, updateQueue]);
 
   useEffect(() => {
     setVideoId(currentSong?.videoId || null);
