@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
 import { User, Song, PlaybackState } from '@/types/karaoke';
 import { useRoom } from '@/hooks/useRoom';
 import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
@@ -24,6 +25,7 @@ import { INITIAL_RIBBON_VISIBILITY, RIBBON_HIDE_DELAY_MS, peekPointerEnterPatch,
 import { removeSongFromQueue } from '@/lib/queuePlayback';
 import { StageBackground } from '@/components/StageBackground';
 import { connectionStatus } from '@/lib/connectionStatus';
+import { remoteJoinUrl, roleFromSearch } from '@/lib/remoteJoin';
 import {
   Sheet,
   SheetContent,
@@ -46,6 +48,7 @@ type StageMode = 'video' | 'sing';
 const Room = () => {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [volume, setVolume] = useState(80);
   const [isVideoFullscreen, setIsVideoFullscreen] = useState(false);
@@ -57,6 +60,8 @@ const Room = () => {
     lastUpdate: Date.now(),
   }));
   const getClockPlayback = useCallback(() => livePlaybackRef.current(), []);
+  const initialRole = useMemo(() => roleFromSearch(location.search), [location.search]);
+  const remoteUrl = useMemo(() => remoteJoinUrl(window.location.origin, code || ''), [code]);
   const { setVideoId } = useTheme();
 
   useEffect(() => {
@@ -80,7 +85,7 @@ const Room = () => {
     role,
     setRole,
     isClock,
-  } = useRoom(code || '', user, getClockPlayback);
+  } = useRoom(code || '', user, getClockPlayback, initialRole);
 
   const currentSong = queue[playbackState.currentSongIndex];
   const status = connectionStatus(isConnected);
@@ -668,14 +673,26 @@ const Room = () => {
             )}
 
             {!currentSong && (
-              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black px-6 text-center">
-                <div>
-                  <p className="text-base font-medium text-foreground">No song playing yet</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {isWideDesktop ? 'Search for a song in the panel to start.' : 'Tap the panel button to add a song.'}
-                  </p>
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 bg-black px-6 text-center">
+                <div className="flex items-center gap-5">
+                  <div>
+                    <p className="text-sm uppercase tracking-wide text-muted-foreground">Room code</p>
+                    <p className="mt-1 font-mono text-5xl font-bold tracking-[0.3em] text-foreground">{code}</p>
+                    <p className="mt-3 max-w-sm text-sm text-muted-foreground">
+                      Friends scan QR or enter code, then add songs from their phone.
+                    </p>
+                  </div>
+                  <div className="hidden rounded-xl bg-white p-2 sm:block">
+                    <QRCodeSVG value={remoteUrl} size={116} title="Scan to join as remote" />
+                  </div>
                 </div>
-                <Button variant="outline" className="rounded-full" onClick={() => setRole('remote')}>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {isWideDesktop ? 'Or search for a song in the panel to start.' : 'Or tap the panel button to add a song.'}
+                  </p>
+                  <p className="mt-1 hidden text-xs text-muted-foreground sm:block">Scan QR to join as remote.</p>
+                </div>
+                <Button variant="ghost" size="sm" className="rounded-full text-muted-foreground" onClick={() => setRole('remote')}>
                   <Smartphone className="h-4 w-4" />
                   Use this phone as a remote
                 </Button>

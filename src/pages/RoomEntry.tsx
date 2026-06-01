@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { ArrowLeft, ArrowRight, Mic2 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StageBackground } from '@/components/StageBackground';
 import { toast } from '@/hooks/use-toast';
 import { generateRoomCode, isValidRoomCode } from '@/lib/roomCode';
+import { roomCodeFromSearch, roleFromSearch } from '@/lib/remoteJoin';
 
 export type EntryMode = 'create' | 'join';
 
@@ -15,8 +16,9 @@ interface RoomEntryProps {
 
 const RoomEntry = ({ mode }: RoomEntryProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [nickname, setNickname] = useState('');
-  const [roomCode, setRoomCode] = useState('');
+  const [roomCode, setRoomCode] = useState(() => roomCodeFromSearch(location.search));
 
   const enterRoom = () => {
     if (!nickname.trim()) {
@@ -34,7 +36,8 @@ const RoomEntry = ({ mode }: RoomEntryProps) => {
       avatarId: '',
       isSpeaking: false,
     }));
-    navigate(`/room/${mode === 'create' ? generateRoomCode() : roomCode.toUpperCase()}`);
+    const remoteSearch = mode === 'join' && roleFromSearch(location.search) === 'remote' ? '?role=remote' : '';
+    navigate(`/room/${mode === 'create' ? generateRoomCode() : roomCode.toUpperCase()}${remoteSearch}`);
   };
 
   return (
