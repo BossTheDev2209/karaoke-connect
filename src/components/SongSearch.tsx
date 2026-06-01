@@ -40,13 +40,11 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, resul
     setChannelVideos([]);
     
     try {
-      const searchQuery = activeTab === 'songs' && karaokeFilterEnabled 
-        ? `${query} karaoke instrumental` 
-        : query;
-
       if (activeTab === 'songs') {
+        // The edge function biases the query and re-ranks known karaoke
+        // providers to the top when the karaoke flag is set.
         const { data, error } = await supabase.functions.invoke('youtube-search', {
-          body: { query: searchQuery, type: 'video' },
+          body: { query, type: 'video', karaoke: karaokeFilterEnabled },
         });
         if (error) throw error;
         setResults(data.results || []);
@@ -182,7 +180,7 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, resul
         </button>
         <button
           onClick={() => setKaraokeFilterEnabled(!karaokeFilterEnabled)}
-          title="Only show Instrumental/Karaoke versions"
+          title="Surface karaoke / instrumental versions first"
           className={cn(
             'ml-auto flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
             karaokeFilterEnabled

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { applyPlayableVideoFilters, filterEmbeddableVideoDetails } from "./videoSearchParams.ts";
+import { rankForKaraoke } from "./karaokeRank.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,7 +36,7 @@ serve(async (req) => {
   }
 
   try {
-    const { query, type = 'video', channelId } = await req.json();
+    const { query, type = 'video', channelId, karaoke = false } = await req.json();
     
     if (!query && !channelId) {
       return new Response(
@@ -66,8 +67,8 @@ serve(async (req) => {
     }
 
     // Default: search for videos
-    console.log('Searching YouTube videos for:', query);
-    return await searchVideos(apiKey, query);
+    console.log('Searching YouTube videos for:', query, karaoke ? '(karaoke mode)' : '');
+    return await searchVideos(apiKey, query, karaoke);
 
   } catch (err) {
     const error = err as Error;
@@ -79,11 +80,12 @@ serve(async (req) => {
   }
 });
 
-async function searchVideos(apiKey: string, query: string) {
-  // Search for videos - no longer appending "karaoke OR lyrics"
+async function searchVideos(apiKey: string, query: string, karaoke = false) {
+  // In karaoke mode bias the query so YouTube surfaces karaoke/instrumental cuts.
+  const q = karaoke ? `${query} karaoke` : query;
   const searchUrl = new URL('https://www.googleapis.com/youtube/v3/search');
   searchUrl.searchParams.set('part', 'snippet');
-  searchUrl.searchParams.set('q', query);
+  searchUrl.searchParams.set('q', q);
   searchUrl.searchParams.set('type', 'video');
   searchUrl.searchParams.set('maxResults', '15');
   searchUrl.searchParams.set('videoCategoryId', '10'); // Music category
@@ -124,7 +126,7 @@ async function searchVideos(apiKey: string, query: string) {
   const detailsItems = (detailsData.items || []) as YtSearchItem[];
   const embeddableItems = filterEmbeddableVideoDetails(detailsItems);
   const results = embeddableItems.map((item: YtSearchItem) => ({
-    videoId: item.id,
+    videoId: typeof item.id === 'string' ? item.id : item.id.videoId ?? '',
     title: item.snippet.title,
     channelTitle: item.snippet.channelTitle,
     channelId: item.snippet.channelId,
@@ -132,11 +134,14 @@ async function searchVideos(apiKey: string, query: string) {
     duration: formatDuration(item.contentDetails!.duration),
   })) || [];
 
+  // Karaoke mode: float known karaoke providers + karaoke/instrumental titles up.
+  const ranked = karaoke ? rankForKaraoke(results) : results;
+
   console.log(`Dropped ${detailsItems.length - embeddableItems.length} non-embeddable video results`);
-  console.log(`Found ${results.length} video results`);
+  console.log(`Found ${ranked.length} video results`);
 
   return new Response(
-    JSON.stringify({ results }),
+    JSON.stringify({ results: ranked }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
 }
