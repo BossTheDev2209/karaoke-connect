@@ -49,6 +49,17 @@ describe('pickBest', () => {
     const ok = [{ id: 1, artistName: 'Coldplay', trackName: 'Yellow', syncedLyrics: '[00:01.0]x' }];
     expect(pickBest(ok, query)?.trackName).toBe('Yellow');
   });
+
+  it('picks a real match from a noisy full-text candidate pool', () => {
+    const query = { artist: 'BLACKPINK', title: 'Pink Venom BLACKPINK' };
+    const candidates = [
+      { artistName: 'Dept', trackName: 'I feel like that', syncedLyrics: '[00:01.0]x' },
+      { artistName: 'BLACKPINK', trackName: 'Pink Venom', syncedLyrics: '[00:01.0]x' },
+      { artistName: 'Coldplay', trackName: 'Yellow', syncedLyrics: '[00:01.0]x' },
+    ];
+
+    expect(pickBest(candidates, query)?.trackName).toBe('Pink Venom');
+  });
 });
 
 describe('similarity', () => {

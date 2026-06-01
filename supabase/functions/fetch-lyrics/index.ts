@@ -43,6 +43,29 @@ async function searchLRCLIB(trackName: string, artistName?: string): Promise<Lrc
   }
 }
 
+async function searchLRCLIBFulltext(query: string): Promise<LrclibResult[]> {
+  const searchUrl = new URL(`${LRCLIB_API}/search`);
+  searchUrl.searchParams.set('q', query);
+
+  console.log(`Searching LRCLIB full-text: q="${query}"`);
+
+  try {
+    const response = await fetch(searchUrl.toString(), {
+      headers: { 'User-Agent': 'KaraokeApp/1.0' },
+    });
+
+    if (!response.ok) {
+      console.error('LRCLIB full-text search failed:', response.status);
+      return [];
+    }
+
+    return await response.json();
+  } catch (err) {
+    console.error('LRCLIB full-text fetch error:', err);
+    return [];
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -70,16 +93,26 @@ serve(async (req) => {
     // synced hit can't short-circuit a better unsynced match.
     const seen = new Set<string | number>();
     const all: Candidate[] = [];
+    const addCandidates = (results: LrclibResult[]) => {
+      for (const r of results) {
+        if (r.id != null && seen.has(r.id)) continue;
+        if (r.id != null) seen.add(r.id);
+        all.push(r as Candidate);
+      }
+    };
+
     for (const g of guesses) {
       if (!g.title || g.title.length < 2) continue;
       for (const withArtist of [true, false]) {
-        const results = await searchLRCLIB(g.title, withArtist ? g.artist : undefined);
-        for (const r of results) {
-          if (r.id != null && seen.has(r.id)) continue;
-          if (r.id != null) seen.add(r.id);
-          all.push(r as Candidate);
-        }
+        addCandidates(await searchLRCLIB(g.title, withArtist ? g.artist : undefined));
       }
+    }
+
+    for (const query of [
+      `${cleanText(artist)} ${cleanText(title)}`,
+      cleanText(title),
+    ]) {
+      addCandidates(await searchLRCLIBFulltext(query));
     }
 
     // Score every candidate against the cleaned (artist, title); require a real
