@@ -5,7 +5,31 @@ import {
   pickBest,
   similarity,
   cleanText,
+  coreTitle,
 } from '../../supabase/functions/fetch-lyrics/lyricMatch';
+
+describe('coreTitle', () => {
+  it('keeps the part before a Thai/English dual-title separator', () => {
+    expect(coreTitle('ช่วงที่ดีที่สุด / The Sweetest Moment')).toBe('ช่วงที่ดีที่สุด');
+  });
+  it('drops parenthetical tags and a trailing feat clause', () => {
+    expect(coreTitle('ห่างไกลเหลือเกิน (So Far Away) feat. Pod Moderndog')).toBe('ห่างไกลเหลือเกิน');
+  });
+});
+
+describe('parseArtistTitle core variants', () => {
+  it('offers a clean core title for a "/ English" YouTube title with no dash', () => {
+    const guesses = parseArtistTitle('ช่วงที่ดีที่สุด / The Sweetest Moment', 'BOYdPOD - Topic');
+    expect(guesses.some((g) => g.artist === 'BOYdPOD' && g.title === 'ช่วงที่ดีที่สุด')).toBe(true);
+  });
+  it('strips a trailing (English) feat. clause so the bare song name is queried', () => {
+    const guesses = parseArtistTitle(
+      'Boyd Kosiyabong - ห่างไกลเหลือเกิน (So Far Away) feat. Pod Moderndog [Official MV]',
+      'Bakery Music [ Official ]',
+    );
+    expect(guesses.some((g) => g.title === 'ห่างไกลเหลือเกิน')).toBe(true);
+  });
+});
 
 describe('cleanText', () => {
   it('strips YouTube noise markers', () => {
