@@ -20,6 +20,12 @@ export function shouldShowRibbon(state: RibbonVisibilityState): boolean {
   return state.zoneHovered || state.ribbonHovered || state.focusWithin || state.touchOpen;
 }
 
+// Hovering the resting peek must not expand the ribbon before its controls can
+// be clicked. Expansion is explicit through the chevron affordance.
+export function peekPointerEnterPatch(): Partial<RibbonVisibilityState> {
+  return {};
+}
+
 export function ribbonTransitionDuration(prefersReducedMotion: boolean): string {
   return prefersReducedMotion ? '0ms' : '160ms';
 }

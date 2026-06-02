@@ -36,13 +36,14 @@ export const useRoom = (
   roomCode: string,
   user: User | null,
   getClockPlayback?: () => PlaybackState,
+  initialRole?: RoomRole,
 ): UseRoomReturn => {
   const [users, setUsers] = useState<User[]>([]);
   const [queue, setQueue] = useState<Song[]>([]);
   const [playbackState, setPlaybackState] = useState<PlaybackState>(DEFAULT_PLAYBACK);
   const [isConnected, setIsConnected] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const [role, setRoleState] = useState<RoomRole>(() => detectDefaultRole(readDeviceEnv()));
+  const [role, setRoleState] = useState<RoomRole>(() => initialRole ?? detectDefaultRole(readDeviceEnv()));
   const roleRef = useRef(role);
   const isClockRef = useRef(false);
   const hasAuthoritativeStateRef = useRef(false);

@@ -29,6 +29,10 @@ interface PlayerControlsProps {
   onSync: () => void;
   className?: string;
   showVolume?: boolean;
+  /** No song to control (empty queue): dim + disable transport, freeze the scrubber. */
+  disabled?: boolean;
+  /** Tighter layout for the horizontal desktop ribbon (remote stays roomy). */
+  compact?: boolean;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -48,6 +52,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   onSync,
   className,
   showVolume = true,
+  disabled = false,
+  compact = false,
 }) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -55,21 +61,41 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const shownTime = disabled ? 0 : currentTime;
+
   return (
-    <div className={cn('space-y-3', className)}>
-      <div className="space-y-1.5">
-        <Slider
-          value={[currentTime]}
-          max={duration || 100}
-          step={1}
-          onValueChange={([value]) => onSeek(value)}
-          className="cursor-pointer"
-        />
-        <div className="flex justify-between font-mono text-[11px] text-muted-foreground">
-          <span>{formatTime(currentTime)}</span>
-          <span>{formatTime(duration)}</span>
+    <div className={cn(compact ? 'space-y-1.5' : 'space-y-3', className)}>
+      {compact ? (
+        <div className="flex items-center gap-2.5">
+          <span className="w-9 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted-foreground">{formatTime(shownTime)}</span>
+          <Slider
+            value={[shownTime]}
+            max={duration || 100}
+            step={1}
+            onValueChange={([value]) => onSeek(value)}
+            disabled={disabled}
+            seek
+            className="flex-1 cursor-pointer"
+          />
+          <span className="w-9 shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">{formatTime(duration)}</span>
         </div>
-      </div>
+      ) : (
+        <div className="space-y-1.5">
+          <Slider
+            value={[shownTime]}
+            max={duration || 100}
+            step={1}
+            onValueChange={([value]) => onSeek(value)}
+            disabled={disabled}
+            seek
+            className="cursor-pointer"
+          />
+          <div className="flex justify-between font-mono text-[11px] text-muted-foreground">
+            <span>{formatTime(shownTime)}</span>
+            <span>{formatTime(duration)}</span>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         {/* left: secondary action */}
@@ -87,27 +113,31 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         </div>
 
         {/* center: primary transport, always optically centered */}
-        <div className="flex items-center justify-center gap-2 sm:gap-3">
+        <div className={cn('flex items-center justify-center', compact ? 'gap-1.5' : 'gap-2 sm:gap-3')}>
           <Button
             variant="ghost"
             size="icon"
             onClick={onPrevious}
             disabled={!canGoPrevious}
-            className="h-11 w-11 rounded-full"
+            className={cn('rounded-full', compact ? 'h-9 w-9' : 'h-11 w-11')}
             aria-label="Previous song"
           >
-            <SkipBack className="h-5 w-5" />
+            <SkipBack className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
           </Button>
 
           <Button
             onClick={onPlayPause}
-            className="flex h-14 w-14 items-center justify-center rounded-full p-0 shadow-lg shadow-primary/30 transition-transform duration-150 ease-out hover:scale-105 active:scale-90 motion-reduce:transition-none motion-reduce:hover:scale-100"
+            disabled={disabled}
+            className={cn(
+              'flex items-center justify-center rounded-full p-0 shadow-lg shadow-primary/30 transition-transform duration-150 ease-out hover:scale-105 active:scale-90 motion-reduce:transition-none motion-reduce:hover:scale-100',
+              compact ? 'h-11 w-11' : 'h-14 w-14',
+            )}
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? (
-              <Pause className="h-6 w-6" />
+              <Pause className={compact ? 'h-5 w-5' : 'h-6 w-6'} />
             ) : (
-              <Play className="ml-0.5 h-6 w-6" />
+              <Play className={cn('ml-0.5', compact ? 'h-5 w-5' : 'h-6 w-6')} />
             )}
           </Button>
 
@@ -116,10 +146,10 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
             size="icon"
             onClick={onNext}
             disabled={!canGoNext}
-            className="h-11 w-11 rounded-full"
+            className={cn('rounded-full', compact ? 'h-9 w-9' : 'h-11 w-11')}
             aria-label="Next song"
           >
-            <SkipForward className="h-5 w-5" />
+            <SkipForward className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
           </Button>
         </div>
 
@@ -142,7 +172,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 max={100}
                 step={1}
                 onValueChange={([value]) => onVolumeChange(value)}
-                className="w-20"
+                seek
+                className={compact ? 'w-16' : 'w-20'}
                 aria-label="Volume"
               />
             </div>

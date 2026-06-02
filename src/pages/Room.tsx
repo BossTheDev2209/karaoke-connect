@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
 import { User, Song, PlaybackState } from '@/types/karaoke';
 import { useRoom } from '@/hooks/useRoom';
 import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
@@ -17,12 +18,16 @@ import { RoomSettings } from '@/components/RoomSettings';
 import { FloatingReactions, ReactionBar, ReactionPicker } from '@/components/Reactions';
 import { useReactions } from '@/hooks/useReactions';
 import { toast } from '@/hooks/use-toast';
-import { Captions, ChevronUp, Ellipsis, ListMusic, LogOut, Maximize2, Mic2, Minimize2, Monitor, PanelRight, Pause, Play, Plus, Settings, Smartphone, Subtitles } from 'lucide-react';
+import { Captions, ChevronUp, Ellipsis, ListMusic, Loader2, LogOut, Maximize2, Mic2, Minimize2, Monitor, PanelRight, Pause, Play, Plus, QrCode, RefreshCw, Settings, SkipBack, SkipForward, Smartphone, Subtitles, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
 import { expectedPosition, shouldCorrect } from '@/lib/playbackClock';
-import { INITIAL_RIBBON_VISIBILITY, RIBBON_HIDE_DELAY_MS, ribbonTransitionDuration, shouldShowRibbon } from '@/lib/ribbonVisibility';
+import { INITIAL_RIBBON_VISIBILITY, RIBBON_HIDE_DELAY_MS, peekPointerEnterPatch, ribbonTransitionDuration, shouldShowRibbon } from '@/lib/ribbonVisibility';
 import { removeSongFromQueue } from '@/lib/queuePlayback';
 import { StageBackground } from '@/components/StageBackground';
+import { connectionStatus } from '@/lib/connectionStatus';
+import { remoteJoinUrl, roleFromSearch } from '@/lib/remoteJoin';
+import { hotkeyAction } from '@/lib/playerHotkeys';
 import {
   Sheet,
   SheetContent,
@@ -30,6 +35,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { ToastAction } from '@/components/ui/toast';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,15 +43,28 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
 type StageMode = 'video' | 'sing';
 
+const formatTime = (seconds: number) => {
+  const total = Math.max(0, Math.floor(seconds || 0));
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
 const Room = () => {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
-  const [volume, setVolume] = useState(80);
+  const [volume, setVolume] = useState(() => {
+    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('karaoke_volume') : null;
+    const n = stored === null ? NaN : Number(stored);
+    return Number.isFinite(n) && n >= 0 && n <= 100 ? n : 45;
+  });
   const [isVideoFullscreen, setIsVideoFullscreen] = useState(false);
   const videoStageRef = useRef<HTMLDivElement>(null);
   const livePlaybackRef = useRef<() => PlaybackState>(() => ({
@@ -55,6 +74,8 @@ const Room = () => {
     lastUpdate: Date.now(),
   }));
   const getClockPlayback = useCallback(() => livePlaybackRef.current(), []);
+  const initialRole = useMemo(() => roleFromSearch(location.search), [location.search]);
+  const remoteUrl = useMemo(() => remoteJoinUrl(window.location.origin, code || ''), [code]);
   const { setVideoId } = useTheme();
 
   useEffect(() => {
@@ -78,15 +99,34 @@ const Room = () => {
     role,
     setRole,
     isClock,
-  } = useRoom(code || '', user, getClockPlayback);
+  } = useRoom(code || '', user, getClockPlayback, initialRole);
 
   const currentSong = queue[playbackState.currentSongIndex];
+  const status = connectionStatus(isConnected);
   const removeSong = useCallback((songId: string) => {
     const next = removeSongFromQueue(queue, playbackState.currentSongIndex, songId);
     if (!next) return;
+    const removed = queue.find((song) => song.id === songId);
+    const prevQueue = queue;
+    const prevPlayback = playbackState;
     updateQueue(next.queue);
     updatePlayback(next.playback);
-  }, [queue, playbackState.currentSongIndex, updatePlayback, updateQueue]);
+    toast({
+      title: 'Removed from queue',
+      description: removed?.title ?? 'Song removed',
+      action: (
+        <ToastAction
+          altText="Undo remove"
+          onClick={() => {
+            updateQueue(prevQueue);
+            updatePlayback(prevPlayback);
+          }}
+        >
+          Undo
+        </ToastAction>
+      ),
+    });
+  }, [queue, playbackState, updatePlayback, updateQueue]);
 
   useEffect(() => {
     setVideoId(currentSong?.videoId || null);
@@ -274,7 +314,8 @@ const Room = () => {
     setRibbonIntent((current) => ({ ...current, [key]: value }));
   };
 
-  const handlePlayPause = () => {
+  const handlePlayPause = useCallback(() => {
+    if (!currentSong) return; // nothing to play with an empty queue
     if (effectiveIsPlaying) {
       pause();
       updatePlayback({ isPlaying: false, currentTime: effectiveTime });
@@ -282,28 +323,29 @@ const Room = () => {
       play();
       updatePlayback({ isPlaying: true, currentTime: effectiveTime });
     }
-  };
+  }, [currentSong, effectiveIsPlaying, effectiveTime, pause, play, updatePlayback]);
 
-  const handleSeek = (time: number) => {
+  const handleSeek = useCallback((time: number) => {
+    if (!currentSong) return;
     seekTo(time);
     if (isClock || role === 'remote') {
       updatePlayback({ currentTime: time });
     }
-  };
+  }, [currentSong, isClock, role, seekTo, updatePlayback]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (playbackState.currentSongIndex < queue.length - 1) {
       const nextIndex = playbackState.currentSongIndex + 1;
       updatePlayback({ currentSongIndex: nextIndex, currentTime: 0, isPlaying: true });
     }
-  };
+  }, [playbackState.currentSongIndex, queue.length, updatePlayback]);
 
-  const handlePrevious = () => {
+  const handlePrevious = useCallback(() => {
     if (playbackState.currentSongIndex > 0) {
       const prevIndex = playbackState.currentSongIndex - 1;
       updatePlayback({ currentSongIndex: prevIndex, currentTime: 0, isPlaying: true });
     }
-  };
+  }, [playbackState.currentSongIndex, updatePlayback]);
 
   const handleAddSong = (song: Song) => {
     updateQueue([...queue, song]);
@@ -316,7 +358,19 @@ const Room = () => {
   const handleVolumeChange = (v: number) => {
     setVolume(v);
     setPlayerVolume(v);
+    try { localStorage.setItem('karaoke_volume', String(v)); } catch { /* private mode */ }
   };
+
+  // Push the saved volume to the player as soon as it is ready, so it never
+  // blasts at YouTube's default 100 on open.
+  useEffect(() => {
+    if (isReady) setPlayerVolume(volume);
+  }, [isReady, volume, setPlayerVolume]);
+
+  const handleResync = useCallback(() => {
+    requestSync();
+    toast({ title: 'Syncing to the room…', description: 'Catching up to the current position.' });
+  }, [requestSync]);
 
   const handleLeave = () => {
     sessionStorage.removeItem('karaoke_user');
@@ -334,6 +388,22 @@ const Room = () => {
 
     await stage.requestFullscreen();
   };
+
+  useEffect(() => {
+    if (role === 'remote') return;
+    const onKey = (e: KeyboardEvent) => {
+      const action = hotkeyAction(e);
+      if (!action) return;
+      e.preventDefault();
+      if (action === 'playpause') handlePlayPause();
+      else if (action === 'seekback') handleSeek(Math.max(0, effectiveTime - 5));
+      else if (action === 'seekfwd') handleSeek(effectiveTime + 5);
+      else if (action === 'prev') handlePrevious();
+      else if (action === 'next') handleNext();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [role, handlePlayPause, handleSeek, effectiveTime, handlePrevious, handleNext]);
 
   if (!user || !code) return null;
 
@@ -404,13 +474,22 @@ const Room = () => {
     return (
       <div className="relative isolate min-h-screen overflow-y-auto bg-background">
         <StageBackground />
+        {!isConnected && (
+          <div
+            role="status"
+            className="fixed inset-x-0 top-16 z-50 flex items-center justify-center gap-2 bg-destructive/90 py-1.5 text-xs font-medium text-destructive-foreground"
+          >
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" aria-hidden="true" />
+            Reconnecting to the room…
+          </div>
+        )}
         <div className="mx-auto flex min-h-screen w-full max-w-lg flex-col px-4 py-4">
           <header className="flex items-center justify-between border-b border-white/10 pb-3">
             <RoomCodeDisplay code={code} />
             <div className="flex items-center gap-2">
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className={cn('h-1.5 w-1.5 rounded-full', isConnected ? 'bg-[hsl(var(--success))]' : 'bg-destructive')} />
-                {users.length}
+                <span className={cn('h-1.5 w-1.5 rounded-full', status.tone === 'ok' ? 'bg-[hsl(var(--success))]' : 'bg-destructive')} aria-hidden="true" />
+                {status.label} · {users.length}
               </span>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -419,9 +498,9 @@ const Room = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52 rounded-xl border-white/10 bg-[hsl(var(--surface))]">
-                  <DropdownMenuItem onSelect={() => setRole('player')} className="rounded-lg">
-                    <Monitor className="mr-2 h-4 w-4" />
-                    Play audio here
+                  <DropdownMenuItem onSelect={() => setRole('player')} className="flex-col items-start rounded-lg">
+                    <span className="flex items-center"><Monitor className="mr-2 h-4 w-4" />Play audio here</span>
+                    <span className="ml-6 text-xs text-muted-foreground">Switch this phone to play the video and sound.</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setSettingsOpen(true)} className="rounded-lg">
                     <Settings className="mr-2 h-4 w-4" />
@@ -444,7 +523,9 @@ const Room = () => {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-foreground">{currentSong.title}</p>
                   <p className="truncate text-xs text-muted-foreground">{currentSong.artist}</p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">Audio on stage screen</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {effectiveIsPlaying ? 'Playing on the stage screen' : 'Paused on the stage screen'}
+                  </p>
                 </div>
               </>
             ) : (
@@ -470,8 +551,9 @@ const Room = () => {
               onSeek={handleSeek}
               onVolumeChange={handleVolumeChange}
               onMuteToggle={isMuted ? unmute : mute}
-              onSync={requestSync}
+              onSync={handleResync}
               showVolume={false}
+              disabled={!currentSong}
             />
           </section>
 
@@ -506,12 +588,12 @@ const Room = () => {
         </div>
 
         <Sheet open={remoteSearchOpen} onOpenChange={setRemoteSearchOpen}>
-          <SheetContent side="bottom" className="max-h-[84vh] border-white/10 bg-[hsl(var(--surface))] p-0 shadow-2xl">
-            <SheetHeader className="px-4 pt-4 text-left">
+          <SheetContent side="bottom" className="flex max-h-[88vh] flex-col gap-0 rounded-t-2xl border-white/10 bg-[hsl(var(--surface))] p-0 shadow-2xl">
+            <SheetHeader className="shrink-0 px-4 pb-1 pt-4 text-left">
               <SheetTitle>Add Song</SheetTitle>
-              <SheetDescription>Search shared queue.</SheetDescription>
+              <SheetDescription>Search and add to the shared queue.</SheetDescription>
             </SheetHeader>
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 scrollbar-karaoke">
+            <div className="overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2 scrollbar-karaoke">
               <SongSearch onAddSong={handleAddSong} userId={user.id} resultsPlacement="inline" />
             </div>
           </SheetContent>
@@ -547,15 +629,42 @@ const Room = () => {
   return (
     <div className="relative isolate h-screen overflow-hidden bg-background">
       <StageBackground />
+      {!isConnected && (
+        <div
+          role="status"
+          className="fixed inset-x-0 top-16 z-50 flex items-center justify-center gap-2 bg-destructive/90 py-1.5 text-xs font-medium text-destructive-foreground"
+        >
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" aria-hidden="true" />
+          Reconnecting to the room…
+        </div>
+      )}
       <FloatingReactions reactions={reactions} />
 
       <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-white/10 bg-background/95 px-3 sm:px-5">
-        <RoomCodeDisplay code={code} />
+        <div className="flex items-center gap-1.5">
+          <RoomCodeDisplay code={code} />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full" aria-label="Show QR code to join as remote">
+                <QrCode className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-auto rounded-xl border-white/10 bg-[hsl(var(--surface))] p-3">
+              <div className="rounded-lg bg-white p-2">
+                <QRCodeSVG value={remoteUrl} size={144} title="Scan to join as remote" />
+              </div>
+              <p className="mt-2 max-w-[160px] text-center text-xs text-muted-foreground">Scan with your phone to join as a remote</p>
+            </PopoverContent>
+          </Popover>
+        </div>
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-          <div className="hidden items-center gap-2 sm:flex">
-            <span className={cn('h-1.5 w-1.5 rounded-full', isConnected ? 'bg-[hsl(var(--success))]' : 'bg-destructive')} aria-hidden="true" />
-            <span className="text-xs text-muted-foreground">{users.length} online</span>
-          </div>
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span
+              className={cn('h-1.5 w-1.5 rounded-full', status.tone === 'ok' ? 'bg-[hsl(var(--success))]' : 'bg-destructive')}
+              aria-hidden="true"
+            />
+            {status.label} · {users.length}
+          </span>
           {users.length > 0 && (
             <div className="hidden sm:block">
               <UserAvatars size={26} maxVisible={5} overlap={36} users={avatarUsers} />
@@ -598,6 +707,12 @@ const Room = () => {
             <div className="absolute inset-0 overflow-hidden rounded-lg" id="youtube-player-wrapper">
             </div>
 
+            {currentSong && !isReady && (
+              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground motion-reduce:animate-none" />
+              </div>
+            )}
+
             {showCountdown && (
               <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
                 <div className="rounded-2xl bg-black/70 px-6 py-4">
@@ -611,6 +726,12 @@ const Room = () => {
               </div>
             )}
 
+            {stageMode === 'video' && showStageLyrics && currentSong && lyricsLoading && !fullscreenLyric && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center bg-black/50 px-4 pb-6 pt-5">
+                <span className="text-sm text-white/70">Finding lyrics…</span>
+              </div>
+            )}
+
             {stageMode === 'video' && showStageLyrics && fullscreenLyric && (
               <div className="karaoke-fullscreen-lyrics pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center bg-black/65 px-4 pb-7 pt-6">
                 <div className="max-w-5xl text-center text-[clamp(1.5rem,3.5vw,2.75rem)] font-semibold leading-relaxed text-white">
@@ -621,6 +742,15 @@ const Room = () => {
 
             {stageMode === 'sing' && currentSong && (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/75">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-3 top-3 z-30 rounded-full bg-white/10 text-white hover:bg-white/20"
+                  onClick={() => setStageMode('video')}
+                >
+                  <Minimize2 className="h-4 w-4" />
+                  Back to video
+                </Button>
                 <SingLyrics lyrics={lyricsSynced ? lyrics : []} currentLineIndex={currentLineIndex} currentTime={effectiveTime} />
               </div>
             )}
@@ -628,12 +758,15 @@ const Room = () => {
             {!currentSong && (
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black px-6 text-center">
                 <div>
-                  <p className="text-base font-medium text-foreground">No song playing yet</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {isWideDesktop ? 'Search for a song in the panel to start.' : 'Tap the panel button to add a song.'}
+                  <p className="text-sm uppercase tracking-wide text-muted-foreground">Room code</p>
+                  <p className="mt-1 font-mono text-5xl font-bold tracking-[0.3em] text-foreground">{code}</p>
+                  <p className="mt-3 max-w-sm text-sm text-muted-foreground">
+                    {isWideDesktop
+                      ? 'Search for a song in the panel to start, or share the code so friends can join.'
+                      : 'Tap the panel button to add a song, or share the code so friends can join.'}
                   </p>
                 </div>
-                <Button variant="outline" className="rounded-full" onClick={() => setRole('remote')}>
+                <Button variant="ghost" size="sm" className="rounded-full text-muted-foreground" onClick={() => setRole('remote')}>
                   <Smartphone className="h-4 w-4" />
                   Use this phone as a remote
                 </Button>
@@ -655,17 +788,25 @@ const Room = () => {
         </SheetContent>
       </Sheet>
 
+      <Button
+        variant="secondary"
+        className="fixed right-4 top-20 z-30 hidden rounded-full shadow-lg md:inline-flex lg:hidden"
+        onClick={() => setUtilitySheetOpen(true)}
+      >
+        <Plus className="h-4 w-4" />
+        Add song
+      </Button>
+
       {/* Persistent control peek: always-visible at rest so the controls are
           discoverable on a mouse-idle / TV screen; hovering or focusing it
           expands the full ribbon below. Fades out once the ribbon is showing. */}
       <div
         className="fixed inset-x-0 bottom-0 z-30 hidden h-24 md:block lg:right-[24rem]"
-        onPointerEnter={() => setRibbonFlag('zoneHovered', true)}
-        onPointerLeave={() => setRibbonFlag('zoneHovered', false)}
+        onPointerEnter={() => setRibbonIntent((current) => ({ ...current, ...peekPointerEnterPatch() }))}
       >
         <div
           className={cn(
-            'absolute inset-x-2 bottom-3 mx-auto flex max-w-7xl items-center gap-3 rounded-2xl border border-white/10 bg-[hsl(var(--surface)/0.9)] px-3 py-2 shadow-xl transition-opacity ease-out sm:inset-x-4 lg:left-4 lg:right-[25rem] lg:mx-0 lg:max-w-none',
+            'absolute inset-x-2 bottom-3 mx-auto flex max-w-7xl items-center gap-3 rounded-2xl border border-white/10 bg-[hsl(var(--surface)/0.9)] px-3 py-2 shadow-xl transition-opacity ease-out sm:inset-x-4 lg:left-4 lg:right-4 lg:mx-0 lg:max-w-none',
             ribbonVisible ? 'pointer-events-none opacity-0' : 'opacity-100'
           )}
           style={{ transitionDuration: ribbonTransitionDuration(prefersReducedMotion) }}
@@ -682,13 +823,41 @@ const Room = () => {
             variant="ghost"
             size="icon"
             className="h-9 w-9 shrink-0 rounded-full"
+            onClick={handlePrevious}
+            disabled={playbackState.currentSongIndex <= 0}
+            aria-label="Previous song"
+          >
+            <SkipBack className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0 rounded-full"
             onClick={handlePlayPause}
             disabled={!currentSong}
             aria-label={effectiveIsPlaying ? 'Pause' : 'Play'}
           >
             {effectiveIsPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           </Button>
-          <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0 rounded-full"
+            onClick={handleNext}
+            disabled={playbackState.currentSongIndex >= queue.length - 1}
+            aria-label="Next song"
+          >
+            <SkipForward className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0 rounded-full text-muted-foreground"
+            onClick={() => setRibbonFlag('touchOpen', true)}
+            aria-label="Show full playback controls"
+          >
+            <ChevronUp className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -709,69 +878,90 @@ const Room = () => {
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setRibbonFlag('focusWithin', false);
         }}
         className={cn(
-          'fixed inset-x-2 bottom-3 z-40 mx-auto flex max-w-7xl flex-col gap-3 rounded-2xl border border-white/10 bg-[hsl(var(--surface)/0.97)] p-3 shadow-2xl transition-[opacity,transform] ease-out sm:inset-x-4 lg:left-4 lg:right-[25rem] lg:mx-0 lg:max-w-none lg:flex-row lg:items-center lg:p-4',
+          'fixed inset-x-2 bottom-3 z-40 mx-auto flex max-w-7xl flex-col gap-1 rounded-2xl border border-white/10 bg-[hsl(var(--surface)/0.97)] px-4 py-2 shadow-2xl transition-[opacity,transform] ease-out sm:inset-x-4 lg:left-4 lg:right-[25rem] lg:mx-0 lg:max-w-none',
           ribbonVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0'
         )}
         style={{ transitionDuration: ribbonTransitionDuration(prefersReducedMotion) }}
       >
-        <div className="min-w-0 lg:w-64">
+        {/* Row 1: now playing, centered */}
+        <div className="flex min-w-0 items-center justify-center gap-2">
           {currentSong ? (
-            <div className="flex items-center gap-3">
-              <img src={currentSong.thumbnail} alt="" className="h-11 w-16 rounded-md object-cover" />
-              <div className="min-w-0">
-                <p className="truncate font-medium text-foreground">{currentSong.title}</p>
-                <p className="truncate text-xs text-muted-foreground">{currentSong.artist}</p>
-              </div>
+            <>
+              <img src={currentSong.thumbnail} alt="" className="h-6 w-9 shrink-0 rounded object-cover" />
+              <p className="truncate text-sm font-medium text-foreground">{currentSong.title}</p>
+              <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">&middot; {currentSong.artist}</span>
+            </>
+          ) : (
+            <p className="text-sm font-medium text-muted-foreground">Queue waiting.</p>
+          )}
+        </div>
+
+        {/* Row 2: sync (left) · transport (center) · volume + tools (right) */}
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2 lg:grid-cols-[1fr_auto_1fr]">
+          <div className="flex items-center justify-start">
+            <Button variant="ghost" size="icon" onClick={handleResync} className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" aria-label="Sync with room" title="Sync with room">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-center gap-2">
+            <Button variant="ghost" size="icon" onClick={handlePrevious} disabled={playbackState.currentSongIndex <= 0} className="h-9 w-9 rounded-full" aria-label="Previous song">
+              <SkipBack className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={handlePlayPause}
+              disabled={!currentSong}
+              className="flex h-11 w-11 items-center justify-center rounded-full p-0 shadow-lg shadow-primary/30 transition-transform duration-150 ease-out hover:scale-105 active:scale-90 motion-reduce:transition-none motion-reduce:hover:scale-100"
+              aria-label={effectiveIsPlaying ? 'Pause' : 'Play'}
+            >
+              {effectiveIsPlaying ? <Pause className="h-5 w-5" /> : <Play className="ml-0.5 h-5 w-5" />}
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleNext} disabled={playbackState.currentSongIndex >= queue.length - 1} className="h-9 w-9 rounded-full" aria-label="Next song">
+              <SkipForward className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-end gap-1">
+            <div className="mr-1 hidden items-center gap-1.5 md:flex">
+              <Button variant="ghost" size="icon" onClick={isMuted ? unmute : mute} className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" aria-label={isMuted ? 'Unmute' : 'Mute'}>
+                {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              </Button>
+              <Slider value={[isMuted ? 0 : volume]} max={100} step={1} onValueChange={([v]) => handleVolumeChange(v)} seek className="w-16" aria-label="Volume" />
             </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Queue waiting.</p>
-            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn('rounded-full hover:bg-transparent', stageMode === 'sing' ? 'text-primary hover:text-primary' : 'text-foreground hover:text-foreground')}
+              onClick={() => setStageMode(stageMode === 'video' ? 'sing' : 'video')}
+              aria-label={stageMode === 'video' ? 'Big lyrics (full-screen sing mode)' : 'Back to video'}
+              aria-pressed={stageMode === 'sing'}
+              title={stageMode === 'video' ? 'Big lyrics (full-screen sing mode)' : 'Back to video'}
+            >
+              <Mic2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn('rounded-full hover:bg-transparent', showStageLyrics ? 'text-primary hover:text-primary' : 'text-muted-foreground hover:text-muted-foreground')}
+              onClick={() => setShowStageLyrics((v) => !v)}
+              aria-label={showStageLyrics ? 'Hide subtitles on video' : 'Show subtitles on video'}
+              aria-pressed={showStageLyrics}
+              title={showStageLyrics ? 'Subtitles on video (on)' : 'Subtitles on video (off)'}
+            >
+              <Subtitles className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="rounded-full text-foreground hover:bg-transparent hover:text-foreground lg:hidden" onClick={() => setUtilitySheetOpen(true)} aria-label="Open search, queue and lyrics">
+              <PanelRight className="h-4 w-4" />
+            </Button>
+            <ReactionPicker onReact={sendReaction} />
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
-          <PlayerControls
-            isPlaying={effectiveIsPlaying}
-            isMuted={isMuted}
-            volume={volume}
-            currentTime={effectiveTime}
-            duration={duration}
-            canGoPrevious={playbackState.currentSongIndex > 0}
-            canGoNext={playbackState.currentSongIndex < queue.length - 1}
-            onPlayPause={handlePlayPause}
-            onNext={handleNext}
-            onPrevious={handlePrevious}
-            onSeek={handleSeek}
-            onVolumeChange={handleVolumeChange}
-            onMuteToggle={isMuted ? unmute : mute}
-            onSync={requestSync}
-          />
-        </div>
-        <div className="flex shrink-0 items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn('rounded-full hover:bg-transparent', stageMode === 'sing' ? 'text-primary hover:text-primary' : 'text-foreground hover:text-foreground')}
-            onClick={() => setStageMode(stageMode === 'video' ? 'sing' : 'video')}
-            aria-label={stageMode === 'video' ? 'Big lyrics (full-screen sing mode)' : 'Back to video'}
-            aria-pressed={stageMode === 'sing'}
-            title={stageMode === 'video' ? 'Big lyrics (full-screen sing mode)' : 'Back to video'}
-          >
-            <Mic2 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn('rounded-full hover:bg-transparent', showStageLyrics ? 'text-primary hover:text-primary' : 'text-muted-foreground hover:text-muted-foreground')}
-            onClick={() => setShowStageLyrics((v) => !v)}
-            aria-label={showStageLyrics ? 'Hide subtitles on video' : 'Show subtitles on video'}
-            aria-pressed={showStageLyrics}
-            title={showStageLyrics ? 'Subtitles on video (on)' : 'Subtitles on video (off)'}
-          >
-            <Subtitles className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="rounded-full text-foreground hover:bg-transparent hover:text-foreground lg:hidden" onClick={() => setUtilitySheetOpen(true)} aria-label="Open search, queue and lyrics">
-            <PanelRight className="h-4 w-4" />
-          </Button>
-          <ReactionPicker onReact={sendReaction} />
+
+        {/* Row 3: seek rail, full width with inline times */}
+        <div className="flex items-center gap-2.5">
+          <span className="w-9 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted-foreground">{formatTime(currentSong ? effectiveTime : 0)}</span>
+          <Slider value={[currentSong ? effectiveTime : 0]} max={duration || 100} step={1} onValueChange={([v]) => handleSeek(v)} disabled={!currentSong} seek className="flex-1 cursor-pointer" />
+          <span className="w-9 shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">{formatTime(duration)}</span>
         </div>
       </section>
 
