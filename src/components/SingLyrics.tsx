@@ -13,6 +13,33 @@ export const SingLyrics = ({ lyrics, currentLineIndex, currentTime }: SingLyrics
   const nextLine = lyrics[currentLineIndex + 1];
   const nextLineStartsIn = nextLine ? nextLine.time - currentTime : null;
 
+  // Pre-roll: lyrics are loaded but playback hasn't reached the first timed
+  // line yet (currentLineIndex === -1). Show the opening line as "coming up"
+  // so big-lyric mode isn't blank during the intro.
+  if (!activeLine && currentLineIndex < 0 && lyrics.length > 0) {
+    const firstLine = lyrics[0];
+    const startsIn = firstLine.time - currentTime;
+    return (
+      <div className="mx-auto flex max-w-5xl flex-col items-center gap-5 px-6 text-center">
+        <p className="text-[clamp(1.25rem,2.2vw,2rem)] font-medium leading-relaxed text-white/45">
+          Get ready…
+        </p>
+        <p className="text-[clamp(2.2rem,5vw,5rem)] font-semibold leading-[1.15] tracking-[-0.06em] text-white/70">
+          {firstLine.text}
+        </p>
+        <div className="min-h-14">
+          {startsIn > 0 && startsIn <= 3 && (
+            <div className="mt-4 flex justify-center gap-2" aria-label="First lyric line starting soon">
+              {[3, 2, 1].map((second) => (
+                <span key={second} className={cn('h-1.5 w-1.5 rounded-full', startsIn <= second ? 'bg-primary' : 'bg-white/20')} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (!activeLine) {
     return <p className="text-center text-lg text-white/45">Timed lyrics unavailable.</p>;
   }

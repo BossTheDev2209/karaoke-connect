@@ -72,6 +72,27 @@ describe("electClock", () => {
     expect(electClock([remaining])).toBe("aaaa");
   });
 
+  it("does NOT let a lower-id player steal the clock once it becomes authoritative (sticky)", () => {
+    // host 'zzzz' is the standing clock; a lower-id player joins and (after one
+    // broadcast) also reports authoritative state. It must not take over.
+    const host = { ...user("zzzz"), hasAuthoritativeState: true };
+    const joiner = { ...user("aaaa"), hasAuthoritativeState: true };
+    expect(electClock([host, joiner], "zzzz")).toBe("zzzz");
+  });
+
+  it("re-elects the lowest id only when the sticky clock has left", () => {
+    const joiner = { ...user("aaaa"), hasAuthoritativeState: true };
+    const other = { ...user("mmmm"), hasAuthoritativeState: true };
+    // previous clock 'zzzz' is gone => fall back to lowest id among players
+    expect(electClock([joiner, other], "zzzz")).toBe("aaaa");
+  });
+
+  it("falls back to lowest id for the initial election (no previous clock)", () => {
+    const a = { ...user("aaaa"), hasAuthoritativeState: true };
+    const b = { ...user("zzzz"), hasAuthoritativeState: true };
+    expect(electClock([a, b])).toBe("aaaa");
+  });
+
   it("ignores remotes when electing", () => {
     const users = [user("aaa", "remote"), user("bbb", "player")];
     expect(electClock(users)).toBe("bbb");

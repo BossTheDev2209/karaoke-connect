@@ -67,8 +67,15 @@ export const useLyrics = (
       return;
     }
 
-    // If preloading is in progress, show loading state
-    if (preloadedData && preloadedData.status === 'loading') {
+    // Preload queued or in progress for THIS song: clear the previous song's
+    // lyrics immediately so a slow fetch can't leave the prior song's words on
+    // screen, and show the loading state until they arrive.
+    if (preloadedData && (preloadedData.status === 'loading' || preloadedData.status === 'pending')) {
+      setLyrics([]);
+      setIsSynced(false);
+      setSource(null);
+      setError(null);
+      setOffset(0);
       setIsLoading(true);
       return;
     }
@@ -78,6 +85,9 @@ export const useLyrics = (
       setIsLoading(true);
       setError(null);
       setOffset(0);
+      setLyrics([]);
+      setIsSynced(false);
+      setSource(null);
 
       try {
         const { data, error: fnError } = await supabase.functions.invoke('fetch-lyrics', {

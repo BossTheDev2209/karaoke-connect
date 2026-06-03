@@ -47,6 +47,7 @@ export const useRoom = (
   const roleRef = useRef(role);
   const isClockRef = useRef(false);
   const hasAuthoritativeStateRef = useRef(false);
+  const clockIdRef = useRef<string | null>(null);
   const usersRef = useRef(users);
   const getClockPlaybackRef = useRef(getClockPlayback);
 
@@ -79,6 +80,7 @@ export const useRoom = (
 
     isClockRef.current = false;
     hasAuthoritativeStateRef.current = false;
+    clockIdRef.current = null;
 
     const channel = supabase.channel(`room:${roomCode}`, {
       config: {
@@ -200,11 +202,15 @@ export const useRoom = (
     }
   }, [user]);
 
-  const isElectedClock = !!user && electClock(users) === user.id;
+  const electedClockId = electClock(users, clockIdRef.current);
+  const isElectedClock = !!user && electedClockId === user.id;
   const isClock = canBroadcastClockState({
     isClock: isElectedClock,
     hasAuthoritativeState: hasAuthoritativeStateRef.current,
   });
+  useEffect(() => {
+    clockIdRef.current = electedClockId;
+  }, [electedClockId]);
   useEffect(() => {
     if (!user || hasAuthoritativeStateRef.current) return;
     const players = users.filter((candidate) => (candidate.role ?? 'player') === 'player');
