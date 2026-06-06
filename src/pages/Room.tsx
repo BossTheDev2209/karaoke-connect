@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { User, Song, PlaybackState } from '@/types/karaoke';
+import { User, Song, PlaybackState, PlayerCommand } from '@/types/karaoke';
 import { useRoom } from '@/hooks/useRoom';
 import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
 import { useLyrics } from '@/hooks/useLyrics';
@@ -76,6 +76,10 @@ const Room = () => {
   const getClockPlayback = useCallback(() => livePlaybackRef.current(), []);
   const initialRole = useMemo(() => roleFromSearch(location.search), [location.search]);
   const remoteUrl = useMemo(() => remoteJoinUrl(window.location.origin, code || ''), [code]);
+  const playerCommandHandlerRef = useRef<(cmd: PlayerCommand) => void>(() => undefined);
+  const handlePlayerCommand = useCallback((cmd: PlayerCommand) => {
+    playerCommandHandlerRef.current(cmd);
+  }, []);
   const { setVideoId } = useTheme();
 
   useEffect(() => {
@@ -99,7 +103,8 @@ const Room = () => {
     role,
     setRole,
     isClock,
-  } = useRoom(code || '', user, getClockPlayback, initialRole);
+    sendPlayerCommand,
+  } = useRoom(code || '', user, getClockPlayback, initialRole, handlePlayerCommand);
 
   const currentSong = queue[playbackState.currentSongIndex];
   const status = connectionStatus(isConnected);
@@ -249,6 +254,9 @@ const Room = () => {
   const [utilitySheetOpen, setUtilitySheetOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'queue' | 'lyrics'>('queue');
   const [showStageLyrics, setShowStageLyrics] = useState(true);
+  const [cinema, setCinema] = useState(false);
+  const [remoteCinema, setRemoteCinema] = useState(false);
+  const [remoteStageLyrics, setRemoteStageLyrics] = useState(true);
   const [remoteSearchOpen, setRemoteSearchOpen] = useState(false);
   const [remoteLyricsOpen, setRemoteLyricsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -314,6 +322,18 @@ const Room = () => {
     setRibbonIntent((current) => ({ ...current, [key]: value }));
   };
 
+  const applyPlayerCommand = useCallback((cmd: PlayerCommand) => {
+    if (cmd.action === 'seek_to' && typeof cmd.value === 'number') {
+      seekTo(cmd.value);
+      if (isClock) updatePlayback({ currentTime: cmd.value });
+    } else if (cmd.action === 'cinema') {
+      setCinema(!!cmd.value);
+    } else if (cmd.action === 'lyrics') {
+      setShowStageLyrics(!!cmd.value);
+    }
+  }, [isClock, seekTo, updatePlayback]);
+  playerCommandHandlerRef.current = applyPlayerCommand;
+
   const handlePlayPause = useCallback(() => {
     if (!currentSong) return; // nothing to play with an empty queue
     if (effectiveIsPlaying) {
@@ -328,10 +348,25 @@ const Room = () => {
   const handleSeek = useCallback((time: number) => {
     if (!currentSong) return;
     seekTo(time);
+    if (role === 'remote') {
+      sendPlayerCommand({ action: 'seek_to', value: time });
+    }
     if (isClock || role === 'remote') {
       updatePlayback({ currentTime: time });
     }
-  }, [currentSong, isClock, role, seekTo, updatePlayback]);
+  }, [currentSong, isClock, role, seekTo, sendPlayerCommand, updatePlayback]);
+
+  const handleRemoteCinemaToggle = useCallback(() => {
+    const next = !remoteCinema;
+    setRemoteCinema(next);
+    sendPlayerCommand({ action: 'cinema', value: next });
+  }, [remoteCinema, sendPlayerCommand]);
+
+  const handleRemoteStageLyricsToggle = useCallback(() => {
+    const next = !remoteStageLyrics;
+    setRemoteStageLyrics(next);
+    sendPlayerCommand({ action: 'lyrics', value: next });
+  }, [remoteStageLyrics, sendPlayerCommand]);
 
   const handleNext = useCallback(() => {
     if (playbackState.currentSongIndex < queue.length - 1) {
@@ -557,12 +592,30 @@ const Room = () => {
             />
           </section>
 
-          <section className="flex items-center gap-2 border-b border-white/10 py-3">
-            <Button variant="outline" className="h-11 flex-1 rounded-full" onClick={() => setRemoteSearchOpen(true)}>
+          <section className="flex flex-wrap items-center gap-2 border-b border-white/10 py-3">
+            <Button variant="outline" className="h-11 min-w-[9rem] flex-1 rounded-full" onClick={() => setRemoteSearchOpen(true)}>
               <Plus className="h-4 w-4" />
               Add Song
             </Button>
-            <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setRemoteLyricsOpen(true)} aria-label="Open lyrics">
+            <Button
+              variant="ghost"
+              className={cn('h-11 min-w-[8rem] flex-1 rounded-full', remoteCinema ? 'bg-white/10 text-foreground' : 'text-muted-foreground')}
+              onClick={handleRemoteCinemaToggle}
+              aria-pressed={remoteCinema}
+            >
+              {remoteCinema ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              Cinema
+            </Button>
+            <Button
+              variant="ghost"
+              className={cn('h-11 min-w-[8rem] flex-1 rounded-full', remoteStageLyrics ? 'bg-white/10 text-foreground' : 'text-muted-foreground')}
+              onClick={handleRemoteStageLyricsToggle}
+              aria-pressed={remoteStageLyrics}
+            >
+              <Subtitles className="h-4 w-4" />
+              Lyrics
+            </Button>
+            <Button variant="ghost" size="icon" className="h-11 rounded-full" onClick={() => setRemoteLyricsOpen(true)} aria-label="Open lyrics">
               <Captions className="h-4 w-4" />
             </Button>
           </section>
@@ -640,7 +693,10 @@ const Room = () => {
       )}
       <FloatingReactions reactions={reactions} />
 
-      <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-white/10 bg-background/95 px-3 sm:px-5">
+      <header
+        className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-white/10 bg-background/95 px-3 sm:px-5"
+        style={{ display: cinema ? 'none' : undefined }}
+      >
         <div className="flex items-center gap-1.5">
           <RoomCodeDisplay code={code} />
           <Popover>
@@ -698,11 +754,17 @@ const Room = () => {
         </div>
       </header>
 
-      <div className="flex h-full pt-16">
-        <main className="flex min-w-0 flex-1 items-center justify-center px-3 pb-20 pt-3 sm:px-6 sm:pb-24">
+      <div className={cn('flex h-full', cinema ? 'pt-0' : 'pt-16')}>
+        <main className={cn(
+          'flex min-w-0 flex-1 items-center justify-center',
+          cinema ? 'p-0' : 'px-3 pb-20 pt-3 sm:px-6 sm:pb-24'
+        )}>
           <div
             ref={videoStageRef}
-            className="karaoke-fullscreen-stage relative aspect-video w-full max-w-[min(100vw,calc((100vh-7rem)*16/9))] overflow-hidden rounded-lg bg-black"
+            className={cn(
+              'karaoke-fullscreen-stage relative aspect-video w-full max-w-[min(100vw,calc((100vh-7rem)*16/9))] overflow-hidden rounded-lg bg-black',
+              cinema && 'cinema-stage'
+            )}
           >
             <div className="absolute inset-0 overflow-hidden rounded-lg" id="youtube-player-wrapper">
             </div>
@@ -775,12 +837,12 @@ const Room = () => {
           </div>
         </main>
 
-        <aside className="hidden h-full w-96 shrink-0 border-l border-white/10 lg:block">
+        <aside className="hidden h-full w-96 shrink-0 border-l border-white/10 lg:block" style={{ display: cinema ? 'none' : undefined }}>
           {renderUtilityContent()}
         </aside>
       </div>
 
-      <Sheet open={utilitySheetOpen} onOpenChange={setUtilitySheetOpen}>
+      <Sheet open={!cinema && utilitySheetOpen} onOpenChange={setUtilitySheetOpen}>
         <SheetContent className="flex w-[min(92vw,30rem)] flex-col border-white/10 bg-[hsl(var(--surface))] p-0 shadow-2xl sm:max-w-md">
           <SheetTitle className="sr-only">Search, queue and lyrics</SheetTitle>
           <SheetDescription className="sr-only">Room queue, search, and lyric tools.</SheetDescription>
@@ -792,6 +854,7 @@ const Room = () => {
         variant="secondary"
         className="fixed right-4 top-20 z-30 hidden rounded-full shadow-lg md:inline-flex lg:hidden"
         onClick={() => setUtilitySheetOpen(true)}
+        style={{ display: cinema ? 'none' : undefined }}
       >
         <Plus className="h-4 w-4" />
         Add song
@@ -803,6 +866,7 @@ const Room = () => {
       <div
         className="fixed inset-x-0 bottom-0 z-30 hidden h-24 md:block lg:right-[24rem]"
         onPointerEnter={() => setRibbonIntent((current) => ({ ...current, ...peekPointerEnterPatch() }))}
+        style={{ display: cinema ? 'none' : undefined }}
       >
         <div
           className={cn(
@@ -867,6 +931,7 @@ const Room = () => {
         onClick={() => setRibbonFlag('touchOpen', !ribbonIntent.touchOpen)}
         className="fixed bottom-2 left-1/2 z-50 h-1.5 w-12 -translate-x-1/2 rounded-full bg-white/40 md:hidden"
         aria-label={ribbonIntent.touchOpen ? 'Hide playback controls' : 'Show playback controls'}
+        style={{ display: cinema ? 'none' : undefined }}
       />
 
       <section
@@ -881,7 +946,7 @@ const Room = () => {
           'fixed inset-x-2 bottom-3 z-40 mx-auto flex max-w-7xl flex-col gap-1 rounded-2xl border border-white/10 bg-[hsl(var(--surface)/0.97)] px-4 py-2 shadow-2xl transition-[opacity,transform] ease-out sm:inset-x-4 lg:left-4 lg:right-[25rem] lg:mx-0 lg:max-w-none',
           ribbonVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0'
         )}
-        style={{ transitionDuration: ribbonTransitionDuration(prefersReducedMotion) }}
+        style={{ display: cinema ? 'none' : undefined, transitionDuration: ribbonTransitionDuration(prefersReducedMotion) }}
       >
         {/* Row 1: now playing, centered */}
         <div className="flex min-w-0 items-center justify-center gap-2">

@@ -494,8 +494,23 @@
   background: #000;
 }
 
+.cinema-stage {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 60;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  border-radius: 0 !important;
+  background: #000;
+}
+
 .karaoke-fullscreen-stage:fullscreen #youtube-player-wrapper {
   border-radius: 0;
+}
+
+.cinema-stage #youtube-player-wrapper {
+  border-radius: 0 !important;
 }
 
 .karaoke-fullscreen-stage:fullscreen .karaoke-fullscreen-lyrics {
@@ -508,7 +523,25 @@
   );
 }
 
+.cinema-stage .karaoke-fullscreen-lyrics {
+  padding-bottom: clamp(2rem, 7vh, 5rem);
+  background: linear-gradient(
+    to top,
+    hsl(0 0% 0% / 0.82),
+    hsl(0 0% 0% / 0.42),
+    transparent
+  );
+}
+
 .karaoke-fullscreen-stage:fullscreen .karaoke-fullscreen-lyrics > div {
+  max-width: min(92vw, 72rem);
+  font-size: clamp(2rem, 5vw, 4.75rem);
+  line-height: 1.25;
+  text-shadow:
+    0 4px 18px hsl(0 0% 0% / 0.95);
+}
+
+.cinema-stage .karaoke-fullscreen-lyrics > div {
   max-width: min(92vw, 72rem);
   font-size: clamp(2rem, 5vw, 4.75rem);
   line-height: 1.25;

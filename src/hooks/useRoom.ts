@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { User, Song, PlaybackState, RealtimePayload, RoomRole } from '@/types/karaoke';
+import { User, Song, PlaybackState, PlayerCommand, RealtimePayload, RoomRole } from '@/types/karaoke';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { detectDefaultRole, readDeviceEnv } from '@/lib/deviceRole';
 import { canBroadcastClockState, electClock } from '@/lib/playbackClock';
@@ -17,6 +17,7 @@ interface UseRoomReturn {
   channel: RealtimeChannel | null;
   updatePlayback: (state: Partial<PlaybackState>) => void;
   updateQueue: (queue: Song[]) => void;
+  sendPlayerCommand: (cmd: PlayerCommand) => void;
   requestSync: () => void;
   role: RoomRole;
   setRole: (role: RoomRole) => void;
@@ -37,6 +38,7 @@ export const useRoom = (
   user: User | null,
   getClockPlayback?: () => PlaybackState,
   initialRole?: RoomRole,
+  onPlayerCommand?: (cmd: PlayerCommand) => void,
 ): UseRoomReturn => {
   const [users, setUsers] = useState<User[]>([]);
   const [queue, setQueue] = useState<Song[]>([]);
@@ -50,10 +52,15 @@ export const useRoom = (
   const clockIdRef = useRef<string | null>(null);
   const usersRef = useRef(users);
   const getClockPlaybackRef = useRef(getClockPlayback);
+  const onPlayerCommandRef = useRef(onPlayerCommand);
 
   useEffect(() => {
     getClockPlaybackRef.current = getClockPlayback;
   }, [getClockPlayback]);
+
+  useEffect(() => {
+    onPlayerCommandRef.current = onPlayerCommand;
+  }, [onPlayerCommand]);
 
   useEffect(() => {
     roleRef.current = role;
@@ -103,6 +110,11 @@ export const useRoom = (
             break;
           case 'queue_update':
             setQueue(data.payload as Song[]);
+            break;
+          case 'player_command':
+            if (data.senderId !== user.id && roleRef.current !== 'remote') {
+              onPlayerCommandRef.current?.(data.payload as PlayerCommand);
+            }
             break;
           case 'sync_request': {
             if (
@@ -182,6 +194,14 @@ export const useRoom = (
       payload: { type: 'queue_update', payload: newQueue },
     });
   }, []);
+
+  const sendPlayerCommand = useCallback((cmd: PlayerCommand) => {
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'room_event',
+      payload: { type: 'player_command', payload: cmd, senderId: user?.id },
+    });
+  }, [user]);
 
   const requestSync = useCallback(() => {
     channelRef.current?.send({
@@ -280,6 +300,7 @@ export const useRoom = (
     channel: channelRef.current,
     updatePlayback,
     updateQueue,
+    sendPlayerCommand,
     requestSync,
     role,
     setRole,

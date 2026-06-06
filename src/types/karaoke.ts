@@ -57,6 +57,11 @@ export interface PlaybackState {
   lastUpdate: number;
 }
 
+export interface PlayerCommand {
+  action: 'seek_to' | 'cinema' | 'lyrics';
+  value?: number | boolean;
+}
+
 export interface RoomSnapshot {
   code: string;
   queue: Song[];
@@ -109,7 +114,8 @@ export type RealtimePayload = {
     | 'mode_vote_start'
     | 'mode_vote_cast'
     | 'mode_update'
-    | 'team_update';
+    | 'team_update'
+    | 'player_command';
   payload: unknown;
   senderId?: string;
 };
