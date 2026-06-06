@@ -588,13 +588,16 @@ const Room = () => {
         </div>
 
         <Sheet open={remoteSearchOpen} onOpenChange={setRemoteSearchOpen}>
-          <SheetContent side="bottom" className="flex max-h-[88vh] flex-col gap-0 rounded-t-2xl border-white/10 bg-[hsl(var(--surface))] p-0 shadow-2xl">
-            <SheetHeader className="shrink-0 px-4 pb-1 pt-4 text-left">
+          <SheetContent
+            side="top"
+            className="flex h-screen flex-col gap-0 border-white/10 bg-[hsl(var(--surface))] p-0 shadow-2xl supports-[height:100dvh]:h-[100dvh] supports-[height:100svh]:min-h-[100svh] [&>button]:right-[max(1rem,env(safe-area-inset-right))] [&>button]:top-[max(1rem,env(safe-area-inset-top))]"
+          >
+            <SheetHeader className="shrink-0 px-4 pb-2 pr-14 pt-[max(1rem,env(safe-area-inset-top))] text-left">
               <SheetTitle>Add Song</SheetTitle>
               <SheetDescription>Search and add to the shared queue.</SheetDescription>
             </SheetHeader>
-            <div className="overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2 scrollbar-karaoke">
-              <SongSearch onAddSong={handleAddSong} userId={user.id} resultsPlacement="inline" />
+            <div className="flex min-h-0 flex-1 flex-col px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
+              <SongSearch onAddSong={handleAddSong} userId={user.id} resultsPlacement="inline" fill voiceSearch queueFeedback />
             </div>
           </SheetContent>
         </Sheet>

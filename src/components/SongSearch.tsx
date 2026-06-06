@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Search, Plus, X, Loader2, Music, User, ArrowLeft, Mic2 } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Search, Plus, X, Loader2, Music, User, ArrowLeft, Mic2, Check, Mic } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,16 +7,52 @@ import { YouTubeSearchResult, YouTubeChannel, Song } from '@/types/karaoke';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 import { toast } from '@/hooks/use-toast';
+import { finalTranscriptFromSpeechEvent, type SpeechResultEventLike } from '@/lib/voiceSearch';
+
+interface SpeechRecognitionErrorLike extends Event {
+  error?: string;
+}
+
+interface SpeechRecognitionInstance {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((event: SpeechResultEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort?: () => void;
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
 
 interface SongSearchProps {
   onAddSong: (song: Song) => void;
   userId: string;
   resultsPlacement?: 'popover' | 'inline';
+  fill?: boolean;
+  voiceSearch?: boolean;
+  queueFeedback?: boolean;
 }
 
 type SearchTab = 'songs' | 'artists';
 
-export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, resultsPlacement = 'popover' }) => {
+export const SongSearch: React.FC<SongSearchProps> = ({
+  onAddSong,
+  userId,
+  resultsPlacement = 'popover',
+  fill = false,
+  voiceSearch = false,
+  queueFeedback = false,
+}) => {
   const { karaokeFilterEnabled, setKaraokeFilterEnabled } = useTheme();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<YouTubeSearchResult[]>([]);
@@ -28,9 +64,20 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, resul
   const [channelVideos, setChannelVideos] = useState<YouTubeSearchResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [addedVideoIds, setAddedVideoIds] = useState<Set<string>>(() => new Set());
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const voiceErrorToastShownRef = useRef(false);
+  const addedTimersRef = useRef<Record<string, number>>({});
+  const speechRecognitionCtor = useMemo<SpeechRecognitionConstructor | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
+  }, []);
+  const canUseVoiceSearch = voiceSearch && speechRecognitionCtor !== null;
 
-  const handleSearch = async () => {
-    if (!query.trim()) return;
+  const handleSearch = async (searchQuery = query) => {
+    const trimmedQuery = searchQuery.trim();
+    if (!trimmedQuery) return;
 
     setIsLoading(true);
     setError(null);
@@ -44,14 +91,14 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, resul
         // The edge function biases the query and re-ranks known karaoke
         // providers to the top when the karaoke flag is set.
         const { data, error } = await supabase.functions.invoke('youtube-search', {
-          body: { query, type: 'video', karaoke: karaokeFilterEnabled },
+          body: { query: trimmedQuery, type: 'video', karaoke: karaokeFilterEnabled },
         });
         if (error) throw error;
         setResults(data.results || []);
         setChannels([]);
       } else {
         const { data, error } = await supabase.functions.invoke('youtube-search', {
-          body: { query, type: 'channel' },
+          body: { query: trimmedQuery, type: 'channel' },
         });
         if (error) throw error;
         setChannels(data.channels || []);
@@ -65,6 +112,57 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, resul
       toast({ title: 'Search failed', description: 'Could not reach the search service.', variant: 'destructive' });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleVoiceSearch = () => {
+    if (!speechRecognitionCtor) return;
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new speechRecognitionCtor();
+    recognition.lang = navigator.language || 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event) => {
+      const transcript = finalTranscriptFromSpeechEvent(event);
+      if (transcript) {
+        setQuery(transcript);
+        void handleSearch(transcript);
+      }
+      recognition.stop();
+    };
+    recognition.onerror = (event) => {
+      setIsListening(false);
+      if (
+        (event.error === 'not-allowed' || event.error === 'service-not-allowed') &&
+        !voiceErrorToastShownRef.current
+      ) {
+        voiceErrorToastShownRef.current = true;
+        toast({ title: 'Mic blocked', description: 'Allow microphone access to use voice search.' });
+      }
+    };
+    recognition.onend = () => {
+      setIsListening(false);
+      if (recognitionRef.current === recognition) recognitionRef.current = null;
+    };
+
+    try {
+      recognitionRef.current = recognition;
+      recognition.start();
+      setIsListening(true);
+    } catch (err) {
+      console.error('Voice search start error:', err);
+      recognitionRef.current = null;
+      setIsListening(false);
+      if (!voiceErrorToastShownRef.current) {
+        voiceErrorToastShownRef.current = true;
+        toast({ title: 'Voice search unavailable', description: 'Try typing the search instead.' });
+      }
     }
   };
 
@@ -101,6 +199,25 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, resul
       addedBy: userId,
     };
     onAddSong(song);
+    if (!queueFeedback) return;
+
+    setAddedVideoIds((current) => {
+      const next = new Set(current);
+      next.add(result.videoId);
+      return next;
+    });
+    if (addedTimersRef.current[result.videoId] !== undefined) {
+      window.clearTimeout(addedTimersRef.current[result.videoId]);
+    }
+    addedTimersRef.current[result.videoId] = window.setTimeout(() => {
+      setAddedVideoIds((current) => {
+        const next = new Set(current);
+        next.delete(result.videoId);
+        return next;
+      });
+      delete addedTimersRef.current[result.videoId];
+    }, 1000);
+    toast({ title: 'Added to queue', description: result.title });
     // Don't close anything - let user continue browsing/adding songs
   };
 
@@ -130,73 +247,106 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, resul
     ? videosToShow.length > 0 
     : (selectedChannel ? channelVideos.length > 0 : channels.length > 0);
 
-  return (
-    <div className="relative">
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder={activeTab === 'songs' ? "Search for songs..." : "Search for artists..."}
-            className="rounded-xl border-border bg-background/55 pl-10 text-base md:text-base"
-          />
-        </div>
-        <Button 
-          onClick={handleSearch} 
-          disabled={isLoading}
-          className="h-11"
-        >
-          {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
-        </Button>
-      </div>
+  useEffect(() => {
+    const addedTimers = addedTimersRef.current;
+    return () => {
+      const recognition = recognitionRef.current;
+      if (recognition) {
+        recognition.onresult = null;
+        recognition.onerror = null;
+        recognition.onend = null;
+        recognition.abort?.();
+      }
+      Object.values(addedTimers).forEach((timer) => window.clearTimeout(timer));
+    };
+  }, []);
 
-      {/* Tabs */}
-      <div className="flex gap-1 mt-2">
-        <button
-          onClick={() => handleTabChange('songs')}
-          className={cn(
-            'flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
-            activeTab === 'songs'
-              ? 'border-primary bg-primary text-primary-foreground'
-              : 'border-border bg-transparent text-muted-foreground hover:bg-[hsl(var(--surface)/0.7)] hover:text-foreground'
+  return (
+    <div className={cn('relative', fill && 'flex min-h-0 flex-1 flex-col')}>
+      <div className={cn(fill && 'sticky top-0 z-10 shrink-0 bg-[hsl(var(--surface))] pb-2')}>
+        <div className="flex gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              placeholder={activeTab === 'songs' ? "Search for songs..." : "Search for artists..."}
+              enterKeyHint="search"
+              inputMode="search"
+              className="rounded-xl border-border bg-background/55 pl-10 text-base md:text-base"
+            />
+          </div>
+          {canUseVoiceSearch && (
+            <Button
+              type="button"
+              variant={isListening ? 'secondary' : 'outline'}
+              size="icon"
+              onClick={handleVoiceSearch}
+              className="h-11 w-11 shrink-0 rounded-xl"
+              aria-label={isListening ? 'Stop voice search' : 'Start voice search'}
+              aria-pressed={isListening}
+              title={isListening ? 'Stop voice search' : 'Start voice search'}
+            >
+              <Mic className={cn('h-4 w-4', isListening && 'text-primary motion-safe:animate-pulse')} />
+            </Button>
           )}
-        >
-          <Music className="w-3.5 h-3.5" />
-          Songs
-        </button>
-        <button
-          onClick={() => handleTabChange('artists')}
-          className={cn(
-            'flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
-            activeTab === 'artists'
-              ? 'border-primary bg-primary text-primary-foreground'
-              : 'border-border bg-transparent text-muted-foreground hover:bg-[hsl(var(--surface)/0.7)] hover:text-foreground'
-          )}
-        >
-          <User className="w-3.5 h-3.5" />
-          Artists
-        </button>
-        <button
-          onClick={() => setKaraokeFilterEnabled(!karaokeFilterEnabled)}
-          title="Surface karaoke / instrumental versions first"
-          className={cn(
-            'ml-auto flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
-            karaokeFilterEnabled
-              ? 'border-primary/50 bg-primary/10 text-primary'
-              : 'border-border bg-transparent text-muted-foreground hover:bg-[hsl(var(--surface)/0.7)] hover:text-foreground'
-          )}
-        >
-          <Mic2 className="w-3.5 h-3.5" />
-          Karaoke
-        </button>
+          <Button
+            onClick={() => handleSearch()}
+            disabled={isLoading}
+            className="h-11 shrink-0"
+          >
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+          </Button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 mt-2">
+          <button
+            onClick={() => handleTabChange('songs')}
+            className={cn(
+              'flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+              activeTab === 'songs'
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-transparent text-muted-foreground hover:bg-[hsl(var(--surface)/0.7)] hover:text-foreground'
+            )}
+          >
+            <Music className="w-3.5 h-3.5" />
+            Songs
+          </button>
+          <button
+            onClick={() => handleTabChange('artists')}
+            className={cn(
+              'flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+              activeTab === 'artists'
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-transparent text-muted-foreground hover:bg-[hsl(var(--surface)/0.7)] hover:text-foreground'
+            )}
+          >
+            <User className="w-3.5 h-3.5" />
+            Artists
+          </button>
+          <button
+            onClick={() => setKaraokeFilterEnabled(!karaokeFilterEnabled)}
+            title="Surface karaoke / instrumental versions first"
+            className={cn(
+              'ml-auto flex min-h-11 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+              karaokeFilterEnabled
+                ? 'border-primary/50 bg-primary/10 text-primary'
+                : 'border-border bg-transparent text-muted-foreground hover:bg-[hsl(var(--surface)/0.7)] hover:text-foreground'
+            )}
+          >
+            <Mic2 className="w-3.5 h-3.5" />
+            Karaoke
+          </button>
+        </div>
       </div>
 
       {isOpen && (hasResults || isLoading || error || hasSearched) && (
         <div className={cn(
-          'scrollbar-karaoke z-50 mt-2 max-h-96 overflow-x-hidden overflow-y-auto rounded-xl border border-white/10 bg-[hsl(var(--surface))] pr-1 shadow-2xl',
-          resultsPlacement === 'popover' && 'absolute left-0 right-0 top-full'
+          'scrollbar-karaoke z-50 mt-2 overflow-x-hidden overflow-y-auto rounded-xl border border-white/10 bg-[hsl(var(--surface))] pr-1 shadow-2xl',
+          fill ? 'min-h-0 flex-1' : 'max-h-96',
+          resultsPlacement === 'popover' && !fill && 'absolute left-0 right-0 top-full'
         )}>
           <div className="p-2 flex justify-between items-center border-b border-border">
             {selectedChannel ? (
@@ -286,36 +436,44 @@ export const SongSearch: React.FC<SongSearchProps> = ({ onAddSong, userId, resul
             ))}
 
             {/* Show videos (either search results or channel videos) */}
-            {(activeTab === 'songs' || selectedChannel) && videosToShow.map((result) => (
-              <button
-                key={result.videoId}
-                onClick={() => handleAddSong(result)}
-                className={cn(
-                  'w-full flex items-center gap-3 p-2 rounded-lg transition-colors',
-                  'hover:bg-muted/50 text-left group'
-                )}
-              >
-                <img
-                  src={result.thumbnail}
-                  alt={result.title}
-                  className="w-16 h-12 object-cover rounded"
-                  loading="lazy"
-                  decoding="async"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{result.title}</p>
-                  <p className="text-xs text-primary font-medium truncate">
-                    {result.channelTitle}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground font-mono">
-                    {result.duration}
-                  </span>
-                  <Plus className="w-5 h-5 text-[hsl(var(--success))] opacity-0 transition-opacity group-hover:opacity-100" />
-                </div>
-              </button>
-            ))}
+            {(activeTab === 'songs' || selectedChannel) && videosToShow.map((result) => {
+              const isAdded = queueFeedback && addedVideoIds.has(result.videoId);
+
+              return (
+                <button
+                  key={result.videoId}
+                  onClick={() => handleAddSong(result)}
+                  className={cn(
+                    'w-full flex items-center gap-3 p-2 rounded-lg transition-colors',
+                    'hover:bg-muted/50 text-left group'
+                  )}
+                >
+                  <img
+                    src={result.thumbnail}
+                    alt={result.title}
+                    className="w-16 h-12 object-cover rounded"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{result.title}</p>
+                    <p className="text-xs text-primary font-medium truncate">
+                      {result.channelTitle}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {result.duration}
+                    </span>
+                    {isAdded ? (
+                      <Check className="w-5 h-5 text-[hsl(var(--success))] opacity-100 transition-opacity motion-reduce:transition-none" />
+                    ) : (
+                      <Plus className="w-5 h-5 text-[hsl(var(--success))] opacity-0 transition-opacity group-hover:opacity-100 motion-reduce:transition-none" />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
 
             {/* Loading state for channel videos */}
             {isLoading && selectedChannel && (
