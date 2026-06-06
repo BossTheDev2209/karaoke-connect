@@ -12,13 +12,14 @@ import { SingLyrics } from '@/components/SingLyrics';
 import { PlayerControls } from '@/components/PlayerControls';
 import { SongQueue } from '@/components/SongQueue';
 import { SongSearch } from '@/components/SongSearch';
+import { Playlists } from '@/components/Playlists';
 import { UserAvatars } from '@/components/ui/user-avatars';
 import { RoomCodeDisplay } from '@/components/RoomCodeDisplay';
 import { RoomSettings } from '@/components/RoomSettings';
 import { FloatingReactions, ReactionBar, ReactionPicker } from '@/components/Reactions';
 import { useReactions } from '@/hooks/useReactions';
 import { toast } from '@/hooks/use-toast';
-import { Captions, ChevronUp, Ellipsis, ListMusic, Loader2, LogOut, Maximize2, Mic2, Minimize2, Monitor, PanelRight, Pause, Play, Plus, QrCode, RefreshCw, Settings, SkipBack, SkipForward, Smartphone, Subtitles, Volume2, VolumeX } from 'lucide-react';
+import { Captions, ChevronUp, Ellipsis, Library, ListMusic, Loader2, LogOut, Maximize2, Mic2, Minimize2, Monitor, PanelRight, Pause, Play, Plus, QrCode, RefreshCw, Settings, SkipBack, SkipForward, Smartphone, Subtitles, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { expectedPosition, shouldCorrect } from '@/lib/playbackClock';
@@ -252,7 +253,7 @@ const Room = () => {
 
   const [stageMode, setStageMode] = useState<StageMode>('video');
   const [utilitySheetOpen, setUtilitySheetOpen] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<'queue' | 'lyrics'>('queue');
+  const [sidebarTab, setSidebarTab] = useState<'queue' | 'lyrics' | 'playlists'>('queue');
   const [showStageLyrics, setShowStageLyrics] = useState(true);
   const [cinema, setCinema] = useState(false);
   const [remoteCinema, setRemoteCinema] = useState(false);
@@ -449,7 +450,7 @@ const Room = () => {
         <SongSearch onAddSong={handleAddSong} userId={user.id} resultsPlacement="inline" />
       </div>
 
-      {/* Queue / Lyrics tabs */}
+      {/* Queue / Lyrics / Playlists tabs */}
       <div className="flex items-center gap-1 px-3 pt-3">
         <Button
           variant="ghost"
@@ -469,6 +470,15 @@ const Room = () => {
         >
           <Captions className="h-3.5 w-3.5" />
           Lyrics
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn('flex-1 rounded-full', sidebarTab === 'playlists' ? 'bg-white/10 text-foreground' : 'text-muted-foreground')}
+          onClick={() => setSidebarTab('playlists')}
+        >
+          <Library className="h-3.5 w-3.5" />
+          Playlists
         </Button>
       </div>
 
@@ -490,6 +500,10 @@ const Room = () => {
             onEnableCaptions={enableCaptions}
             onDisableCaptions={disableCaptions}
           />
+        </div>
+      ) : sidebarTab === 'playlists' ? (
+        <div className="min-h-0 flex-1 p-4">
+          <Playlists queue={queue} onQueueSongs={(songs) => updateQueue([...queue, ...songs])} />
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto p-4 scrollbar-karaoke">
