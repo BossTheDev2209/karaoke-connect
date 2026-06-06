@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { 
   Play, 
   Pause, 
@@ -55,10 +55,29 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   disabled = false,
   compact = false,
 }) => {
+  const [syncSpinning, setSyncSpinning] = useState(false);
+  const syncTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (syncTimerRef.current !== null) window.clearTimeout(syncTimerRef.current);
+    };
+  }, []);
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleSyncClick = () => {
+    onSync();
+    setSyncSpinning(true);
+    if (syncTimerRef.current !== null) window.clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = window.setTimeout(() => {
+      setSyncSpinning(false);
+      syncTimerRef.current = null;
+    }, 700);
   };
 
   const shownTime = disabled ? 0 : currentTime;
@@ -103,12 +122,12 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           <Button
             variant="ghost"
             size="icon"
-            onClick={onSync}
+            onClick={handleSyncClick}
             className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground"
             title="Sync with room"
             aria-label="Sync with room"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className={cn('h-4 w-4', syncSpinning && 'animate-spin motion-reduce:animate-none')} />
           </Button>
         </div>
 
@@ -129,16 +148,21 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
             onClick={onPlayPause}
             disabled={disabled}
             className={cn(
-              'flex items-center justify-center rounded-full p-0 shadow-lg shadow-primary/30 transition-transform duration-150 ease-out hover:scale-105 active:scale-90 motion-reduce:transition-none motion-reduce:hover:scale-100',
+              'flex items-center justify-center rounded-full p-0 shadow-lg shadow-primary/30 transition-transform duration-150 ease-out hover:scale-105 active:scale-90 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100',
               compact ? 'h-11 w-11' : 'h-14 w-14',
             )}
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
-            {isPlaying ? (
-              <Pause className={compact ? 'h-5 w-5' : 'h-6 w-6'} />
-            ) : (
-              <Play className={cn('ml-0.5', compact ? 'h-5 w-5' : 'h-6 w-6')} />
-            )}
+            <span
+              key={isPlaying ? 'pause' : 'play'}
+              className="flex animate-in fade-in zoom-in-75 duration-150 motion-reduce:animate-none"
+            >
+              {isPlaying ? (
+                <Pause className={compact ? 'h-5 w-5' : 'h-6 w-6'} />
+              ) : (
+                <Play className={cn('ml-0.5', compact ? 'h-5 w-5' : 'h-6 w-6')} />
+              )}
+            </span>
           </Button>
 
           <Button
